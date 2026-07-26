@@ -1,0 +1,1018 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sd:system-design
+    xmlns:sd="urn:sudoku:system-design:v4"
+    xmlns:ux="urn:sudoku:ux:v4"
+    xmlns:arch="urn:sudoku:architecture:v4"
+    xmlns:a11y="urn:sudoku:accessibility:v4"
+    xmlns:url="urn:sudoku:url-codec:v4"
+    xmlns:test="urn:sudoku:verification:v4"
+    xmlns:risk="urn:sudoku:risk:v4"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xml:id="sudoku-system-design-v4"
+    xml:lang="ko-KR"
+    version="4.0"
+    phase="1"
+    status="revision-proposed"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 1 System Design rev 4 제안본.
+    rev 3 검토에서 발견된 구현 차단·접근성·정합성 문제의 해결책을 본문에 통합했다.
+    사용자 승인 전까지 Phase 2의 불변 기준선이 아니다.
+
+    confidence 값:
+      verified   코드, 산식 또는 1차 기술 자료로 확인
+      reasoned   명세와 설계 원칙에서 도출
+      hypothesis 프로토타입·사용성 시험으로 검증 필요
+  -->
+
+  <sd:document-control xml:id="document-control">
+    <sd:title>Web Sudoku UI·상태·공유 설계</sd:title>
+    <sd:owner>codex-mhj</sd:owner>
+    <sd:baseline>
+      <sd:file>docs/sudoku-ui-system-design.xml</sd:file>
+      <sd:version>3.0</sd:version>
+      <sd:sha256>9FCAB6A7305C744AE188F5F5F29FFF06B86253D2D0458E958295ECF853417B96</sd:sha256>
+    </sd:baseline>
+    <sd:deliverable>
+      <sd:file>docs/codex-mhj_26_07_26_01_sudoku-ui-system-design.xml</sd:file>
+      <sd:scope>설계 문서만 포함하며 application code는 변경하지 않는다.</sd:scope>
+    </sd:deliverable>
+    <sd:approval-state current="awaiting-user-approval">
+      <sd:next-on-approval>Phase 2 — Macro Blocking</sd:next-on-approval>
+      <sd:prohibited-before-approval>Phase 2 확정 및 Phase 4 code implementation</sd:prohibited-before-approval>
+    </sd:approval-state>
+  </sd:document-control>
+
+  <sd:decision-register xml:id="decision-register">
+    <sd:locked-decisions>
+      <sd:decision xml:id="U1" topic="persistence" status="locked">
+        localStorage 전용이며 server-side persistence와 database model을 추가하지 않는다.
+      </sd:decision>
+      <sd:decision xml:id="U2" topic="frontend" status="locked">
+        Vanilla JavaScript를 유지하고 build tool을 도입하지 않는다.
+      </sd:decision>
+      <sd:decision xml:id="U3" topic="memo-scope" status="locked">
+        cell note와 row/column/box region note를 지원하고 puzzle-wide note는 제외한다.
+      </sd:decision>
+      <sd:decision xml:id="U4" topic="deliverable" status="locked">
+        현재 workflow의 산출물은 설계 문서이며 code implementation은 별도 승인 대상이다.
+      </sd:decision>
+      <sd:decision xml:id="U5" topic="url-state" status="locked">
+        URL fragment로 puzzle, progress, candidates, 선택적 notes를 유지·공유한다.
+      </sd:decision>
+    </sd:locked-decisions>
+
+    <sd:rev4-decisions status="proposed">
+      <sd:decision xml:id="V4-01" topic="url-envelope">
+        압축 여부와 format version은 압축되지 않은 outer envelope에 둔다.
+      </sd:decision>
+      <sd:decision xml:id="V4-02" topic="touch-detection">
+        TouchAdapter 자동 표시는 coarse pointer의 존재로 판단하고, 항상 접근 가능한 manual override를 둔다.
+      </sd:decision>
+      <sd:decision xml:id="V4-03" topic="mobile-region-note">
+        mobile Memo button은 cell/row/column/box target selector를 거치는 visible primary path다.
+      </sd:decision>
+      <sd:decision xml:id="V4-04" topic="focus-model">
+        note editor는 non-modal이며 focus trap을 사용하지 않는다. 실제 modal dialog만 focus를 가둔다.
+      </sd:decision>
+      <sd:decision xml:id="V4-05" topic="memo-marker">
+        dog-ear는 비대화형 표시다. 읽기·편집은 gridcell, Memo button, Notes list로 수행한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-06" topic="candidate-visual">
+        candidate font floor는 9px로 단일화하고 모든 candidate text contrast는 4.5:1 이상으로 한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-07" topic="bootstrap">
+        index view는 shell만 반환하며 session이 없을 때만 new-puzzle API를 호출한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-08" topic="persistence-flush">
+        300ms debounce 외에 pagehide와 hidden visibilitychange에서 pending write를 동기 flush한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-09" topic="url-integrity">
+        canonical uncompressed body의 CRC32를 envelope trailer에 저장한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-10" topic="url-merge">
+        URL share scope가 생략한 field는 삭제 명령이 아니다. notes conflict는 target 단위로 해결한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-11" topic="check-action">
+        모든 session에서 동일한 “규칙 확인”을 제공한다. solution 대조형 UI는 1차 범위에서 제외한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-12" topic="address-bar-sync">
+        1차 범위는 explicit snapshot만 구현하고 automatic address-bar sync는 제외한다.
+      </sd:decision>
+      <sd:decision xml:id="V4-13" topic="state-contract">
+        HistoryEntry, persistence validation·migration을 명시하고 API의 solution은 client state에 저장하지 않는다.
+      </sd:decision>
+    </sd:rev4-decisions>
+  </sd:decision-register>
+
+  <sd:revision-log xml:id="revision-log">
+    <sd:revision number="4" date="2026-07-26" status="proposed">
+      <sd:change-set>
+        <sd:change severity="blocker" ref="#V4-01">압축 flag 순환 의존을 외부 envelope로 제거했다.</sd:change>
+        <sd:change severity="high" ref="#V4-02">pointer: fine과 keyboard 존재를 연결하던 잘못된 전제를 제거했다.</sd:change>
+        <sd:change severity="high" ref="#V4-03">mobile region note 생성 경로를 완결했다.</sd:change>
+        <sd:change severity="high" ref="#V4-04">non-modal dialog와 focus trap의 모순을 제거했다.</sd:change>
+        <sd:change severity="high" ref="#V4-05">5~7px marker를 interaction target으로 사용하지 않게 했다.</sd:change>
+        <sd:change severity="high" ref="#V4-06">9px/10px floor와 3:1/4.5:1 contrast 충돌을 해소했다.</sd:change>
+        <sd:change severity="high" ref="#V4-07">server puzzle 생성 때문에 restore가 지연되는 bootstrap을 교체했다.</sd:change>
+        <sd:change severity="high" ref="#V4-08">debounce window의 마지막 변경 유실 경계를 닫았다.</sd:change>
+        <sd:change severity="high" ref="#V4-09">raw payload의 silent corruption 탐지 수단을 추가했다.</sd:change>
+        <sd:change severity="high" ref="#V4-10">notes 생략·병합·동일 target 충돌 의미를 정의했다.</sd:change>
+        <sd:change severity="high" ref="#V4-13">state, history, serialization, migration 계약의 구현 공백을 닫았다.</sd:change>
+        <sd:change severity="medium">rev 3에 남은 dvh, candidate mode, breakpoint, default-value 문구를 통일했다.</sd:change>
+        <sd:change severity="medium">P3 실행 순서와 property-based test 방향을 바로잡았다.</sd:change>
+      </sd:change-set>
+    </sd:revision>
+    <sd:revision number="3" date="2026-07-26" status="superseded">
+      mobile candidate flow, additive adapters, dynamic keyboard scaling, component ownership을 보강했다.
+    </sd:revision>
+    <sd:revision number="2" date="2026-07-26" status="superseded">
+      URL state, VisualViewport, savedAt, LEB128, sparse candidates, archive policy를 보강했다.
+    </sd:revision>
+    <sd:revision number="1" date="2026-07-26" status="superseded">
+      최초 System Design과 URL snapshot 설계다.
+    </sd:revision>
+  </sd:revision-log>
+
+  <!-- ========================================================== 1 -->
+  <sd:section xml:id="sec-01-executive-summary" order="1" name="executive-summary">
+    <sd:title>결론 요약</sd:title>
+    <ux:recommendation xml:id="recommendation-E" code="E" name="Additive Hybrid" recommended="true">
+      <ux:one-line>
+        domain state는 하나로 유지하고, keyboard input은 항상 활성화하며, touch controls는 coarse pointer 또는
+        manual override가 있을 때 보드 밖에 가산한다.
+      </ux:one-line>
+      <ux:platform name="desktop">
+        Cell First, number keys, Shift quasimode candidates, non-modal right notes rail을 사용한다.
+      </ux:platform>
+      <ux:platform name="touch">
+        Digit First와 Cell First를 함께 제공하고, candidate는 visible sticky toggle로 입력한다.
+      </ux:platform>
+      <ux:invariants>
+        <ux:invariant>BoardView 위에 persistent input 또는 note UI를 겹치지 않는다.</ux:invariant>
+        <ux:invariant>숨은 gesture는 accelerator일 뿐이며 visible equivalent가 항상 존재한다.</ux:invariant>
+        <ux:invariant>색상은 단독 상태 신호로 사용하지 않는다.</ux:invariant>
+        <ux:invariant>URL은 snapshot이고 localStorage session이 local canonical state다.</ux:invariant>
+        <ux:invariant>모바일 숫자 입력 때문에 software keyboard를 열지 않는다.</ux:invariant>
+      </ux:invariants>
+    </ux:recommendation>
+  </sd:section>
+
+  <!-- ========================================================== 2 -->
+  <sd:section xml:id="sec-02-problem" order="2" name="problem-definition">
+    <sd:title>문제 정의</sd:title>
+    <ux:problem>
+      핵심 문제는 UI element 수가 아니라 추론 중인 cell과 입력 장치 사이의 시선 왕복, mode memory,
+      refresh 후 상태 단절이다. 해법은 UI를 무조건 숨기는 것이 아니라 board area를 보존하면서 입력 경로를
+      platform capability에 맞게 배치하는 것이다.
+    </ux:problem>
+    <ux:goals>
+      <ux:goal xml:id="G-IMMERSION">보드 면적과 이웃 cell 가시성을 보존한다.</ux:goal>
+      <ux:goal xml:id="G-SPEED">desktop은 1 keystroke, touch는 digit activation 후 cell당 1 tap을 목표로 한다.</ux:goal>
+      <ux:goal xml:id="G-NOTES">cell·row·column·box notes를 생성하고 다시 찾을 수 있게 한다.</ux:goal>
+      <ux:goal xml:id="G-RECOVERY">모든 비파괴 조작을 단일 undo/redo history로 복구한다.</ux:goal>
+      <ux:goal xml:id="G-PERSIST">reload, tab close, explicit share에서 상태 무결성을 유지한다.</ux:goal>
+      <ux:goal xml:id="G-A11Y">keyboard, screen reader, coarse pointer 경로를 동등하게 제공한다.</ux:goal>
+    </ux:goals>
+    <ux:non-goals>
+      <ux:non-goal>server persistence, account, ranking</ux:non-goal>
+      <ux:non-goal>AI hints, technique explanation, voice notes</ux:non-goal>
+      <ux:non-goal>12x12·16x16 UI</ux:non-goal>
+      <ux:non-goal>timer and statistics</ux:non-goal>
+    </ux:non-goals>
+  </sd:section>
+
+  <!-- ========================================================== 3 -->
+  <sd:section xml:id="sec-03-research" order="3" name="research-findings">
+    <sd:title>조사 결과와 적용 범위</sd:title>
+    <sd:finding xml:id="R1" confidence="verified">
+      <sd:source xlink:type="simple" xlink:href="https://www.sudoku9x9.com/manual/">sudoku9x9 User Manual</sd:source>
+      <sd:observation>Digit First와 Cell First가 서로 다른 scan strategy를 지원한다.</sd:observation>
+      <sd:decision>TouchAdapter는 둘을 자동 전환 가능한 동등 경로로 제공한다.</sd:decision>
+    </sd:finding>
+    <sd:finding xml:id="R2" confidence="verified">
+      <sd:source xlink:type="simple" xlink:href="https://www.7sudoku.com/instructions/entering-numbers">7sudoku pencil marks</sd:source>
+      <sd:observation>Shift를 누른 동안 candidate를 입력하는 실제 service pattern이 존재한다.</sd:observation>
+      <sd:decision>Shift quasimode는 physical keyboard 전용이며 touch에는 적용하지 않는다.</sd:decision>
+    </sd:finding>
+    <sd:finding xml:id="R3" confidence="verified">
+      <sd:source xlink:type="simple" xlink:href="https://www.w3.org/WAI/ARIA/apg/patterns/grid/">WAI-ARIA APG Grid</sd:source>
+      <sd:observation>Grid는 한 element만 page tab sequence에 두고 arrow keys로 내부 focus를 이동한다.</sd:observation>
+      <sd:decision>81 inputs를 focusable gridcells와 roving tabindex로 교체한다.</sd:decision>
+    </sd:finding>
+    <sd:finding xml:id="R4" confidence="verified">
+      <sd:source xlink:type="simple" xlink:href="https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport">MDN VisualViewport</sd:source>
+      <sd:observation>On-screen keyboard는 layout viewport를 유지한 채 visual viewport를 줄일 수 있다.</sd:observation>
+      <sd:decision>Keyboard-open geometry는 VisualViewport가 primary source이고 dvh는 browser chrome 대응용 보조다.</sd:decision>
+    </sd:finding>
+    <sd:finding xml:id="R5" confidence="verified">
+      <sd:source xlink:type="simple" xlink:href="https://www.w3.org/TR/mediaqueries-5/">Media Queries Level 5</sd:source>
+      <sd:observation>pointer는 pointing device만 설명하며 keyboard 존재를 판정하지 않는다.</sd:observation>
+      <sd:decision>fine pointer를 keyboard의 proxy로 사용하지 않는다.</sd:decision>
+    </sd:finding>
+    <sd:finding xml:id="R6" confidence="reasoned">
+      <sd:source xlink:type="simple" xlink:href="https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html">WCAG 2.2 Target Size</sd:source>
+      <sd:observation>Primary touch target은 24x24 CSS px 이상이어야 하며 큰 target이 바람직하다.</sd:observation>
+      <sd:decision>5~7px dog-ear는 indicator로만 사용하고 interaction은 큰 equivalent controls로 제공한다.</sd:decision>
+    </sd:finding>
+    <sd:finding xml:id="R7" confidence="verified">
+      <sd:source xlink:type="simple" xlink:href="https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html">WCAG 2.2 Contrast</sd:source>
+      <sd:observation>작은 일반 text는 4.5:1 contrast가 필요하다.</sd:observation>
+      <sd:decision>Candidate digits도 light·dark theme 모두 4.5:1 이상으로 한다.</sd:decision>
+    </sd:finding>
+  </sd:section>
+
+  <!-- ========================================================== 4 -->
+  <sd:section xml:id="sec-04-audit" order="4" name="assumption-audit">
+    <sd:title>가정 감사</sd:title>
+    <sd:audit-table>
+      <sd:item assumption="board-only" verdict="conditional">
+        Desktop에서는 유지하되 touch portrait의 board 아래 공간에는 controls를 배치한다.
+      </sd:item>
+      <sd:item assumption="hidden-ui-equals-immersion" verdict="rejected">
+        Immersion 지표를 element count가 아니라 board area와 gaze cost로 정의한다.
+      </sd:item>
+      <sd:item assumption="one-input-mode" verdict="rejected">
+        KeyboardAdapter와 TouchAdapter는 additive이며 mutually exclusive하지 않다.
+      </sd:item>
+      <sd:item assumption="candidate-toggle-is-universal" verdict="rejected">
+        Desktop은 Shift quasimode, touch는 visible sticky toggle을 사용한다.
+      </sd:item>
+      <sd:item assumption="marker-is-control" verdict="rejected">
+        Marker는 display-only이고 interaction은 cell, Memo button, Notes list가 담당한다.
+      </sd:item>
+      <sd:item assumption="server-puzzle-can-be-discarded-later" verdict="rejected">
+        Server-side generation은 HTML response 전에 발생하므로 index를 shell render로 바꾼다.
+      </sd:item>
+      <sd:item assumption="compressed-header-is-self-describing" verdict="rejected">
+        Codec selector를 outer envelope로 이동한다.
+      </sd:item>
+      <sd:item assumption="debounce-alone-is-durable" verdict="rejected">
+        Lifecycle flush를 추가한다.
+      </sd:item>
+    </sd:audit-table>
+  </sd:section>
+
+  <!-- ========================================================== 5 -->
+  <sd:section xml:id="sec-05-alternatives" order="5" name="alternatives">
+    <sd:title>대안 비교</sd:title>
+    <ux:alternative code="A" name="Gesture and Keyboard Only" viable="false">
+      <ux:benefit>Desktop expert throughput가 높다.</ux:benefit>
+      <ux:risk severity="fatal">Touch discovery와 number input path가 부족하다.</ux:risk>
+    </ux:alternative>
+    <ux:alternative code="B" name="Cell Popover" viable="false">
+      <ux:benefit>시선과 입력 위치가 가깝다.</ux:benefit>
+      <ux:risk severity="fatal">Neighbor cells를 가리고 edge placement가 불안정하다.</ux:risk>
+    </ux:alternative>
+    <ux:alternative code="C" name="Persistent Touch Bar" viable="partial">
+      <ux:benefit>Touch discovery와 target size가 좋다.</ux:benefit>
+      <ux:risk severity="medium">Desktop에서는 vertical space를 낭비한다.</ux:risk>
+    </ux:alternative>
+    <ux:alternative code="D" name="Margin Notes" viable="partial">
+      <ux:benefit>Board를 가리지 않고 notes 재탐색이 쉽다.</ux:benefit>
+      <ux:risk severity="blocking">Number input을 해결하지 않는다.</ux:risk>
+    </ux:alternative>
+    <ux:alternative code="E" name="Additive Hybrid" viable="true" recommended="true">
+      <ux:composition>A keyboard path + C touch controls + D notes</ux:composition>
+      <ux:risk severity="medium">두 input adapter를 유지해야 한다.</ux:risk>
+      <ux:mitigation>Store와 domain rules는 한 벌로 유지하고 adapter만 분리한다.</ux:mitigation>
+    </ux:alternative>
+  </sd:section>
+
+  <!-- ========================================================== 6 -->
+  <sd:section xml:id="sec-06-matrix" order="6" name="evaluation-matrix">
+    <sd:title>평가 매트릭스</sd:title>
+    <ux:matrix scale="1-5" weight-total="44" max-score="220">
+      <ux:criterion code="C1" name="Immersion" weight="5" A="5" B="4" C="3" D="3" E="5"/>
+      <ux:criterion code="C2" name="Input speed" weight="5" A="3" B="3" C="4" D="2" E="5"/>
+      <ux:criterion code="C3" name="Memo discovery" weight="5" A="1" B="4" C="5" D="4" E="4"/>
+      <ux:criterion code="C4" name="Memo review" weight="4" A="2" B="3" C="3" D="5" E="5"/>
+      <ux:criterion code="C5" name="Mobile keyboard behavior" weight="4" A="1" B="2" C="3" D="2" E="4"/>
+      <ux:criterion code="C6" name="Desktop keyboard efficiency" weight="4" A="5" B="2" C="3" D="3" E="5"/>
+      <ux:criterion code="C7" name="Mistake prevention and recovery" weight="4" A="3" B="3" C="4" D="3" E="4"/>
+      <ux:criterion code="C8" name="Accessibility" weight="4" A="3" B="2" C="4" D="4" E="5"/>
+      <ux:criterion code="C9" name="Learning cost" weight="3" A="1" B="4" C="5" D="4" E="4"/>
+      <ux:criterion code="C10" name="Implementation simplicity" weight="3" A="4" B="2" C="4" D="3" E="2"/>
+      <ux:criterion code="C11" name="Extensibility" weight="3" A="2" B="3" C="4" D="5" E="4"/>
+      <ux:totals A="122" B="130" C="167" D="149" E="192" winner="E"/>
+    </ux:matrix>
+    <sd:note>
+      rev 3의 E/C7 점수를 5에서 4로 낮췄다. Touch candidate는 sticky toggle이므로 mode error가 구조적으로
+      제거되지 않는다. 순위는 변하지 않는다.
+    </sd:note>
+  </sd:section>
+
+  <!-- ========================================================== 7 -->
+  <sd:section xml:id="sec-07-ui" order="7" name="recommended-ui">
+    <sd:title>권장 UI 구조</sd:title>
+    <ux:layer-model>
+      <ux:layer z="0" name="board">Grid와 board highlights</ux:layer>
+      <ux:layer z="1" name="input-adapter">Board 밖의 touch controls</ux:layer>
+      <ux:layer z="2" name="notes">Desktop rail 또는 mobile sheet</ux:layer>
+      <ux:layer z="3" name="transient">Toast와 modal dialogs</ux:layer>
+      <ux:rule>z=1과 z=2는 board rectangle과 겹치지 않는다.</ux:rule>
+      <ux:rule>z=3 modal은 명시적 user action으로만 열고 외부 interaction을 inert 처리한다.</ux:rule>
+      <ux:rule>Toast는 board 밖에 두고 focus를 이동하지 않는다.</ux:rule>
+    </ux:layer-model>
+
+    <ux:states>
+      <ux:state code="ST0" name="Idle">선택 없음. Desktop hint strip은 최초 3회만 표시한다.</ux:state>
+      <ux:state code="ST1" name="Selected">Cell, peers, same digit를 비색상 신호와 함께 강조한다.</ux:state>
+      <ux:state code="ST2" name="Value entry">Value를 즉시 반영하고 history group을 기록한다.</ux:state>
+      <ux:state code="ST3" name="Candidate entry">Desktop Shift-held 또는 sticky candidate 상태다.</ux:state>
+      <ux:state code="ST4" name="Note edit">대상은 강조되고 editor는 board 밖에 유지된다.</ux:state>
+      <ux:state code="ST5" name="Note review">Notes list와 board target이 양방향으로 강조된다.</ux:state>
+      <ux:state code="ST6" name="Share">Modal share dialog에서 scope와 길이를 확인한다.</ux:state>
+    </ux:states>
+
+    <ux:wireframe xml:id="wf-mobile" platform="mobile" state="ST1" viewport="390x768" xml:space="preserve"><![CDATA[
+┌──────────────────────────────────────┐
+│ 스도쿠                         [?][⋯]│ 48px
+├──────────────────────────────────────┤
+│                                      │
+│           374 x 374 board            │
+│                                      │
+├──────────────────────────────────────┤
+│ 선택 대상·메모 상태 요약             │ flexible
+├──────────────────────────────────────┤
+│  1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ 60px
+│ each target = 374/9 = 41.56px, gap 0 │
+├──────────────────────────────────────┤
+│ 연필 │ 지움 │ 실행취소 │ 메모         │ 56px
+└──────────────────────────────────────┘
+    ]]></ux:wireframe>
+
+    <ux:wireframe xml:id="wf-note-target" platform="mobile" state="ST4" xml:space="preserve"><![CDATA[
+┌──────────────────────────────────────┐
+│ 메모 대상                            │
+│ [현재 셀] [현재 행] [현재 열] [현재 박스] │ each >= 48px high
+└──────────────────────────────────────┘
+선택 후 header를 접고 NotesSheet editor를 software keyboard 바로 위에 둔다.
+    ]]></ux:wireframe>
+
+    <ux:keyboard-open-layout>
+      <ux:formula><![CDATA[
+visibleTop    = visualViewport?.offsetTop ?? 0
+visibleHeight = visualViewport?.height ?? document.documentElement.clientHeight
+reserved      = noteEditorHeight(56) + breathingSpace(16)
+available     = max(0, visibleHeight - reserved)
+boardScale    = min(1, available / boardWidth)
+      ]]></ux:formula>
+      <ux:rule>편집 surface의 top은 visual viewport 좌표계의 visibleTop에 맞춘다.</ux:rule>
+      <ux:rule>resize와 scroll을 관찰하고 최신 geometry를 requestAnimationFrame 1회로 합친다.</ux:rule>
+      <ux:rule>pinch zoom 중에는 scale 값을 읽어 layout coordinate와 visual coordinate를 혼동하지 않는다.</ux:rule>
+      <ux:rule>Editor 종료 시 boardScale을 1로 복원한다. reduced-motion에서는 transition을 생략한다.</ux:rule>
+    </ux:keyboard-open-layout>
+  </sd:section>
+
+  <!-- ========================================================== 8 -->
+  <sd:section xml:id="sec-08-interactions" order="8" name="interaction-specification">
+    <sd:title>상세 Interaction</sd:title>
+
+    <ux:scenario xml:id="S1" platform="keyboard" name="Value entry">
+      <ux:step n="1">Click 또는 arrow key로 editable cell을 선택한다.</ux:step>
+      <ux:step n="2">1..9는 value를 set 또는 toggle하며 own candidates를 제거한다.</ux:step>
+      <ux:step n="3">다른 value 입력은 replace한다.</ux:step>
+      <ux:step n="4">0, Backspace, Delete는 value 또는 candidates를 제거한다.</ux:step>
+      <ux:guard>Given cell의 mutation은 거부하고 polite status로 한 번 알린다.</ux:guard>
+    </ux:scenario>
+
+    <ux:scenario xml:id="S2" platform="keyboard" name="Candidate entry">
+      <ux:primary>Shift held + Digit1..Digit9 또는 Numpad1..Numpad9</ux:primary>
+      <ux:key-detection>
+        Digit은 event.code를 우선하고 event.key 1..9를 fallback으로 사용한다. Candidate 여부는 event.shiftKey다.
+      </ux:key-detection>
+      <ux:layout-risk>AZERTY에서 Shift가 digit 입력 자체에 필요하므로 quasimode가 충돌할 수 있다.</ux:layout-risk>
+      <ux:mitigation>Space sticky toggle, setting의 shiftQuasimode=false, help text를 동등 primary path로 제공한다.</ux:mitigation>
+      <ux:assistive-technology>
+        Shift-held 상태는 반복 live announcement를 하지 않는다. Sticky toggle만 on/off를 한 번 알린다.
+      </ux:assistive-technology>
+    </ux:scenario>
+
+    <ux:scenario xml:id="S3" platform="desktop" name="Non-modal note editor">
+      <ux:open>N은 selected cell note를 연다. Shift+N은 row/column/box selector를 연다.</ux:open>
+      <ux:focus>
+        Textarea로 초기 focus를 옮기지만 focus trap은 사용하지 않는다. Tab은 textarea, Save, Cancel 이후
+        문서의 다음 focusable element로 이동한다.
+      </ux:focus>
+      <ux:keyboard>Editor descendant가 focus를 가진 동안 board shortcuts를 해석하지 않는다.</ux:keyboard>
+      <ux:save>Ctrl+Enter 또는 Save button으로 저장한다. Enter는 textarea newline이다.</ux:save>
+      <ux:cancel>Escape 또는 Cancel button으로 취소하며 dirty draft일 때만 confirmation modal을 연다.</ux:cancel>
+      <ux:return-focus>Save 또는 Cancel 후 originating gridcell로 focus를 복귀한다.</ux:return-focus>
+    </ux:scenario>
+
+    <ux:scenario xml:id="S4" platform="touch" name="Digit First and Cell First">
+      <ux:step n="1">Digit tap은 activeDigit을 set한다. 같은 digit 재탭은 clear한다.</ux:step>
+      <ux:step n="2">activeDigit이 있으면 editable cell tap으로 set, toggle, replace한다.</ux:step>
+      <ux:step n="3">activeDigit이 없으면 cell을 select하고 다음 digit tap으로 set한다.</ux:step>
+      <ux:guard>Given cell tap은 mutation하지 않는다.</ux:guard>
+    </ux:scenario>
+
+    <ux:scenario xml:id="S5" platform="touch" name="Candidate sticky mode">
+      <ux:step n="1">Pencil button으로 candidateSticky를 toggle한다.</ux:step>
+      <ux:step n="2">Digit을 선택하고 cell을 tap해 해당 bit를 toggle한다.</ux:step>
+      <ux:feedback>Pressed pencil shape, dashed board outline, text badge를 함께 표시한다.</ux:feedback>
+      <ux:recovery>모든 toggle은 undo 가능하며 자동 timeout 해제는 하지 않는다.</ux:recovery>
+    </ux:scenario>
+
+    <ux:scenario xml:id="S6" platform="touch" name="Cell and region notes">
+      <ux:primary-path>
+        Memo button을 누르면 현재 selection을 기준으로 Cell, Row, Column, Box 네 target button을 표시한다.
+        선택된 target의 existing note가 있으면 draft에 채운다.
+      </ux:primary-path>
+      <ux:accelerator>Editable cell 400ms long press는 Cell target editor를 바로 연다.</ux:accelerator>
+      <ux:haptic>navigator.vibrate가 지원되는 경우에만 best-effort 10ms feedback을 사용한다.</ux:haptic>
+      <ux:editing>Save와 Cancel을 명시적으로 제공한다. Keyboard dismissal은 draft를 삭제하거나 자동 저장하지 않는다.</ux:editing>
+      <ux:list-path>Selection이 없을 때 Memo button은 Notes list를 연다.</ux:list-path>
+    </ux:scenario>
+
+    <ux:scenario xml:id="S7" platform="shared" name="Note review">
+      <ux:marker>Dog-ear와 region tick은 pointer-events:none인 display-only indicator다.</ux:marker>
+      <ux:desktop>Focused gridcell의 accessible name에 “메모 있음”을 포함하고 N 또는 Notes rail card로 연다.</ux:desktop>
+      <ux:mobile>Memo button 또는 Notes list에서 target을 선택한다. 5~7px marker를 직접 tap하지 않는다.</ux:mobile>
+    </ux:scenario>
+
+    <ux:scenario xml:id="S8" platform="shared" name="Undo and redo">
+      <ux:undo>Ctrl+Z 또는 touch Undo. Value, candidates, notes를 하나의 history에 기록한다.</ux:undo>
+      <ux:redo>Ctrl+Shift+Z 또는 Ctrl+Y.</ux:redo>
+      <ux:grouping>자동 candidate 제거는 value mutation과 같은 groupId로 묶는다.</ux:grouping>
+      <ux:depth>200 groups</ux:depth>
+      <ux:destructive>New Game, Clear All, Delete All Notes만 confirmation modal을 사용한다.</ux:destructive>
+    </ux:scenario>
+
+    <ux:domain-rules>
+      <ux:rule code="CF1" default="on">Duplicate value는 허용하되 underline과 color를 함께 표시한다.</ux:rule>
+      <ux:rule code="CF2" default="off">Solution과 즉시 대조하지 않는다.</ux:rule>
+      <ux:rule code="CF3">Peer value와 같은 candidate도 사용자가 원하면 기록할 수 있다.</ux:rule>
+      <ux:rule code="CF4" default="on">Value set 시 peers의 같은 candidate를 제거하고 한 번에 undo한다.</ux:rule>
+      <ux:terminology>
+        “자동 후보 계산”은 default off, “입력값에 따른 candidate 제거”는 default on으로 구분한다.
+      </ux:terminology>
+    </ux:domain-rules>
+  </sd:section>
+
+  <!-- ========================================================== 9 -->
+  <sd:section xml:id="sec-09-responsive" order="9" name="responsive-specification">
+    <sd:title>Responsive·Input Adapter 설계</sd:title>
+    <ux:viewport-contract>
+      <ux:required-markup><![CDATA[
+<meta name="viewport" content="width=device-width, initial-scale=1">
+      ]]></ux:required-markup>
+      <ux:rule>100vh는 사용하지 않는다. Browser chrome layout에는 dvh/svh를 사용한다.</ux:rule>
+      <ux:rule>On-screen keyboard layout에는 VisualViewport height와 offsetTop을 사용한다.</ux:rule>
+      <ux:rule>Bottom controls에는 env(safe-area-inset-bottom)을 더한다.</ux:rule>
+    </ux:viewport-contract>
+
+    <ux:adapter-policy>
+      <ux:keyboard>KeyboardAdapter는 viewport와 media query에 무관하게 항상 활성이다.</ux:keyboard>
+      <ux:touch-auto-query><![CDATA[
+@media (pointer: coarse), (any-pointer: coarse) { /* show TouchAdapter */ }
+      ]]></ux:touch-auto-query>
+      <ux:manual-setting values="auto show hide">touchControls setting</ux:manual-setting>
+      <ux:resolution-order>
+        touchControls=show는 media query와 무관하게 표시하고, hide는 controls 본체를 숨기며,
+        auto일 때만 coarse-pointer query 결과를 따른다.
+      </ux:resolution-order>
+      <ux:safety>
+        hide 상태에서도 44x44 이상 expand handle을 남긴다. 따라서 잘못된 media query나 분리형 keyboard 제거 후에도
+        touch controls를 복구할 수 있다.
+      </ux:safety>
+    </ux:adapter-policy>
+
+    <ux:breakpoints>
+      <ux:breakpoint name="wide" min-width="1024px">
+        Board는 min(70dvh, 640px)로 시작한다. TouchAdapter가 보이면 board 아래 중앙 또는 landscape right rail에 둔다.
+        Notes rail 280px을 확보할 수 없으면 board를 줄여 adjacent drawer를 만들며 overlay하지 않는다.
+        48px cell floor가 불가능한 낮은 viewport에서는 board floor를 강제하지 않고 vertical scroll과 readability QA를 사용한다.
+      </ux:breakpoint>
+      <ux:breakpoint name="medium" min-width="600px" max-width="1023px">
+        TouchAdapter 표시 여부는 media policy를 따르고, 표시 시 portrait bottom 또는 landscape right에 배치한다.
+        Notes는 bottom sheet다.
+      </ux:breakpoint>
+      <ux:breakpoint name="narrow" max-width="599px">
+        Portrait board width는 calc(100vw - 16px)다. Number targets는 board width를 9등분하고 gap을 두지 않는다.
+        Landscape는 board를 왼쪽, 3x3 digit pad와 tools를 오른쪽에 둔다.
+      </ux:breakpoint>
+    </ux:breakpoints>
+  </sd:section>
+
+  <!-- ========================================================= 10 -->
+  <sd:section xml:id="sec-10-visual" order="10" name="visual-design">
+    <sd:title>Visual Design Tokens</sd:title>
+    <ux:grid-lines>
+      <ux:line role="outer" width="3px"/>
+      <ux:line role="box" width="2px"/>
+      <ux:line role="cell" width="1px"/>
+    </ux:grid-lines>
+    <ux:number-tiers>
+      <ux:tier role="given" size="52% of cell" weight="600" non-color-cue="background and weight"/>
+      <ux:tier role="user-value" size="52% of cell" weight="400" non-color-cue="transparent background"/>
+      <ux:tier role="candidate" size="max(9px, 24cqi)" weight="400" min-contrast="4.5:1"/>
+    </ux:number-tiers>
+    <ux:candidate-css><![CDATA[
+.cell {
+  container-type: inline-size;
+}
+.candidate {
+  font-size: 9px;
+  font-size: max(9px, 24cqi);
+}
+    ]]></ux:candidate-css>
+    <ux:target-sizing>
+      <ux:digit-button width="board-width / 9" height="48px" gap="0"/>
+      <ux:tool-button min-width="48px" min-height="48px" gap="4px"/>
+      <ux:marker interactive="false" cell-size="7px" region-size="5px"/>
+    </ux:target-sizing>
+    <ux:state-cues>
+      <ux:cue state="selected">2px solid outline + background</ux:cue>
+      <ux:cue state="candidate-mode">2px dashed outline + text badge</ux:cue>
+      <ux:cue state="conflict">2px underline + semantic color</ux:cue>
+      <ux:cue state="memo-present">dog-ear shape + accessible name text</ux:cue>
+      <ux:cue state="focus">2px visible focus ring</ux:cue>
+    </ux:state-cues>
+    <ux:themes>
+      <ux:theme name="light" source="CSS custom properties"/>
+      <ux:theme name="dark" source="prefers-color-scheme"/>
+      <ux:contrast>본문, value, candidate 모두 normal-size text 기준 4.5:1 이상이다.</ux:contrast>
+    </ux:themes>
+    <ux:motion max-duration="180ms">
+      prefers-reduced-motion: reduce에서는 duration을 0ms로 한다.
+    </ux:motion>
+  </sd:section>
+
+  <!-- ========================================================= 11 -->
+  <sd:section xml:id="sec-11-accessibility" order="11" name="accessibility">
+    <sd:title>Accessibility</sd:title>
+    <a11y:grid-semantics>
+      <a11y:structure><![CDATA[
+<div role="grid" aria-label="스도쿠 9x9 퍼즐">
+  <div role="row">
+    <div role="gridcell" aria-rowindex="1" aria-colindex="1" tabindex="0"></div>
+  </div>
+</div>
+      ]]></a11y:structure>
+      <a11y:roving-tabindex>현재 cell만 0이고 나머지는 -1이다.</a11y:roving-tabindex>
+      <a11y:cell-label>
+        행, 열, value/given 여부, candidates, conflict, memo presence를 한 문장으로 제공한다.
+      </a11y:cell-label>
+    </a11y:grid-semantics>
+
+    <a11y:keymap>
+      <a11y:key combo="Arrow keys">한 cell 이동</a11y:key>
+      <a11y:key combo="Ctrl+Arrow keys">한 box 이동</a11y:key>
+      <a11y:key combo="Home / End">현재 row 처음 / 끝</a11y:key>
+      <a11y:key combo="Ctrl+Home / Ctrl+End">board 처음 / 끝</a11y:key>
+      <a11y:key combo="1..9">value</a11y:key>
+      <a11y:key combo="Shift+1..9">candidate quasimode</a11y:key>
+      <a11y:key combo="Space">candidate sticky toggle</a11y:key>
+      <a11y:key combo="N">cell note</a11y:key>
+      <a11y:key combo="Shift+N">region note selector</a11y:key>
+      <a11y:key combo="M">Notes rail 또는 list</a11y:key>
+      <a11y:key combo="Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y">undo / redo</a11y:key>
+      <a11y:key combo="? / F1">help dialog</a11y:key>
+    </a11y:keymap>
+
+    <a11y:focus-model>
+      <a11y:non-modal name="Notes editor">
+        Initial focus와 return focus는 관리하지만 Tab을 가두지 않고 aria-modal을 사용하지 않는다.
+      </a11y:non-modal>
+      <a11y:modal name="Confirm, conflict, help, share">
+        role=dialog, aria-modal=true, inert background, contained tab sequence, Escape close, return focus를 적용한다.
+      </a11y:modal>
+      <a11y:marker>Marker 자체는 focusable하지 않다.</a11y:marker>
+    </a11y:focus-model>
+
+    <a11y:live-region politeness="polite">
+      Sticky mode change, undo/redo, note save/delete, rejected given mutation, completion, link copy,
+      session restore/archive만 알린다. 각 digit input은 알리지 않는다.
+    </a11y:live-region>
+
+    <a11y:touch-targets>
+      Gridcell은 narrow viewport에서 약 38~42px이다. 별도 controls는 48px 이상을 우선한다.
+      Display-only marker의 기능은 Memo button과 Notes list라는 48px equivalent path로 제공한다.
+    </a11y:touch-targets>
+  </sd:section>
+
+  <!-- ========================================================= 12 -->
+  <sd:section xml:id="sec-12-architecture" order="12" name="implementation-model">
+    <sd:title>Implementation Model</sd:title>
+    <arch:current-state confidence="verified">
+      <arch:file path="game/views.py">index와 new_puzzle이 request마다 puzzle과 solution을 생성한다.</arch:file>
+      <arch:file path="game/templates/game/index.html">viewport meta가 없다.</arch:file>
+      <arch:file path="game/static/game/js/game.js">81 input elements와 DOM-only state를 사용한다.</arch:file>
+      <arch:file path="game/models.py">application model이 없다.</arch:file>
+      <arch:file path="game/sudoku/spec.py">9, 12, 16 geometry를 지원한다.</arch:file>
+    </arch:current-state>
+
+    <arch:bootstrap xml:id="bootstrap-v4" critical="true">
+      <arch:server-rule>index는 puzzle generation 없이 HTML shell과 static assets만 반환한다.</arch:server-rule>
+      <arch:sequence><![CDATA[
+1. Render inert skeleton.
+2. Parse #s= fragment if present.
+3. Decode and validate URL snapshot.
+4. Read sudoku:v1:session.
+5. Resolve URL/local conflict using section 15 rules.
+6. If adopted session exists, render it.
+7. Otherwise GET /api/new-puzzle/ and create a new session.
+8. Enable BoardView and adapters.
+9. Remove consumed fragment with history.replaceState.
+      ]]></arch:sequence>
+      <arch:failure>URL decode failure는 local session 또는 new puzzle flow로 복구하며 blank page를 만들지 않는다.</arch:failure>
+    </arch:bootstrap>
+
+    <arch:state-shape><![CDATA[
+GameSession {
+  schemaVersion: number,
+  puzzleId: string,                  // cache key; equality uses givens bytes
+  dim: 9,
+  givens: Uint8Array(81),
+  values: Uint8Array(81),
+  candidates: Uint16Array(81),
+  cellNotes: Record<number, string>,
+  regionNotes: Record<"r0".."r8" | "c0".."c8" | "b0".."b8", string>,
+  createdAt: number,
+  updatedAt: number
+}
+
+UiState {
+  selection: number | null,
+  activeDigit: number | null,
+  candidateHeld: boolean,
+  candidateSticky: boolean,
+  editor: null | { targetKind, targetKey, draft, dirty },
+  dialog: null | { kind, payload },
+  notesOpen: boolean,
+  boardScale: number
+}
+
+Settings {
+  schemaVersion: number,
+  autoRemoveCandidates: boolean,     // true
+  showConflicts: boolean,            // true
+  shiftQuasimode: boolean,           // true
+  touchControls: "auto" | "show" | "hide",
+  hintStripSeenCount: number
+}
+
+HistoryEntry {
+  kind: "value" | "candidates" | "cellNote" | "regionNote",
+  key: number | string,
+  before: number | string,
+  after: number | string,
+  groupId: number,
+  at: number
+}
+    ]]></arch:state-shape>
+
+    <arch:api-contract>
+      기존 GET /api/new-puzzle/ response shape는 변경하지 않는다. Response의 solution은 호환성을 위해 남지만
+      rev 4 client는 이를 GameSession, localStorage, URL에 저장하거나 “규칙 확인”에 사용하지 않는다.
+    </arch:api-contract>
+
+    <arch:persistence>
+      <arch:key name="sudoku:v1:session">active session</arch:key>
+      <arch:key name="sudoku:v1:archive">previous session, one slot</arch:key>
+      <arch:key name="sudoku:v1:settings">settings</arch:key>
+      <arch:write-policy>
+        Mutation마다 updatedAt을 갱신하고 300ms trailing debounce로 localStorage에 쓴다.
+      </arch:write-policy>
+      <arch:serialization>
+        Typed arrays는 고정 길이 JSON number arrays로 serialize한다. Restore 시 schemaVersion, 배열 길이,
+        element integer range, note key와 text type을 전부 검사한 뒤에만 typed arrays로 복원한다.
+      </arch:serialization>
+      <arch:lifecycle-flush>
+        pagehide와 visibilitychange의 hidden 전환에서 timer를 취소하고 현재 Store state를 동기 serialize하여
+        즉시 localStorage에 쓴다.
+        beforeunload prompt에 의존하지 않는다.
+      </arch:lifecycle-flush>
+      <arch:migration>
+        알려진 이전 schemaVersion만 순차 migrate한다. 미래 version 또는 validation 실패 state는 적용하지 않고
+        사용자에게 복원 실패를 알린 뒤 new-puzzle flow로 간다. History와 UiState는 persistence 대상이 아니다.
+      </arch:migration>
+      <arch:failure-policy>
+        Quota 또는 security exception은 한 번 알리고 in-memory mode로 계속한다. 저장 성공을 거짓으로 표시하지 않는다.
+      </arch:failure-policy>
+    </arch:persistence>
+
+    <arch:components>
+      <arch:component name="SudokuStore">Domain state, mutation API, grouped history</arch:component>
+      <arch:component name="BoardView">Grid render, partial cell updates, roving tabindex</arch:component>
+      <arch:component name="KeyboardAdapter">Key translation and quasimode state</arch:component>
+      <arch:component name="TouchAdapter">Digit bar, tools, adapter visibility and expand handle</arch:component>
+      <arch:component name="NotesView">Non-modal rail, mobile sheet, target selector, Notes list</arch:component>
+      <arch:component name="DialogHost">Only true modal dialogs and focus containment</arch:component>
+      <arch:component name="Persistence">Serialization, restore, debounce, lifecycle flush</arch:component>
+      <arch:component name="UrlCodec">Outer envelope, canonical body, compression, CRC32, validation</arch:component>
+      <arch:component name="ShareView">Scope selection, length, privacy warning, copy/share</arch:component>
+      <arch:component name="SettingsStore">Settings defaults, migration, persistence</arch:component>
+      <arch:component name="Announcer">Polite status messages</arch:component>
+    </arch:components>
+
+    <arch:security>
+      <arch:rule>Notes render는 textContent만 사용하고 innerHTML을 사용하지 않는다.</arch:rule>
+      <arch:rule>URL input은 untrusted input이며 decode failure를 typed result로 반환한다.</arch:rule>
+      <arch:rule>CRC32는 accidental corruption detection이며 authenticity 또는 security signature가 아니다.</arch:rule>
+      <arch:rule>Fragment를 server request, access log, analytics payload에 포함하지 않는다.</arch:rule>
+    </arch:security>
+  </sd:section>
+
+  <!-- ========================================================= 13 -->
+  <sd:section xml:id="sec-13-prototypes" order="13" name="prototype-and-validation">
+    <sd:title>Prototype·Validation Plan</sd:title>
+    <test:execution-order>
+      <test:lane name="codec" parallel="true">
+        <test:prototype code="P3" priority="1">UrlCodec envelope, raw/compressed body, CRC32, strict decoder</test:prototype>
+      </test:lane>
+      <test:lane name="interaction" parallel="true">
+        <test:prototype code="P0" priority="1">Desktop grid, keyboard, candidate quasimode, undo</test:prototype>
+        <test:prototype code="P1" priority="2">Touch bar, Digit First, sticky candidates, adapter override</test:prototype>
+        <test:prototype code="P2" priority="3">Cell/region notes, rail/sheet, non-modal focus, Notes list</test:prototype>
+      </test:lane>
+      <test:prototype code="P4" priority="4">Bootstrap, local persistence, URL/local conflict integration</test:prototype>
+    </test:execution-order>
+
+    <test:codec-properties>
+      <test:property><![CDATA[
+decode(await encode(state, scope)) == normalize(state, scope)
+      ]]></test:property>
+      <test:property>동일 canonical state와 scope는 savedAt이 같을 때 동일 byte sequence를 만든다.</test:property>
+      <test:case>raw body와 deflate-raw body</test:case>
+      <test:case>CompressionStream 부재 및 constructor format TypeError</test:case>
+      <test:case>CRC mismatch, truncated body, unknown codec, unknown version</test:case>
+      <test:case>reserved flags, padding bits, duplicate notes, trailing bytes</test:case>
+      <test:case>decompression output 64KiB 초과 즉시 cancel</test:case>
+      <test:volume>Seeded random canonical states 1,000개</test:volume>
+    </test:codec-properties>
+
+    <test:usability-study telemetry="none">
+      <test:method>
+        Server analytics를 추가하지 않는다. Moderator가 제공한 prototype build에서 event log를 memory에만 기록하고
+        participant session 종료 시 익명 aggregate를 수동 export한다.
+      </test:method>
+      <test:sample pilot="true">Desktop keyboard 8명, touch 8명, screen reader 4명</test:sample>
+      <test:task code="TD1">Mouse 없이 values와 candidates를 입력한다.</test:task>
+      <test:task code="TD2">Cell note와 box note를 만들고 다시 찾는다.</test:task>
+      <test:task code="TM1">한 손으로 values 10개를 입력한다.</test:task>
+      <test:task code="TM2">현재 box에 region note를 작성한다.</test:task>
+      <test:task code="TA1">Screen reader로 이동, value, candidate, note를 수행한다.</test:task>
+      <test:task code="TS1">링크로 다른 browser에서 progress를 복원한다.</test:task>
+    </test:usability-study>
+
+    <test:metrics>
+      <test:metric name="desktop candidate mode error" target="less-than 5%"/>
+      <test:metric name="touch sticky mode error" target="less-than 8%"/>
+      <test:metric name="mobile region note completion" target="100% task completion"/>
+      <test:metric name="codec round-trip" target="100%"/>
+      <test:metric name="decode latency" target="less-than 100ms at 8,000 chars"/>
+      <test:metric name="accessibility" target="0 critical axe violations and manual pass"/>
+      <test:metric name="lifecycle persistence" target="0 lost final mutations in 100 pagehide trials"/>
+    </test:metrics>
+
+    <test:kill-criteria>
+      <test:criterion>Desktop quasimode error가 sticky toggle보다 높으면 Shift default를 제거한다.</test:criterion>
+      <test:criterion>Digit First의 median tap reduction이 5% 미만이면 Cell First default를 재검토한다.</test:criterion>
+      <test:criterion>Touch sticky mode error가 8% 이상이면 value/candidate controls를 분리한다.</test:criterion>
+      <test:criterion>9px candidates가 320px viewport에서 판독되지 않으면 horizontal zoom 또는 alternate list를 검토한다.</test:criterion>
+      <test:criterion>VisualViewport layout이 지원 browser에서 한 frame 이상 board를 가리면 transition을 제거하고 geometry settle gate를 둔다.</test:criterion>
+    </test:kill-criteria>
+  </sd:section>
+
+  <!-- ========================================================= 14 -->
+  <sd:section xml:id="sec-14-differences" order="14" name="rev4-differences">
+    <sd:title>rev 3 대비 변경사항</sd:title>
+    <sd:change-table>
+      <sd:row item="URL compression selector" before="compressed flags.bit7" after="uncompressed envelope codec byte"/>
+      <sd:row item="URL integrity" before="none" after="CRC32 of canonical body"/>
+      <sd:row item="TouchAdapter query" before="pointer:coarse only" after="coarse pointer presence plus manual override"/>
+      <sd:row item="Wide coarse layout" before="desktop bar absent" after="conditional centered or right TouchAdapter"/>
+      <sd:row item="Mobile region note" before="target selection unspecified" after="visible Cell/Row/Column/Box selector"/>
+      <sd:row item="Dog-ear" before="small marker was focus/tap target" after="display-only marker with large equivalent controls"/>
+      <sd:row item="Notes focus" before="non-modal plus focus trap" after="non-modal natural tab order"/>
+      <sd:row item="Candidate floor" before="9px and 10px mixed" after="9px single floor with prototype gate"/>
+      <sd:row item="Candidate contrast" before="3:1 allowed" after="4.5:1 minimum"/>
+      <sd:row item="Number bar" before="40px buttons plus 4px gaps" after="board width divided by 9, gap 0"/>
+      <sd:row item="Viewport" before="implicit" after="required viewport meta contract"/>
+      <sd:row item="Bootstrap" before="server puzzle generated then possibly discarded" after="shell first, API only if no session"/>
+      <sd:row item="Persistence" before="300ms debounce only" after="debounce plus pagehide/visibility flush"/>
+      <sd:row item="Conflict semantics" before="progress equality ambiguous" after="core fields and notes scope defined separately"/>
+      <sd:row item="Prototype P3" before="order and property direction conflicted" after="priority-1 parallel lane and decode(encode(state))"/>
+    </sd:change-table>
+  </sd:section>
+
+  <!-- ========================================================= 15 -->
+  <sd:section xml:id="sec-15-url" order="15" name="url-state-encoding">
+    <sd:title>URL Snapshot Format and Conflict Resolution</sd:title>
+
+    <url:roles>
+      <url:role medium="localStorage" authority="canonical-local">자동 저장되는 active work state</url:role>
+      <url:role medium="fragment" authority="snapshot">명시적으로 생성한 transfer·backup state</url:role>
+    </url:roles>
+
+    <url:location value="fragment" syntax="#s=base64url" max-chars="8000">
+      Fragment는 HTTP request와 Referer에 포함되지 않는다. Share dialog는 2,000자 초과 시 경고하고
+      8,000자 초과 notes 포함 링크는 거부하며 notes 제외 링크를 제안한다.
+    </url:location>
+
+    <url:envelope xml:id="url-envelope-v1" byte-order="little-endian" critical="true">
+      <url:layout><![CDATA[
+OuterEnvelopeV1 (never compressed)
+  byte 0        formatVersion = 0x01
+  byte 1        codec         = 0x00 raw | 0x01 deflate-raw
+  byte 2..N-5   encodedBody   = BodyV1 or deflateRaw(BodyV1)
+  byte N-4..N-1 bodyCrc32     = CRC32(BodyV1), uint32 little-endian
+
+BodyV1 (canonical uncompressed state)
+  byte 0        stateFlags
+                  bit0 values included
+                  bit1 candidates included
+                  bit2 notes included
+                  bit3 savedAt included
+                  bit4..7 reserved; MUST be zero
+  byte 1        dim = 9
+  [4 bytes]     savedAt: Unix minutes; present only when bit3=1
+  [41 bytes]    givens: 81 nibbles; final padding nibble MUST be zero
+  [41 bytes]    values: same encoding; present only when bit0=1
+  [variable]    candidates; present only when bit1=1
+                  81-bit presence bitmap in 11 bytes; high 7 padding bits MUST be zero
+                  one 9-bit non-zero mask per present cell, packed in cell order
+  [variable]    notes; present only when bit2=1
+                  unsigned LEB128 noteCount
+                  repeated in canonical (kind,key) order:
+                    kind byte: 0 cell | 1 row | 2 column | 3 box
+                    key byte : cell 0..80 | region 0..8
+                    unsigned LEB128 utf8ByteLength
+                    UTF-8 bytes normalized to LF
+      ]]></url:layout>
+      <url:compression-policy>
+        BodyV1을 deflate-raw로 압축한 결과가 raw보다 짧을 때만 codec=1을 사용한다.
+        CompressionStream 또는 deflate-raw format을 지원하지 않으면 raw link만 생성한다.
+        해당 environment가 codec=1 link를 decode할 수 없으면 typed unsupported-codec failure를 표시하고 local session으로 복구한다.
+      </url:compression-policy>
+      <url:integrity>
+        Decoder는 decompressed BodyV1 CRC32가 trailer와 같을 때만 parse한다. CRC32는 malicious tampering을 막는 signature가 아니다.
+      </url:integrity>
+    </url:envelope>
+
+    <url:canonicalization>
+      <url:rule>givens와 values nibble은 0..9다.</url:rule>
+      <url:rule>Given cell의 value와 candidate는 zero다.</url:rule>
+      <url:rule>Non-zero value cell의 candidate는 zero다.</url:rule>
+      <url:rule>Candidate presence bit는 mask가 non-zero일 때만 one이다.</url:rule>
+      <url:rule>Notes는 (kind,key)로 정렬하며 target당 최대 한 건이다.</url:rule>
+      <url:rule>Text는 Unicode scalar sequence를 UTF-8로 encode하고 CRLF/CR을 LF로 normalize한다.</url:rule>
+      <url:rule>LF와 TAB을 제외한 C0 controls와 모든 NUL을 거부한다.</url:rule>
+      <url:rule>SC1은 givens만, SC2는 values·candidates·savedAt, SC3은 SC2와 notes를 포함한다.</url:rule>
+    </url:canonicalization>
+
+    <url:decode-pipeline output-limit="65536">
+      <url:step n="1">Fragment length와 base64url alphabet을 검사한다.</url:step>
+      <url:step n="2">Base64url decode 후 outer length, formatVersion, codec를 검사한다.</url:step>
+      <url:step n="3">Raw body를 사용하거나 DecompressionStream을 읽으며 64KiB 초과 즉시 reader를 cancel한다.</url:step>
+      <url:step n="4">CRC32를 비교한다.</url:step>
+      <url:step n="5">stateFlags reserved bits와 dim을 검사한다.</url:step>
+      <url:step n="6">각 field read 전에 remaining buffer bound를 검사한다.</url:step>
+      <url:step n="7">LEB128은 최대 5바이트이며 minimal representation만 허용한다.</url:step>
+      <url:step n="8">
+        nibble, mask, padding, notes count 100, note length 512를 검사한다. UTF-8은 fatal mode로 decode하고
+        invalid sequence, duplicate target, 비정렬 note order, non-canonical newline과 금지 control을 거부한다.
+      </url:step>
+      <url:step n="9">Given/value overlap, filled-cell candidate, presence-bit/mask 등 canonical state invariants를 검사한다.</url:step>
+      <url:step n="10">Givens row/column/box contradiction을 검사한다.</url:step>
+      <url:step n="11">Body를 정확히 끝까지 소비했는지 확인하고 trailing bytes를 거부한다.</url:step>
+      <url:failure-contract><![CDATA[
+{ ok: false, code: "too-long" | "invalid-base64" | "unsupported-version" |
+  "unsupported-codec" | "decompression-limit" | "crc-mismatch" |
+  "malformed-body" | "invalid-puzzle", message: string }
+      ]]></url:failure-contract>
+    </url:decode-pipeline>
+
+    <url:size-budget confidence="reasoned">
+      <url:case name="SC1 puzzle only">Envelope 6 + Body 43 = 49 bytes raw, base64url 66 chars</url:case>
+      <url:case name="SC2 plus 20 candidate cells">Envelope 6 + Body 122 = 128 bytes raw, base64url 171 chars</url:case>
+      <url:case name="SC3 notes">실제 Korean text compression ratio는 P3에서 측정한다.</url:case>
+      <url:target>일반 SC3 link 2,000자 이하</url:target>
+    </url:size-budget>
+
+    <url:share-dialog modal="true">
+      <url:scope code="SC1" default="false">Puzzle only</url:scope>
+      <url:scope code="SC2" default="true">Puzzle and progress</url:scope>
+      <url:scope code="SC3" default="false">Full state including notes</url:scope>
+      <url:privacy-warning scope="SC3">
+        Notes content는 messenger, clipboard history, browser history, synced browser account에 남을 수 있다.
+      </url:privacy-warning>
+      <url:copy>navigator.clipboard.writeText를 우선하고 selectable readonly input을 fallback으로 제공한다.</url:copy>
+      <url:share>navigator.share가 있으면 user activation 안에서 호출한다.</url:share>
+    </url:share-dialog>
+
+    <url:identity>
+      puzzleId는 SHA-256 cache key로 사용할 수 있으나 equality 결정은 81-byte givens 전체 비교로 확정한다.
+    </url:identity>
+
+    <url:conflict-rules>
+      <url:definitions>
+        <url:field-set name="core">values and candidates</url:field-set>
+        <url:field-set name="notes">cellNotes and regionNotes</url:field-set>
+        <url:rule>Field가 share scope에 없다는 사실은 삭제 명령이 아니다.</url:rule>
+      </url:definitions>
+      <url:resolution-order>givens identity → core selection → notes merge 순서로 한 번만 평가한다.</url:resolution-order>
+      <url:case code="CR1" condition="different givens">
+        Local active session을 one-slot archive로 이동하고 URL session을 채택한다. Undo toast를 8초 표시하고
+        archive는 toast 종료 후에도 menu에서 복원 가능하다.
+      </url:case>
+      <url:case code="CR2" condition="same givens, different core">
+        Local과 URL의 filled count, candidate count, updatedAt/savedAt을 보여주고 user가 core를 선택한다.
+        URL에 notes가 없으면 local notes를 보존한다.
+      </url:case>
+      <url:case code="CR3" condition="same givens and same core">
+        URL에 notes가 없으면 local notes를 유지한다. Notes가 동일하면 no-op다.
+      </url:case>
+      <url:case code="CR4" condition="notes included and different">
+        Disjoint targets는 자동 union한다. 동일 target의 서로 다른 text는 side-by-side dialog에서 local, URL,
+        또는 manual merge를 target별로 선택한다. 기본 선택은 local이다.
+      </url:case>
+      <url:case code="CR5" condition="decode failure">
+        URL을 적용하지 않고 local session 또는 new puzzle로 계속한다. Fragment는 error acknowledgement 후 제거한다.
+      </url:case>
+    </url:conflict-rules>
+
+    <url:solution-policy>
+      URL에는 solution을 넣지 않는다. 자체 session과 shared session 모두 동일한 “규칙 확인” 동작을 사용한다.
+      Incomplete board는 duplicate constraint만 보고하고, complete board는 모든 row/column/box가 1..9를 정확히
+      한 번씩 포함할 때 solved로 판정한다. GET /api/solve/는 1차 범위에서 추가하지 않는다.
+    </url:solution-policy>
+
+    <url:address-policy>
+      Link는 Share dialog에서만 생성한다. Active gameplay 중 history.replaceState 자동 동기화는 구현하지 않는다.
+      Adopted fragment를 소비한 뒤 clean URL로 replaceState한다. pushState와 location.hash assignment는 사용하지 않는다.
+    </url:address-policy>
+  </sd:section>
+
+  <risk:register xml:id="risk-register">
+    <risk:item code="RK1" severity="medium" owner="architecture">
+      두 adapters 유지 비용. Store와 domain rules single-source로 완화한다.
+    </risk:item>
+    <risk:item code="RK2" severity="medium" owner="responsive">
+      VisualViewport event timing 차이. P1 device matrix와 geometry settle 검증으로 완화한다.
+    </risk:item>
+    <risk:item code="RK3" severity="medium" owner="accessibility">
+      9px candidates 판독성. 320/360/390px 실측과 kill criterion으로 관리한다.
+    </risk:item>
+    <risk:item code="RK4" severity="medium" owner="url-codec">
+      URL format은 배포 후 영구 호환 부담이 된다. P3 property tests 통과 전 배포하지 않는다.
+    </risk:item>
+    <risk:item code="RK5" severity="medium" owner="privacy">
+      SC3 notes 유출. Default SC2와 explicit warning으로 완화한다.
+    </risk:item>
+    <risk:item code="RK6" severity="medium" owner="keyboard">
+      AZERTY quasimode 충돌. Sticky mode와 disable setting으로 완화한다.
+    </risk:item>
+    <risk:item code="RK7" severity="low" owner="persistence">
+      Private mode 또는 quota로 localStorage write가 실패할 수 있다. Memory fallback과 truthful warning을 제공한다.
+    </risk:item>
+    <risk:item code="RK8" severity="low" owner="security">
+      CRC32는 authenticity를 보장하지 않는다. URL은 계속 untrusted input으로 처리한다.
+    </risk:item>
+    <risk:item code="RK9" severity="medium" owner="security">
+      기존 new-puzzle API는 solution을 response에 포함한다. rev 4 client는 이를 저장·사용하지 않지만 network exposure는
+      기존 interface를 유지하는 동안 남으며 competition 또는 ranking 도입 전에는 별도 server 설계가 필요하다.
+    </risk:item>
+  </risk:register>
+
+  <sd:scope-decisions xml:id="scope-decisions" status="proposed">
+    <sd:decision topic="difficulty-ui" value="exclude-v1">Medium 고정. API contract는 유지한다.</sd:decision>
+    <sd:decision topic="timer-statistics" value="exclude-v1">몰입과 telemetry 범위를 늘리지 않는다.</sd:decision>
+    <sd:decision topic="larger-dimensions" value="exclude-v1">UI와 URL decoder는 dim=9만 수용한다.</sd:decision>
+    <sd:decision topic="dark-mode" value="include-v1">Light/dark tokens와 contrast QA를 포함한다.</sd:decision>
+    <sd:decision topic="automatic-url-sync" value="exclude-v1">Explicit snapshot만 구현한다.</sd:decision>
+    <sd:decision topic="solution-check" value="constraint-only">모든 session의 button label과 behavior를 통일한다.</sd:decision>
+    <sd:decision topic="archive-slots" value="one">sudoku:v1:archive 하나를 유지한다.</sd:decision>
+  </sd:scope-decisions>
+
+  <sd:sources xml:id="sources">
+    <sd:source xlink:type="simple" xlink:href="https://www.sudoku9x9.com/manual/">sudoku9x9 User Manual</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://www.7sudoku.com/instructions/entering-numbers">7sudoku pencil marks</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://www.w3.org/WAI/ARIA/apg/patterns/grid/">WAI-ARIA APG Grid</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/">WAI-ARIA APG Dialog</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html">WCAG Contrast Minimum</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html">WCAG Target Size Minimum</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://www.w3.org/TR/mediaqueries-5/">Media Queries Level 5</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport">MDN VisualViewport</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://developer.mozilla.org/en-US/docs/Web/API/CompressionStream/CompressionStream">MDN CompressionStream constructor</sd:source>
+    <sd:source xlink:type="simple" xlink:href="https://web.dev/blog/compressionstreams">Compression Streams browser support</sd:source>
+  </sd:sources>
+
+  <sd:approval xml:id="approval" status="awaiting-user-approval">
+    <sd:current-phase>1. System Design revision 4</sd:current-phase>
+    <sd:validation-required>
+      XML well-formedness, unique xml:id, internal references, matrix arithmetic, URL size arithmetic,
+      forbidden placeholder scan, repository-state verification
+    </sd:validation-required>
+    <sd:checkbox checked="false">rev 4 System Design 승인</sd:checkbox>
+    <sd:checkbox checked="false">scope decisions 승인</sd:checkbox>
+    <sd:checkbox checked="false">Phase 2 Macro Blocking 진행 승인</sd:checkbox>
+    <sd:next-phase blocked="true">Phase 2 — Macro Blocking</sd:next-phase>
+  </sd:approval>
+
+</sd:system-design>
