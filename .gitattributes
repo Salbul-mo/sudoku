@@ -1,0 +1,11 @@
+# Store everything with LF in the repository; check out with native endings.
+# Without this, Windows checkouts write CRLF into tracked files and every later
+# diff shows whole-file changes.
+* text=auto eol=lf
+
+# Binary-ish assets git should never try to normalise.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.sqlite3 binary

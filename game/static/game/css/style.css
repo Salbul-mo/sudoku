@@ -1,0 +1,97 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    background: #f2f2f2;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+}
+
+.wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+h1 {
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(9, 40px);
+    grid-template-rows: repeat(9, 40px);
+    border: 3px solid #222;
+    background: #222;
+    gap: 1px;
+}
+
+.cell {
+    width: 40px;
+    height: 40px;
+    text-align: center;
+    font-size: 1.2rem;
+    border: none;
+    background: #fff;
+}
+
+.cell:disabled {
+    background: #e6e6e6;
+    font-weight: bold;
+    color: #222;
+}
+
+.cell.wrong {
+    color: #c0392b;
+    background: #fbe1df;
+}
+
+.cell.border-right {
+    border-right: 2px solid #222;
+}
+
+.cell.border-bottom {
+    border-bottom: 2px solid #222;
+}
+
+.cell:focus {
+    outline: 2px solid #2d7ff9;
+    outline-offset: -2px;
+}
+
+.message {
+    min-height: 1.4rem;
+    font-weight: bold;
+}
+
+.message.success {
+    color: #1a8a3f;
+}
+
+.message.error {
+    color: #c0392b;
+}
+
+.controls {
+    display: flex;
+    gap: 12px;
+}
+
+button {
+    padding: 8px 20px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 6px;
+    background: #2d7ff9;
+    color: #fff;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #1c66d6;
+}

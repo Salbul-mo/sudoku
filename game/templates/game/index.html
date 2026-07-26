@@ -1,0 +1,27 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>스도쿠</title>
+    <link rel="stylesheet" href="{% static 'game/css/style.css' %}">
+</head>
+<body>
+    <main class="wrap">
+        <h1>스도쿠</h1>
+
+        <div id="board" class="board"></div>
+
+        <div id="message" class="message"></div>
+
+        <div class="controls">
+            <button id="check-btn">확인</button>
+            <button id="new-game-btn">새 게임</button>
+        </div>
+    </main>
+
+    {{ puzzle|json_script:"puzzle-data" }}
+    {{ solution|json_script:"solution-data" }}
+    <script src="{% static 'game/js/game.js' %}"></script>
+</body>
+</html>
