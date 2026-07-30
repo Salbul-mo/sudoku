@@ -1,0 +1,1109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mic:micro-blocking
+    xmlns:mic="urn:sudoku:micro-blocking:v1"
+    xmlns:mb="urn:sudoku:micro-block:v1"
+    xmlns:dev="urn:sudoku:deviation:v1"
+    xml:id="sudoku-micro-blocking-wave2a"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="3"
+    wave="W2"
+    part="A"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 3 Micro Blocking, Wave 2 part A.
+    W2는 7개 블록이라 한 문서로는 검토가 불가능하다. DEC-UI-03이 정의한 DOM-free 경계를 따라 나눈다.
+    part A는 document, window를 전혀 참조하지 않는 세 블록이며 전량 node:test로 검증된다.
+  -->
+
+  <mic:document-control xml:id="document-control">
+    <mic:title>Micro Blocking — Wave 2 part A (DOM-free core: domain, state, codec)</mic:title>
+    <mic:owner>claude-mhj</mic:owner>
+    <mic:baseline>
+      <mic:file>docs/claude-mhj_26_07_26_03_sudoku-master-macro-plan.xml</mic:file>
+      <mic:blocks-covered>UI-B03, UI-B04, UI-B05</mic:blocks-covered>
+    </mic:baseline>
+    <mic:deliverable>
+      <mic:file>docs/claude-mhj_26_07_26_06_micro-blocking-wave2a.xml</mic:file>
+      <mic:scope>Micro Block 정의만 포함한다. application code는 변경하지 않았다.</mic:scope>
+    </mic:deliverable>
+    <mic:split-rationale>
+      W2의 나머지(UI-B06, DX-B02, DX-B03, DX-B04)는 part B로 분리한다.
+      part A의 세 블록은 DEC-UI-03의 DOM-free layer 전체와 정확히 일치하며, 결함 비용이 가장 큰 구간이자
+      100% 자동 검증이 가능한 구간이다. 이 경계로 나누면 문서마다 검증 수단이 단일해진다.
+      wave의 병렬성은 영향을 받지 않는다. 세 블록 모두 UI-B01 이후 언제든 착수 가능하다.
+    </mic:split-rationale>
+    <mic:approval-state current="awaiting-user-approval">
+      <mic:next-on-approval>Wave 2 part B Micro Blocking</mic:next-on-approval>
+      <mic:prohibited-before-approval>모든 code implementation</mic:prohibited-before-approval>
+    </mic:approval-state>
+  </mic:document-control>
+
+  <mic:global-conventions xml:id="conventions">
+    <mic:convention id="CV1" name="no DOM">
+      part A의 모든 모듈은 document, window, localStorage를 직접 참조하지 않는다.
+      외부 자원은 인자로 주입한다. 이것이 node:test 검증 가능성의 근거다(DEC-UI-03).
+    </mic:convention>
+    <mic:convention id="CV2" name="typed failure over exception">
+      사용자 입력 또는 저장된 데이터에서 비롯한 실패는 예외가 아니라 {ok:false, code, message}로 반환한다.
+      프로그래밍 오류(잘못된 인자 타입, 범위 밖 index)만 TypeError와 RangeError로 던진다.
+      경계는 "신뢰할 수 없는 입력인가"이며 "실패인가"가 아니다.
+    </mic:convention>
+    <mic:convention id="CV3" name="index convention">
+      cell index는 0..80이며 row = index / 9, col = index % 9다. digit는 1..9이며 0은 빈칸이다.
+      candidate mask는 bit(d-1)이 digit d를 뜻하는 9비트 정수다.
+    </mic:convention>
+    <mic:convention id="CV4" name="test file naming">
+      spec 파일은 tests/js/&lt;module&gt;.test.mjs다. Wave 0의 규약을 그대로 따른다.
+    </mic:convention>
+  </mic:global-conventions>
+
+  <mic:deviations xml:id="deviations">
+    <dev:deviation id="DV-04" from="UI-B03 scope" severity="low" needs-approval="false">
+      <dev:macro-text>UI-B03 scope에 core/spec.js가 포함된다.</dev:macro-text>
+      <dev:problem>
+        server의 game/sudoku/spec.py와 이름이 같아 같은 역할로 오해되기 쉽다. 실제로 client는 dim=9만
+        다루고 exact-cover 제약 열이 필요 없으므로 두 파일은 공통점이 거의 없다.
+      </dev:problem>
+      <dev:resolution>
+        파일명은 DEC-UI-04대로 core/spec.js를 유지하되, 모듈 docstring에 "server spec.py의 포팅이 아니며
+        dim=9 전용 좌표 테이블"임을 명시한다. 구조를 바꾸지 않고 오해만 차단한다.
+      </dev:resolution>
+    </dev:deviation>
+  </mic:deviations>
+
+  <!-- ============================================================ UI-B03 -->
+  <mic:parent-block id="UI-B03" name="Domain core: SudokuStore, rules, history" micro-count="6">
+    <mic:objective-recap>
+      mutation API와 grouped undo/redo가 동작하고, conflict와 완성 판정이 solution 없이 제약만으로 이루어진다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B03-01 → 02 → 03 → 04 → (05, 06)</mic:order>
+
+    <mb:micro id="M-UI-B03-01" parent="UI-B03" name="core/spec.js geometry tables">
+      <mb:rationale>
+        peer 집합과 unit 목록은 conflict 판정, candidate 제거, region note key에서 모두 쓰인다.
+        매번 계산하면 셀 변경마다 반복 비용이 붙으므로 모듈 로드 시 1회 만들어 고정한다.
+      </mb:rationale>
+      <mb:objective>
+        dim=9의 peers, units, boxOf 테이블이 export되고 값이 수학적으로 옳다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/core/spec.js"/></mb:target-files>
+      <mb:preconditions>UI-B01 완료</mb:preconditions>
+      <mb:input-type>없음. 모듈 로드 시 상수를 계산한다.</mb:input-type>
+      <mb:input-validation>
+        런타임 입력이 없다. 계산 결과의 불변식을 모듈 내 개발용 assert가 아니라 test로 검증한다.
+      </mb:input-validation>
+      <mb:output-type><![CDATA[
+DIM = 9, CELLS = 81
+PEERS:   ReadonlyArray<ReadonlyArray<number>>   // length 81, 각 원소 길이 20, 자기 자신 제외
+ROW_OF:  ReadonlyArray<number>                  // length 81, 0..8
+COL_OF:  ReadonlyArray<number>                  // length 81, 0..8
+BOX_OF:  ReadonlyArray<number>                  // length 81, 0..8
+UNITS:   ReadonlyArray<ReadonlyArray<number>>   // length 27, 각 원소 길이 9
+      ]]></mb:output-type>
+      <mb:output-validation>
+        PEERS[i]에 i가 없고 길이가 정확히 20이다. UNITS 27개가 각각 9개 고유 index를 가지며
+        전체 합집합이 0..80을 정확히 3회씩 덮는다.
+      </mb:output-validation>
+      <mb:exceptions>없음. 순수 상수 계산이다.</mb:exceptions>
+      <mb:side-effects>없음. 모든 export를 Object.freeze로 동결해 하류 변조를 막는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+// dim=9 전용 좌표 테이블. server의 spec.py 포팅이 아니다 (DV-04).
+const ROW_OF = i => (i / 9) | 0, COL_OF = i => i % 9;
+const BOX_OF = i => ((ROW_OF(i) / 3) | 0) * 3 + ((COL_OF(i) / 3) | 0);
+PEERS[i] = unique union of row(i), col(i), box(i) members, minus i        // 20 entries
+UNITS    = 9 rows ++ 9 cols ++ 9 boxes                                    // 27 entries
+freeze everything before export
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B03-01" kind="unit">모든 i에서 PEERS[i].length === 20이고 i를 포함하지 않는다.</mb:test>
+        <mb:test id="T-UI-B03-02" kind="unit">UNITS가 27개이고 각 9개 고유 index를 갖는다.</mb:test>
+        <mb:test id="T-UI-B03-03" kind="unit">각 cell이 정확히 3개 unit에 속한다.</mb:test>
+        <mb:test id="T-UI-B03-04" kind="unit">export된 배열이 frozen이라 push가 실패한다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. 아직 의존자가 없다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B03-02" parent="UI-B03" name="core/rules.js domain predicates">
+      <mb:rationale>
+        V4-11이 정한 constraint-only 판정의 본체다. solution을 참조하지 않는다는 성질이
+        여기서 코드로 고정되어야 이후 어떤 블록도 우회할 수 없다.
+      </mb:rationale>
+      <mb:objective>
+        conflicts, isSolved, eliminationTargets 세 순수 함수가 동작하고 solution 인자를 받지 않는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/core/rules.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B03-01 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+conflicts(values: Uint8Array(81), givens: Uint8Array(81)) -> Set<number>
+isSolved(values: Uint8Array(81), givens: Uint8Array(81)) -> boolean
+eliminationTargets(candidates: Uint16Array(81), index: number, digit: number) -> number[]
+      ]]></mb:input-type>
+      <mb:input-validation>
+        배열 길이가 81이 아니면 RangeError. digit이 1..9 밖이면 RangeError.
+        index가 0..80 밖이면 RangeError. 이는 프로그래밍 오류이므로 CV2에 따라 예외다.
+      </mb:input-validation>
+      <mb:output-type>
+        conflicts는 충돌 cell index 집합. isSolved는 boolean. eliminationTargets는 peer index 배열.
+      </mb:output-type>
+      <mb:output-validation>
+        conflicts는 given과 user value를 구분하지 않고 같은 unit의 같은 값 쌍을 모두 포함한다.
+        isSolved는 27개 unit 각각이 1..9를 정확히 한 번씩 가질 때만 true다.
+      </mb:output-validation>
+      <mb:exceptions>RangeError만. solution 관련 인자는 애초에 존재하지 않는다.</mb:exceptions>
+      <mb:side-effects>없음. 인자를 수정하지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+function effective(values, givens, i) { return givens[i] || values[i]; }
+
+conflicts(values, givens):
+    out = new Set()
+    for unit of UNITS:
+        seen = Map<digit, index[]>
+        for i of unit: v = effective(values, givens, i); if v: seen[v].push(i)
+        for entries with length > 1: add every index to out
+    return out
+
+isSolved(values, givens):
+    for unit of UNITS:
+        mask = 0
+        for i of unit: v = effective(...); if !v return false; mask |= 1 << (v-1)
+        if mask !== 0b111111111 return false
+    return true
+
+eliminationTargets(candidates, index, digit):
+    bit = 1 << (digit - 1)
+    return PEERS[index].filter(p => candidates[p] & bit)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B03-05" kind="unit">같은 row의 중복 두 칸이 모두 conflicts에 든다.</mb:test>
+        <mb:test id="T-UI-B03-06" kind="unit">given과 user value가 충돌해도 양쪽 모두 보고된다.</mb:test>
+        <mb:test id="T-UI-B03-07" kind="unit">완성된 유효 격자에서 isSolved가 true, 한 칸만 바꾸면 false다.</mb:test>
+        <mb:test id="T-UI-B03-08" kind="unit">빈 칸이 있으면 isSolved가 false다.</mb:test>
+        <mb:test id="T-UI-B03-09" kind="unit">
+          rules.js 소스에 solution이라는 식별자가 없음을 정적으로 확인한다(V-UI-B03-06 보강).
+        </mb:test>
+        <mb:test id="T-UI-B03-10" kind="unit">길이 80 배열과 digit 0이 RangeError를 던진다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B03-03" parent="UI-B03" name="core/history.js grouped undo and redo">
+      <mb:rationale>
+        G-RECOVERY는 모든 비파괴 조작이 단일 history로 복구되기를 요구하고, CF4의 자동 candidate 제거는
+        value 변경과 한 번에 되돌아가야 한다. grouping을 store와 분리해야 두 관심사가 섞이지 않는다.
+      </mb:rationale>
+      <mb:objective>
+        group 단위 push, undo, redo가 동작하고 200 group 상한에서 가장 오래된 것부터 폐기된다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/core/history.js"/></mb:target-files>
+      <mb:preconditions>없음</mb:preconditions>
+      <mb:input-type><![CDATA[
+HistoryEntry = {
+  kind: "value" | "candidates" | "cellNote" | "regionNote",
+  key: number | string,
+  before: number | string,
+  after: number | string,
+  groupId: number,
+  at: number
+}
+class History {
+  beginGroup(): number
+  record(entry: HistoryEntry): void
+  endGroup(): void
+  undo(): HistoryEntry[] | null    // 역순 정렬된 group
+  redo(): HistoryEntry[] | null    // 정순 정렬된 group
+}
+      ]]></mb:input-type>
+      <mb:input-validation>
+        beginGroup 없이 record하면 Error를 던진다. 열린 group 없이 endGroup해도 Error다.
+        group이 열린 채로 undo를 호출하면 Error다. 상태 기계 위반은 조용히 넘기지 않는다.
+      </mb:input-validation>
+      <mb:output-type>
+        undo는 되돌릴 entry 배열을 역순으로, redo는 정순으로 반환한다. 더 없으면 null이다.
+        History 자신은 상태를 적용하지 않는다. 적용은 store의 책임이다.
+      </mb:output-type>
+      <mb:output-validation>
+        undo 후 redo하면 동일 group이 정순으로 나온다. 새 group을 push하면 redo stack이 비워진다.
+      </mb:output-validation>
+      <mb:exceptions>Error(상태 기계 위반). 그 외 없음.</mb:exceptions>
+      <mb:side-effects>없음. in-memory 배열 두 개만 관리한다. 영속화 대상이 아니다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+MAX_GROUPS = 200
+undoStack: HistoryEntry[][] = []
+redoStack: HistoryEntry[][] = []
+open: HistoryEntry[] | null = null
+
+beginGroup(): if open throw; open = []; return ++groupSeq
+record(e):    if !open throw; open.push(e)
+endGroup():   if !open throw
+              if (open.length) { undoStack.push(open); redoStack.length = 0
+                                 if (undoStack.length > MAX_GROUPS) undoStack.shift() }
+              open = null
+undo():       if open throw; g = undoStack.pop(); if (!g) return null
+              redoStack.push(g); return [...g].reverse()
+redo():       if open throw; g = redoStack.pop(); if (!g) return null
+              undoStack.push(g); return [...g]
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B03-11" kind="unit">빈 group은 stack에 쌓이지 않는다.</mb:test>
+        <mb:test id="T-UI-B03-12" kind="unit">201번째 group을 넣으면 가장 오래된 것이 빠지고 순서가 유지된다(V-UI-B03-05).</mb:test>
+        <mb:test id="T-UI-B03-13" kind="unit">undo 후 새 record를 하면 redo가 null을 반환한다.</mb:test>
+        <mb:test id="T-UI-B03-14" kind="unit">undo가 역순, redo가 정순 배열을 준다.</mb:test>
+        <mb:test id="T-UI-B03-15" kind="unit">beginGroup 없이 record하면 Error다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B03-04" parent="UI-B03" name="core/store.js state container and subscription">
+      <mb:rationale>
+        단일 domain state는 RK1 완화의 근거다. 두 adapter가 같은 store를 보게 하려면
+        상태 소유와 변경 통지를 먼저 세워야 mutation micro block들이 붙을 자리가 생긴다.
+      </mb:rationale>
+      <mb:objective>
+        GameSession을 보유하고 변경 시 구독자에게 변경된 cell index 집합을 통지한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/core/store.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B03-01, 02, 03 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+createStore(session: GameSession) -> Store
+GameSession = {
+  schemaVersion: number, puzzleId: string, dim: 9,
+  givens: Uint8Array(81), values: Uint8Array(81), candidates: Uint16Array(81),
+  cellNotes: Record<string, string>, regionNotes: Record<string, string>,
+  createdAt: number, updatedAt: number
+}
+Store.subscribe(fn: (change: {changed: Set<number>, kind: string}) => void) -> () => void
+      ]]></mb:input-type>
+      <mb:input-validation>
+        session.dim !== 9이면 RangeError. 세 typed array의 길이가 81이 아니면 RangeError.
+        givens와 values가 같은 cell에서 동시에 non-zero이면 Error. 이는 정규화 위반이다.
+      </mb:input-validation>
+      <mb:output-type>Store 인스턴스. subscribe는 해지 함수를 반환한다.</mb:output-type>
+      <mb:output-validation>
+        구독자는 변경이 실제로 있을 때만 호출된다. no-op mutation은 통지하지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>RangeError, Error(정규화 위반)</mb:exceptions>
+      <mb:side-effects>
+        session 객체를 소유하고 제자리에서 수정한다. 호출자는 전달 후 그 객체를 직접 만지지 않는다.
+        updatedAt은 mutation마다 갱신한다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+createStore(session):
+    validate(session)                       // dim, lengths, given/value overlap
+    listeners = new Set()
+    notify(changed, kind) { if (!changed.size) return
+                            session.updatedAt = Date.now()
+                            for (fn of listeners) fn({changed, kind}) }
+    return { session, history: new History(), subscribe, ...mutations }
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B03-16" kind="unit">dim=12 session이 RangeError를 던진다.</mb:test>
+        <mb:test id="T-UI-B03-17" kind="unit">given과 value가 겹치는 session이 Error를 던진다.</mb:test>
+        <mb:test id="T-UI-B03-18" kind="unit">구독 해지 후 통지가 오지 않는다.</mb:test>
+        <mb:test id="T-UI-B03-19" kind="unit">변경 없는 mutation은 통지하지 않는다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B03-05" parent="UI-B03" name="Value and candidate mutations with CF4 grouping">
+      <mb:rationale>
+        CF4의 자동 candidate 제거와 value 변경이 하나의 undo로 묶여야 한다는 것이 이 블록의 가장
+        구체적인 요구다. given 거부도 여기서 강제된다.
+      </mb:rationale>
+      <mb:objective>
+        setValue, toggleCandidate, clearCell이 동작하고 CF4 제거가 같은 groupId로 묶인다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/core/store.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B03-04 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+setValue(index: number, digit: number, opts: {autoRemoveCandidates: boolean}) -> MutationResult
+toggleCandidate(index: number, digit: number) -> MutationResult
+clearCell(index: number) -> MutationResult
+MutationResult = {ok: true, changed: Set<number>} | {ok: false, reason: "given" | "noop"}
+      ]]></mb:input-type>
+      <mb:input-validation>
+        index 0..80, digit 1..9 위반은 RangeError. given cell은 예외가 아니라 {ok:false, reason:"given"}이다.
+        given 입력은 사용자의 정상 조작이지 프로그래밍 오류가 아니기 때문이다(CV2).
+      </mb:input-validation>
+      <mb:output-type>MutationResult. 알림 문구는 만들지 않는다. UI layer의 책임이다.</mb:output-type>
+      <mb:output-validation>
+        setValue 후 해당 cell의 candidates가 0이다. autoRemoveCandidates가 true면 peer의 해당 bit가 사라진다.
+        undo 1회로 value와 모든 peer candidate가 함께 복원된다.
+      </mb:output-validation>
+      <mb:exceptions>RangeError만</mb:exceptions>
+      <mb:side-effects>values, candidates 배열 수정. history group 1개 추가. 구독자 통지 1회.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+setValue(index, digit, opts):
+    if (givens[index]) return {ok:false, reason:"given"}
+    if (values[index] === digit) return clearCell(index)          // toggle off
+    history.beginGroup()
+    record value change; values[index] = digit
+    record own candidate clear; candidates[index] = 0
+    if (opts.autoRemoveCandidates)
+        for (p of eliminationTargets(candidates, index, digit))
+            record candidate change; candidates[p] &= ~(1 << (digit-1))
+    history.endGroup()
+    notify(changedSet, "value")
+
+toggleCandidate(index, digit):
+    if (givens[index]) return {ok:false, reason:"given"}
+    if (values[index])  return {ok:false, reason:"noop"}          // filled cell keeps no candidates
+    single-entry group: candidates[index] ^= 1 << (digit-1)
+
+clearCell(index): given -> reject; clears value and candidates in one group
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B03-20" kind="unit">
+          value set이 peer candidate를 제거하고 undo 1회로 둘 다 복원된다(V-UI-B03-01).
+        </mb:test>
+        <mb:test id="T-UI-B03-21" kind="unit">given cell mutation이 거부되고 배열이 불변이다(V-UI-B03-02).</mb:test>
+        <mb:test id="T-UI-B03-22" kind="unit">autoRemoveCandidates=false면 peer가 유지된다.</mb:test>
+        <mb:test id="T-UI-B03-23" kind="unit">같은 digit 재입력이 값을 지운다.</mb:test>
+        <mb:test id="T-UI-B03-24" kind="unit">값이 있는 cell의 toggleCandidate가 noop을 반환한다(CF 정규화).</mb:test>
+        <mb:test id="T-UI-B03-25" kind="unit">conflicts가 solution 없이 계산된다(V-UI-B03-03).</mb:test>
+        <mb:test id="T-UI-B03-26" kind="unit">완성 시 isSolved가 true다(V-UI-B03-04).</mb:test>
+      </mb:tests>
+      <mb:rollback>mutation 함수만 제거하면 M-UI-B03-04 상태로 돌아간다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B03-06" parent="UI-B03" name="Note mutations for cell and region targets">
+      <mb:rationale>
+        U3가 확정한 memo scope를 store 수준에서 표현한다. note도 같은 history에 들어가야
+        G-RECOVERY의 "단일 undo history"가 성립한다.
+      </mb:rationale>
+      <mb:objective>
+        setNote가 cell과 3종 region target을 처리하고, 빈 문자열이 삭제로 동작하며, undo 가능하다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/core/store.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B03-04 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+setNote(target: NoteTarget, text: string) -> MutationResult
+NoteTarget = {kind: "cell", key: number}          // key 0..80
+           | {kind: "row"|"column"|"box", key: number}   // key 0..8
+getNote(target: NoteTarget) -> string             // 없으면 ""
+      ]]></mb:input-type>
+      <mb:input-validation>
+        kind가 4종 밖이면 RangeError. key 범위 위반도 RangeError.
+        text가 string이 아니면 TypeError. 길이 512 초과는 잘라내지 않고 RangeError를 던진다.
+        조용히 자르면 사용자가 잃은 내용을 알 수 없다.
+      </mb:input-validation>
+      <mb:output-type>MutationResult. 저장 키는 cellNotes[key] 또는 regionNotes["r0".."b8"]다.</mb:output-type>
+      <mb:output-validation>
+        빈 문자열 또는 공백만인 text는 항목을 삭제한다. 삭제 후 getNote가 ""를 반환한다.
+        target당 최대 1건이라는 §15 정규화 규칙이 자연히 성립한다.
+      </mb:output-validation>
+      <mb:exceptions>RangeError, TypeError</mb:exceptions>
+      <mb:side-effects>cellNotes 또는 regionNotes 수정. history group 1개. 통지 1회.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const PREFIX = {row: "r", column: "c", box: "b"};
+keyOf(target): target.kind === "cell" ? String(target.key)
+                                      : PREFIX[target.kind] + target.key
+
+setNote(target, text):
+    validate(target, text)                       // 512 byte cap -> RangeError
+    bag = target.kind === "cell" ? cellNotes : regionNotes
+    k = keyOf(target); before = bag[k] ?? ""; after = text.trim()
+    if (before === after) return {ok:false, reason:"noop"}
+    single-entry group with kind "cellNote" or "regionNote"
+    if (after) bag[k] = after; else delete bag[k]
+    notify(affectedCells(target), "note")
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B03-27" kind="unit">cell, row, column, box 네 target 모두 저장과 조회가 된다.</mb:test>
+        <mb:test id="T-UI-B03-28" kind="unit">빈 문자열이 삭제로 동작하고 undo로 복원된다.</mb:test>
+        <mb:test id="T-UI-B03-29" kind="unit">region key 9가 RangeError다.</mb:test>
+        <mb:test id="T-UI-B03-30" kind="unit">513 byte text가 RangeError이며 잘리지 않는다.</mb:test>
+        <mb:test id="T-UI-B03-31" kind="unit">note 변경이 value와 같은 history에서 undo된다.</mb:test>
+      </mb:tests>
+      <mb:rollback>note 함수만 제거.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B03">
+      V-UI-B03-01 → T-UI-B03-20 | 02 → T-UI-B03-21 | 03 → T-UI-B03-25 | 04 → T-UI-B03-26 |
+      05 → T-UI-B03-12 | 06 → T-UI-B03-09. 6/6 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ UI-B04 -->
+  <mic:parent-block id="UI-B04" name="Persistence and settings" micro-count="5">
+    <mic:objective-recap>
+      300ms debounce 저장, pagehide와 hidden에서 동기 flush, 손상·미래 schemaVersion 거부.
+    </mic:objective-recap>
+    <mic:order>M-UI-B04-01 → 02 → 03 → 04 → 05</mic:order>
+
+    <mb:micro id="M-UI-B04-01" parent="UI-B04" name="state/serialize.js encoder">
+      <mb:rationale>
+        typed array는 JSON이 직접 표현하지 못한다. 인코딩 규칙을 한 곳에 두어야
+        migration이 이전 형식을 해석할 수 있다.
+      </mb:rationale>
+      <mb:objective>GameSession을 고정 길이 number 배열 형태의 평범한 객체로 변환한다.</mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/state/serialize.js"/></mb:target-files>
+      <mb:preconditions>UI-B03 완료</mb:preconditions>
+      <mb:input-type>serializeSession(session: GameSession) -> SerializedSession</mb:input-type>
+      <mb:input-validation>session이 store의 불변식을 이미 만족한다고 가정한다. 여기서 재검증하지 않는다.</mb:input-validation>
+      <mb:output-type><![CDATA[
+SerializedSession = {
+  schemaVersion: 1, puzzleId: string, dim: 9,
+  givens: number[81], values: number[81], candidates: number[81],
+  cellNotes: Record<string,string>, regionNotes: Record<string,string>,
+  createdAt: number, updatedAt: number
+}
+      ]]></mb:output-type>
+      <mb:output-validation>JSON.stringify가 순환 참조 없이 성공하고 typed array가 남지 않는다.</mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음. 새 객체를 만든다. History와 UiState는 포함하지 않는다(V-UI-B04-05).</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+serializeSession(s) = {
+  schemaVersion: CURRENT, puzzleId: s.puzzleId, dim: 9,
+  givens: Array.from(s.givens), values: Array.from(s.values),
+  candidates: Array.from(s.candidates),
+  cellNotes: {...s.cellNotes}, regionNotes: {...s.regionNotes},
+  createdAt: s.createdAt, updatedAt: s.updatedAt
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B04-01" kind="unit">출력에 typed array가 없고 JSON 왕복이 된다.</mb:test>
+        <mb:test id="T-UI-B04-02" kind="unit">history와 UiState 키가 출력에 없다(V-UI-B04-05).</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B04-02" parent="UI-B04" name="state/serialize.js validating decoder">
+      <mb:rationale>
+        localStorage는 사용자가 임의로 편집할 수 있는 신뢰 불가 입력이다. V4-13이 요구한 전수 검사를
+        여기서 구현하지 않으면 손상된 값이 store 불변식을 깨고 뒤늦게 엉뚱한 곳에서 터진다.
+      </mb:rationale>
+      <mb:objective>
+        모든 필드를 검사한 뒤에만 typed array로 복원하고, 실패는 typed code로 반환한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/state/serialize.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B04-01 완료</mb:preconditions>
+      <mb:input-type>deserializeSession(raw: string) -> RestoreResult</mb:input-type>
+      <mb:input-validation><![CDATA[
+JSON 파싱 실패                          -> code "corrupt"
+schemaVersion 미존재 또는 정수 아님      -> "corrupt"
+schemaVersion > CURRENT                 -> "future-version"
+dim !== 9                               -> "unsupported-dim"
+givens/values/candidates 길이 !== 81     -> "corrupt"
+givens/values 원소가 정수 0..9 밖        -> "corrupt"
+candidates 원소가 정수 0..511 밖         -> "corrupt"
+givens[i] && values[i] 동시 non-zero     -> "corrupt"
+note key가 /^\d{1,2}$/ 또는 /^[rcb][0-8]$/ 아님 -> "corrupt"
+note value가 string 아님 또는 512 초과   -> "corrupt"
+      ]]></mb:input-validation>
+      <mb:output-type>{ok:true, session:GameSession} | {ok:false, code:string, message:string}</mb:output-type>
+      <mb:output-validation>
+        성공 시 반환된 session이 store의 validate를 통과한다. 부분 복원은 존재하지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>없음. 모든 실패가 typed result다(CV2).</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+deserializeSession(raw):
+    try { obj = JSON.parse(raw) } catch { return fail("corrupt") }
+    if (!Number.isInteger(obj?.schemaVersion)) return fail("corrupt")
+    if (obj.schemaVersion > CURRENT) return fail("future-version")
+    if (obj.schemaVersion < CURRENT) { obj = migrate(obj); if (!obj) return fail("corrupt") }
+    run every check above, failing closed on the first violation
+    return {ok:true, session: {..., givens:new Uint8Array(obj.givens), ...}}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B04-03" kind="unit">길이 80 배열이 corrupt를 반환한다(V-UI-B04-03).</mb:test>
+        <mb:test id="T-UI-B04-04" kind="unit">값 10이 corrupt를 반환한다.</mb:test>
+        <mb:test id="T-UI-B04-05" kind="unit">잘못된 note key가 corrupt를 반환한다.</mb:test>
+        <mb:test id="T-UI-B04-06" kind="unit">미래 schemaVersion이 future-version을 반환한다.</mb:test>
+        <mb:test id="T-UI-B04-07" kind="unit">given/value 중복이 corrupt를 반환한다.</mb:test>
+        <mb:test id="T-UI-B04-08" kind="unit">정상 왕복이 store validate를 통과한다.</mb:test>
+        <mb:test id="T-UI-B04-09" kind="unit">어떤 입력에도 예외를 던지지 않는다(fuzz 200건).</mb:test>
+      </mb:tests>
+      <mb:rollback>decoder 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B04-03" parent="UI-B04" name="Schema migration ladder">
+      <mb:rationale>
+        V4-13은 알려진 이전 version만 순차 migrate하라고 정한다. 현재 version이 1뿐이라 사다리는 비어 있지만,
+        구조를 지금 세워 두지 않으면 version 2가 생길 때 임시방편이 들어간다.
+      </mb:rationale>
+      <mb:objective>
+        migrate가 등록된 단계만 순서대로 적용하고, 미등록 version은 실패로 닫는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/state/serialize.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B04-02 완료</mb:preconditions>
+      <mb:input-type>migrate(obj: object) -> object | null</mb:input-type>
+      <mb:input-validation>obj.schemaVersion이 CURRENT 미만인 경우에만 호출된다.</mb:input-validation>
+      <mb:output-type>CURRENT로 올라간 객체, 또는 경로가 없으면 null</mb:output-type>
+      <mb:output-validation>
+        반환 객체의 schemaVersion이 CURRENT다. 중간 단계를 건너뛰지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>없음. 실패는 null이다.</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const STEPS = new Map();          // from version -> fn(obj) -> obj ; empty today
+migrate(obj):
+    let cur = obj;
+    while (cur.schemaVersion < CURRENT) {
+        const step = STEPS.get(cur.schemaVersion);
+        if (!step) return null;                    // fail closed, never guess
+        cur = step(cur);
+    }
+    return cur;
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B04-10" kind="unit">등록되지 않은 이전 version이 null을 반환한다.</mb:test>
+        <mb:test id="T-UI-B04-11" kind="unit">
+          가짜 step 2개를 등록하면 순서대로 적용되어 CURRENT에 도달한다.
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>migrate 제거하고 이전 version을 corrupt로 처리한다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B04-04" parent="UI-B04" name="state/persistence.js debounce, flush, quota fallback">
+      <mb:rationale>
+        V4-08이 닫으려는 유실 경계가 여기다. debounce만으로는 마지막 변경이 사라지고,
+        quota 실패를 삼키면 사용자가 저장되었다고 오인한다.
+      </mb:rationale>
+      <mb:objective>
+        300ms trailing debounce로 저장하고, flushNow가 timer를 취소한 뒤 동기 저장하며,
+        저장 실패 시 in-memory mode로 강등하고 1회 알린다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/state/persistence.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B04-02 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+createPersistence(deps: {
+  storage: {getItem(k): string|null, setItem(k,v): void, removeItem(k): void},
+  now: () => number,
+  setTimeout: (fn, ms) => number,
+  clearTimeout: (id) => void,
+  onWarning: (code: string) => void
+}) -> Persistence
+Persistence.schedule(session): void
+Persistence.flushNow(): void
+Persistence.restore(): RestoreResult
+Persistence.mode: "storage" | "memory"
+      ]]></mb:input-type>
+      <mb:input-validation>
+        deps의 다섯 항목이 모두 존재해야 한다. 누락 시 TypeError. CV1에 따라 전역을 직접 잡지 않는다.
+        이 주입 구조가 fake timer 기반 test를 가능하게 하는 핵심이다.
+      </mb:input-validation>
+      <mb:output-type>Persistence 인스턴스</mb:output-type>
+      <mb:output-validation>
+        debounce window 안의 N회 schedule이 setItem 1회로 합쳐진다.
+        flushNow 후 pending timer가 없다.
+      </mb:output-validation>
+      <mb:exceptions>
+        TypeError(deps 누락). storage 예외는 잡아서 mode를 memory로 바꾸고 onWarning을 1회만 호출한다.
+        두 번째부터는 알리지 않는다.
+      </mb:exceptions>
+      <mb:side-effects>
+        storage 쓰기. mode 전환은 되돌리지 않는다. 한 번 실패한 storage를 다시 시도하면
+        매 mutation마다 예외 비용이 붙는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+KEY = "sudoku:v1:session"
+schedule(session):
+    pending = session
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => { timer = null; write(pending) }, 300)
+flushNow():
+    if (timer) { clearTimeout(timer); timer = null }
+    if (pending) write(pending)
+write(session):
+    if (mode === "memory") return
+    try { storage.setItem(KEY, JSON.stringify(serializeSession(session))); pending = null }
+    catch (e) { mode = "memory"; onWarning("storage-unavailable") }   // once, by construction
+restore(): raw = storage.getItem(KEY); return raw ? deserializeSession(raw) : {ok:false, code:"empty"}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B04-12" kind="unit">
+          fake timer로 300ms 안 5회 schedule이 setItem 1회가 된다(V-UI-B04-01).
+        </mb:test>
+        <mb:test id="T-UI-B04-13" kind="unit">
+          pending 상태에서 flushNow가 timer를 취소하고 즉시 쓴다(V-UI-B04-02).
+        </mb:test>
+        <mb:test id="T-UI-B04-14" kind="unit">
+          throw하는 storage에서 mode가 memory로 바뀌고 onWarning이 정확히 1회 호출된다(V-UI-B04-04).
+        </mb:test>
+        <mb:test id="T-UI-B04-15" kind="unit">memory mode에서 후속 schedule이 예외 없이 동작한다.</mb:test>
+        <mb:test id="T-UI-B04-16" kind="unit">deps 누락이 TypeError다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. lifecycle 연결은 UI-B12가 하므로 이 시점엔 의존자가 없다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B04-05" parent="UI-B04" name="state/settings.js defaults and persistence">
+      <mb:rationale>
+        Settings는 session과 수명이 다르고 손상 시 대처도 다르다. session 복원 실패는 새 게임으로 가지만
+        settings 복원 실패는 기본값으로 조용히 계속하는 편이 옳다. 그래서 별도 모듈이다.
+      </mb:rationale>
+      <mb:objective>
+        5개 field의 기본값이 Phase 1과 일치하고, 손상된 저장값이 기본값으로 대체되며, 변경이 즉시 저장된다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/state/settings.js"/></mb:target-files>
+      <mb:preconditions>없음. persistence와 독립이다.</mb:preconditions>
+      <mb:input-type><![CDATA[
+createSettings(storage) -> SettingsStore
+Settings = {
+  schemaVersion: 1,
+  autoRemoveCandidates: boolean,   // default true
+  showConflicts: boolean,          // default true
+  shiftQuasimode: boolean,         // default true
+  touchControls: "auto"|"show"|"hide",   // default "auto"
+  hintStripSeenCount: number       // default 0
+}
+SettingsStore.get() -> Settings ; .set(key, value) -> void ; .subscribe(fn) -> () => void
+      ]]></mb:input-type>
+      <mb:input-validation>
+        알 수 없는 key는 RangeError. 타입 불일치도 RangeError. touchControls는 3개 리터럴만 허용한다.
+        UI-B14가 이 API로만 설정을 바꾸므로 여기서 막으면 전 경로가 막힌다.
+      </mb:input-validation>
+      <mb:output-type>Settings 사본. 내부 객체를 그대로 노출하지 않는다.</mb:output-type>
+      <mb:output-validation>
+        누락되거나 타입이 틀린 field는 기본값으로 채워진다. 알 수 없는 field는 버린다.
+      </mb:output-validation>
+      <mb:exceptions>RangeError(잘못된 key 또는 value). 저장 실패는 조용히 무시하고 in-memory로 계속한다.</mb:exceptions>
+      <mb:side-effects>storage 키 sudoku:v1:settings 쓰기. set마다 즉시 저장한다(debounce 없음).</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+DEFAULTS = {schemaVersion:1, autoRemoveCandidates:true, showConflicts:true,
+            shiftQuasimode:true, touchControls:"auto", hintStripSeenCount:0}
+load(): raw = storage.getItem(KEY)
+        parsed = tryParse(raw) ?? {}
+        return {...DEFAULTS, ...pickValidFields(parsed)}      // unknown keys dropped
+set(k, v): if (!(k in DEFAULTS)) throw RangeError
+           if (typeof v !== typeof DEFAULTS[k]) throw RangeError
+           if (k === "touchControls" && !["auto","show","hide"].includes(v)) throw RangeError
+           current[k] = v; trySave(); notify()
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B04-17" kind="unit">저장값이 없으면 Phase 1 기본값 5종이 나온다.</mb:test>
+        <mb:test id="T-UI-B04-18" kind="unit">손상된 JSON이 기본값으로 대체되고 예외가 없다.</mb:test>
+        <mb:test id="T-UI-B04-19" kind="unit">알 수 없는 key의 set이 RangeError다.</mb:test>
+        <mb:test id="T-UI-B04-20" kind="unit">touchControls에 "yes"를 넣으면 RangeError다.</mb:test>
+        <mb:test id="T-UI-B04-21" kind="unit">일부 field만 저장된 값도 나머지가 기본값으로 채워진다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B04">
+      V-UI-B04-01 → T-UI-B04-12 | 02 → T-UI-B04-13 | 03 → T-UI-B04-03..07 |
+      04 → T-UI-B04-14 | 05 → T-UI-B04-02. 5/5 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ UI-B05 -->
+  <mic:parent-block id="UI-B05" name="URL codec: envelope, canonical body, integrity" micro-count="7">
+    <mic:objective-recap>
+      OuterEnvelopeV1과 BodyV1 왕복, typed failure 거부, 동일 canonical state의 byte 결정성.
+    </mic:objective-recap>
+    <mic:order>M-UI-B05-01, 02는 독립 → 03 → 04 → 05 → 06 → 07</mic:order>
+    <mic:spec-reference>
+      Phase 1 §15 url:envelope, url:canonicalization, url:decode-pipeline이 규범이다.
+      이 블록은 그 규범을 코드로 옮기며 새로운 형식 결정을 하지 않는다.
+    </mic:spec-reference>
+
+    <mb:micro id="M-UI-B05-01" parent="UI-B05" name="url/crc32.js">
+      <mb:rationale>
+        V4-09가 요구한 무결성 수단이다. 독립 순수 함수라 가장 먼저 확정할 수 있고,
+        알려진 test vector로 정확성을 못박을 수 있다.
+      </mb:rationale>
+      <mb:objective>표준 CRC-32(IEEE 802.3, reflected)가 알려진 vector와 일치한다.</mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/url/crc32.js"/></mb:target-files>
+      <mb:preconditions>UI-B01 완료</mb:preconditions>
+      <mb:input-type>crc32(bytes: Uint8Array) -> number (unsigned 32-bit)</mb:input-type>
+      <mb:input-validation>Uint8Array가 아니면 TypeError. 빈 배열은 유효하며 0을 반환한다.</mb:input-validation>
+      <mb:output-type>0..0xFFFFFFFF 범위의 정수. 부호 있는 값을 반환하지 않는다.</mb:output-type>
+      <mb:output-validation>
+        crc32("") === 0, crc32("123456789") === 0xCBF43926. 후자가 표준 check value다.
+      </mb:output-validation>
+      <mb:exceptions>TypeError만</mb:exceptions>
+      <mb:side-effects>없음. 256 entry lookup table을 모듈 로드 시 1회 만든다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+TABLE[n] = 8 rounds of (c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1), starting from n
+crc32(bytes):
+    let c = 0xFFFFFFFF
+    for (b of bytes) c = TABLE[(c ^ b) & 0xFF] ^ (c >>> 8)
+    return (c ^ 0xFFFFFFFF) >>> 0            // >>> 0 keeps it unsigned
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B05-01" kind="unit">표준 check value 0xCBF43926과 일치한다.</mb:test>
+        <mb:test id="T-UI-B05-02" kind="unit">빈 입력이 0이다.</mb:test>
+        <mb:test id="T-UI-B05-03" kind="unit">반환값이 항상 unsigned다(음수 없음).</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B05-02" parent="UI-B05" name="url/leb128.js minimal unsigned encoding">
+      <mb:rationale>
+        §15 decode step 7이 "최대 5바이트, minimal representation만 허용"을 요구한다.
+        non-minimal 인코딩을 받아주면 같은 상태가 여러 byte열을 갖게 되어 결정성이 깨진다.
+      </mb:rationale>
+      <mb:objective>인코딩은 항상 최소 길이이고, 디코딩은 non-minimal과 5바이트 초과를 거부한다.</mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/url/leb128.js"/></mb:target-files>
+      <mb:preconditions>UI-B01 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+encodeULEB128(value: number, out: number[]) -> void
+decodeULEB128(bytes: Uint8Array, offset: number) -> {value: number, next: number} | null
+      ]]></mb:input-type>
+      <mb:input-validation>
+        value가 음수, 비정수, 2^32 이상이면 RangeError.
+        디코딩에서 buffer 끝을 넘어서면 null, 5바이트를 넘어도 null, 최상위 byte가 0인
+        불필요한 연장도 null이다.
+      </mb:input-validation>
+      <mb:output-type>디코딩 성공 시 값과 다음 offset. 실패는 null(typed failure의 하위 형태).</mb:output-type>
+      <mb:output-validation>
+        모든 0..2^32-1 값에서 decode(encode(v)) === v이고 인코딩 길이가 최소다.
+      </mb:output-validation>
+      <mb:exceptions>RangeError(인코딩 입력). 디코딩은 예외를 던지지 않는다.</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+encodeULEB128(v, out):
+    do { let b = v & 0x7F; v >>>= 7; if (v) b |= 0x80; out.push(b) } while (v)
+decodeULEB128(bytes, off):
+    let result = 0, shift = 0, count = 0
+    while (true) {
+        if (off >= bytes.length || count === 5) return null
+        const b = bytes[off++]; count++
+        result += (b & 0x7F) * 2 ** shift; shift += 7
+        if (!(b & 0x80)) break
+    }
+    if (count > 1 && bytes[off-1] === 0) return null      // non-minimal
+    if (result > 0xFFFFFFFF) return null
+    return {value: result, next: off}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B05-04" kind="unit">0, 127, 128, 16383, 2^32-1 왕복이 성립한다.</mb:test>
+        <mb:test id="T-UI-B05-05" kind="unit">0x80 0x00 같은 non-minimal 입력이 null이다.</mb:test>
+        <mb:test id="T-UI-B05-06" kind="unit">6바이트 연속 continuation이 null이다.</mb:test>
+        <mb:test id="T-UI-B05-07" kind="unit">buffer 끝 절단이 null이다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B05-03" parent="UI-B05" name="url/canonical.js normalization and scope projection">
+      <mb:rationale>
+        §15 url:canonicalization 8개 규칙이 여기 모인다. 인코더와 디코더가 같은 정의를 공유해야
+        "동일 canonical state는 동일 byte열"이 성립한다.
+      </mb:rationale>
+      <mb:objective>
+        SC1·SC2·SC3 투영과 canonical 불변식 검사가 한 모듈에 있고, 양방향에서 재사용된다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/url/canonical.js"/></mb:target-files>
+      <mb:preconditions>UI-B03 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+project(session: GameSession, scope: "SC1"|"SC2"|"SC3", savedAt: number|null) -> CanonicalState
+CanonicalState = {
+  givens: Uint8Array(81),
+  values: Uint8Array(81) | null,
+  candidates: Uint16Array(81) | null,
+  notes: Array<{kind: 0|1|2|3, key: number, text: string}> | null,
+  savedAt: number | null
+}
+checkInvariants(state: CanonicalState) -> {ok:true} | {ok:false, code:"invalid-puzzle"|"malformed-body"}
+      ]]></mb:input-type>
+      <mb:input-validation>
+        scope가 3종 밖이면 RangeError. SC1은 values, candidates, notes, savedAt을 모두 null로 만든다.
+        SC2는 notes만 null이다.
+      </mb:input-validation>
+      <mb:output-type>CanonicalState. notes는 (kind, key) 오름차순으로 정렬된다.</mb:output-type>
+      <mb:output-validation><![CDATA[
+given cell의 value와 candidate가 0이다
+non-zero value cell의 candidate가 0이다
+notes는 (kind,key) 정렬이며 target 중복이 없고 길이 <= 108
+text는 LF 정규화 상태이며 LF와 TAB 외 C0 control과 NUL이 없다
+givens에 row/column/box 모순이 없다
+      ]]></mb:output-validation>
+      <mb:exceptions>RangeError(scope). 상태 위반은 typed result다.</mb:exceptions>
+      <mb:side-effects>없음. 입력 session을 수정하지 않고 새 배열을 만든다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+KIND = {cell:0, row:1, column:2, box:3}
+project(session, scope, savedAt):
+    givens = copy(session.givens)
+    if (scope === "SC1") return {givens, values:null, candidates:null, notes:null, savedAt:null}
+    values = copy(session.values); candidates = copy(session.candidates)
+    for i in 0..80: if (givens[i]) { values[i] = 0; candidates[i] = 0 }
+                    else if (values[i]) candidates[i] = 0
+    notes = scope === "SC3" ? collectNotes(session).sort(byKindThenKey) : null
+    return {givens, values, candidates, notes, savedAt}
+
+checkInvariants(state): run every rule above; givens contradiction -> "invalid-puzzle"
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B05-08" kind="unit">SC1 투영이 givens만 남긴다.</mb:test>
+        <mb:test id="T-UI-B05-09" kind="unit">given cell의 value와 candidate가 0으로 정규화된다.</mb:test>
+        <mb:test id="T-UI-B05-10" kind="unit">notes가 (kind,key) 순으로 정렬된다.</mb:test>
+        <mb:test id="T-UI-B05-11" kind="unit">모순된 givens가 invalid-puzzle을 반환한다.</mb:test>
+        <mb:test id="T-UI-B05-12" kind="unit">CRLF가 LF로 정규화되고 NUL이 거부된다.</mb:test>
+        <mb:test id="T-UI-B05-13" kind="unit">note 109건이 malformed-body를 반환한다(H1 회귀).</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B05-04" parent="UI-B05" name="BodyV1 writer">
+      <mb:rationale>
+        §15 layout을 byte로 옮기는 절반이다. padding zero 규칙(V4-15)이 여기서 지켜지지 않으면
+        결정성 property가 깨진다.
+      </mb:rationale>
+      <mb:objective>CanonicalState를 BodyV1 byte열로 쓰고 모든 padding bit가 0이다.</mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/url/codec.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B05-02, 03 완료</mb:preconditions>
+      <mb:input-type>writeBody(state: CanonicalState) -> Uint8Array</mb:input-type>
+      <mb:input-validation>checkInvariants를 통과한 state만 받는다. 호출자가 보장한다.</mb:input-validation>
+      <mb:output-type>BodyV1 byte열</mb:output-type>
+      <mb:output-validation><![CDATA[
+byte0 stateFlags의 bit4..7 = 0
+byte1 = 9
+givens 41바이트의 마지막 nibble = 0
+presence bitmap 11바이트의 상위 7비트 = 0
+mask stream은 LSB-first, 마지막 byte의 미사용 상위 비트 = 0
+noteCount <= 108
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+writeBody(state):
+    flags = (values?1:0) | (candidates?2:0) | (notes?4:0) | (savedAt!=null?8:0)
+    out = [flags, 9]
+    if (savedAt != null) push 4 bytes little-endian of savedAt
+    pushNibbles(out, state.givens)                 // 41 bytes, last nibble zero
+    if (values) pushNibbles(out, state.values)
+    if (candidates) {
+        bitmap = 11 zero bytes; for i where candidates[i]: bitmap bit i = 1   // LSB-first
+        push bitmap
+        bitWriter = LSB-first writer
+        for i in cell order where candidates[i]: bitWriter.write9(candidates[i])
+        bitWriter.flush()                          // pads the final byte with zeros
+    }
+    if (notes) { encodeULEB128(notes.length, out)
+                 for n of notes: out.push(n.kind, n.key)
+                                 utf8 = encodeUTF8(n.text)
+                                 encodeULEB128(utf8.length, out); push utf8 }
+    return Uint8Array.from(out)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B05-14" kind="unit">SC1 body 길이가 정확히 43바이트다(§15 산식).</mb:test>
+        <mb:test id="T-UI-B05-15" kind="unit">
+          SC2 + candidate cell 20개 body가 122바이트다(§15 산식).
+        </mb:test>
+        <mb:test id="T-UI-B05-16" kind="unit">givens 마지막 nibble과 bitmap 상위 7비트가 0이다.</mb:test>
+        <mb:test id="T-UI-B05-17" kind="unit">
+          candidate cell 수 1..81 전 구간에서 mask stream 길이가 ceil(9n/8)이고 말단 padding이 0이다(H2 회귀).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>writer 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B05-05" parent="UI-B05" name="BodyV1 strict reader">
+      <mb:rationale>
+        URL은 신뢰할 수 없는 입력이다(§12 보안 규칙). §15 decode step 5부터 11까지의 검사를
+        하나라도 빠뜨리면 손상된 상태가 store로 들어간다.
+      </mb:rationale>
+      <mb:objective>
+        모든 필드 읽기 전에 경계를 검사하고, 위반을 typed code로 거부하며, buffer를 정확히 소진한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/url/codec.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B05-04 완료</mb:preconditions>
+      <mb:input-type>readBody(bytes: Uint8Array) -> {ok:true, state:CanonicalState} | {ok:false, code, message}</mb:input-type>
+      <mb:input-validation><![CDATA[
+reserved bit 비영               -> "malformed-body"
+dim !== 9                       -> "malformed-body"
+남은 버퍼 부족                   -> "malformed-body"
+nibble > 9                      -> "malformed-body"
+padding bit 비영                 -> "malformed-body"
+mask === 0인 present cell        -> "malformed-body"
+noteCount > 108, length > 512    -> "malformed-body"
+UTF-8 invalid (fatal decode)     -> "malformed-body"
+note 순서 위반 또는 중복 target   -> "malformed-body"
+trailing bytes 잔존              -> "malformed-body"
+givens 모순                      -> "invalid-puzzle"
+      ]]></mb:input-validation>
+      <mb:output-type>CanonicalState 또는 typed failure</mb:output-type>
+      <mb:output-validation>성공 시 checkInvariants가 통과한다. offset === bytes.length여야 한다.</mb:output-validation>
+      <mb:exceptions>없음. 모든 실패가 typed result다.</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+readBody(bytes):
+    r = new Cursor(bytes)                       // every read checks remaining length
+    flags = r.u8(); if (flags & 0xF0) return fail("malformed-body")
+    if (r.u8() !== 9) return fail("malformed-body")
+    savedAt = flags & 8 ? r.u32le() : null
+    givens  = r.nibbles(81); if (r.lastPadNibble !== 0) return fail(...)
+    values  = flags & 1 ? r.nibbles(81) : null
+    candidates = flags & 2 ? r.candidateBlock() : null    // checks both padding rules
+    notes   = flags & 4 ? r.noteBlock() : null            // <=108, sorted, unique, fatal utf8
+    if (!r.atEnd()) return fail("malformed-body")         // step 11
+    state = {givens, values, candidates, notes, savedAt}
+    return checkInvariants(state).ok ? {ok:true, state} : that failure
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B05-18" kind="unit">reserved bit를 세운 입력이 거부된다.</mb:test>
+        <mb:test id="T-UI-B05-19" kind="unit">mask stream 말단 padding을 1로 조작하면 거부된다(V-UI-B05-04).</mb:test>
+        <mb:test id="T-UI-B05-20" kind="unit">noteCount 109가 거부된다(V-UI-B05-03).</mb:test>
+        <mb:test id="T-UI-B05-21" kind="unit">trailing byte 1개가 붙으면 거부된다.</mb:test>
+        <mb:test id="T-UI-B05-22" kind="unit">절단된 body가 예외 없이 malformed-body를 반환한다.</mb:test>
+        <mb:test id="T-UI-B05-23" kind="unit">note 순서를 뒤집으면 거부된다.</mb:test>
+        <mb:test id="T-UI-B05-24" kind="unit">invalid UTF-8 시퀀스가 거부된다.</mb:test>
+      </mb:tests>
+      <mb:rollback>reader 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B05-06" parent="UI-B05" name="OuterEnvelopeV1, compression, base64url">
+      <mb:rationale>
+        V4-01이 압축 flag 순환 의존을 없앤 지점이다. codec byte와 CRC가 압축되지 않은 외부에 있어야
+        디코더가 무엇을 받았는지 먼저 알 수 있다.
+      </mb:rationale>
+      <mb:objective>
+        envelope 조립과 해체, 조건부 deflate-raw, 64KiB 한도, base64url 무패딩 변환이 동작한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/url/codec.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B05-01, 04, 05 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+encode(session, scope, savedAt, deps?) -> Promise<string>
+decode(fragment: string, deps?) -> Promise<{ok:true,state} | {ok:false,code,message}>
+deps = {CompressionStream?, DecompressionStream?}      // 주입 가능, 부재 테스트용
+      ]]></mb:input-type>
+      <mb:input-validation>
+        fragment 길이 8000 초과 -> "too-long". base64url alphabet 위반 -> "invalid-base64".
+        formatVersion !== 1 -> "unsupported-version". codec이 0,1 밖 -> "unsupported-codec".
+      </mb:input-validation>
+      <mb:output-type>base64url 무패딩 문자열, 또는 typed failure</mb:output-type>
+      <mb:output-validation>
+        압축 결과가 raw보다 짧을 때만 codec=1이다. CRC32는 항상 압축 전 BodyV1에 대해 계산한다.
+        decompression 출력이 65536을 넘으면 즉시 reader를 cancel하고 "decompression-limit"이다.
+      </mb:output-validation>
+      <mb:exceptions>없음. CompressionStream 부재는 raw로 강등하고 예외로 만들지 않는다.</mb:exceptions>
+      <mb:side-effects>없음. 네트워크와 DOM을 건드리지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+encode(session, scope, savedAt, deps):
+    state = project(session, scope, savedAt)
+    body  = writeBody(state)
+    crc   = crc32(body)
+    packed = await tryDeflateRaw(body, deps)            // null when unsupported
+    usePacked = packed && packed.length < body.length
+    out = [1, usePacked ? 1 : 0, ...(usePacked ? packed : body), ...le32(crc)]
+    return base64urlNoPad(out)
+
+decode(fragment, deps):
+    length and alphabet checks
+    bytes = base64urlDecode(fragment)
+    if (bytes.length < 6) return fail("malformed-body")
+    if (bytes[0] !== 1) return fail("unsupported-version")
+    codec = bytes[1]; if (codec > 1) return fail("unsupported-codec")
+    payload = bytes.slice(2, -4); trailer = le32At(bytes, bytes.length-4)
+    body = codec === 0 ? payload : await inflateRawLimited(payload, 65536, deps)
+    if (body === UNSUPPORTED) return fail("unsupported-codec")
+    if (body === OVERFLOW)    return fail("decompression-limit")
+    if (crc32(body) !== trailer) return fail("crc-mismatch")
+    return readBody(body)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B05-25" kind="unit">SC1 링크가 66자, SC2+20이 171자다(V-UI-B05-06).</mb:test>
+        <mb:test id="T-UI-B05-26" kind="unit">CRC를 1비트 뒤집으면 crc-mismatch다.</mb:test>
+        <mb:test id="T-UI-B05-27" kind="unit">
+          CompressionStream을 제거한 deps에서 raw만 생성되고 codec=1 입력은 unsupported-codec이다(V-UI-B05-05).
+        </mb:test>
+        <mb:test id="T-UI-B05-28" kind="unit">8001자 fragment가 too-long이다.</mb:test>
+        <mb:test id="T-UI-B05-29" kind="unit">formatVersion 2가 unsupported-version이다.</mb:test>
+        <mb:test id="T-UI-B05-30" kind="unit">64KiB 초과 압축 폭탄이 decompression-limit이다.</mb:test>
+      </mb:tests>
+      <mb:rollback>envelope 계층만 제거하면 writer와 reader는 그대로 쓸 수 있다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B05-07" parent="UI-B05" name="Property test suite over seeded random states">
+      <mb:rationale>
+        RK4가 지적한 영구 호환 부담 때문에 이 블록만 단위 test로는 부족하다.
+        1,000건 무작위 왕복과 byte 결정성이 MR-U2의 해제 조건이다.
+      </mb:rationale>
+      <mb:objective>
+        seeded 무작위 canonical state 1,000건에서 왕복과 결정성이 성립하고 decode 성능이 목표를 만족한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="tests/js/url-codec.property.test.mjs"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B05-06 완료</mb:preconditions>
+      <mb:input-type>
+        결정적 PRNG(seed 고정)로 만든 CanonicalState 생성기. 외부 라이브러리를 쓰지 않는다.
+      </mb:input-type>
+      <mb:input-validation>
+        생성기가 만드는 state는 항상 checkInvariants를 통과해야 한다. 그렇지 않으면 test가 codec이 아니라
+        생성기를 검사하게 된다. 생성 직후 이를 assert한다.
+      </mb:input-validation>
+      <mb:output-type>test 결과</mb:output-type>
+      <mb:output-validation><![CDATA[
+decode(await encode(state, scope)) === normalize(state, scope)     for all 1,000
+동일 (state, scope, savedAt)의 encode 결과가 byte 단위로 동일       (결정성)
+note 수 0, 1, 107, 108 경계 포함
+candidate cell 수 0, 1, 80, 81 경계 포함
+8,000자 payload decode < 100ms
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>실행 시간이 수 초 걸린다. node --test의 기본 timeout을 넘지 않도록 확인한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const rng = mulberry32(0xC0FFEE);            // deterministic, in-repo, no dependency
+for (let i = 0; i < 1000; i++) {
+    const scope = pick(["SC1","SC2","SC3"], rng);
+    const state = randomCanonicalState(rng);           // hits the listed boundaries
+    assert(checkInvariants(state).ok);                 // the generator itself is sane
+    const link = await encode(state, scope, savedAt);
+    const back = await decode(link);
+    assert.deepEqual(back.state, project(state, scope, savedAt));
+    assert.equal(link, await encode(state, scope, savedAt));        // determinism
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B05-31" kind="property">1,000건 왕복이 전부 성립한다(V-UI-B05-01).</mb:test>
+        <mb:test id="T-UI-B05-32" kind="property">동일 입력의 encode가 byte 동일하다(V-UI-B05-02).</mb:test>
+        <mb:test id="T-UI-B05-33" kind="property">note 108건 왕복 성공, 109건 거부가 표본에 포함된다.</mb:test>
+        <mb:test id="T-UI-B05-34" kind="performance">8,000자 decode가 100ms 미만이다(V-UI-B05-07).</mb:test>
+      </mb:tests>
+      <mb:rollback>test 파일 삭제. 다만 MR-U2 해제 조건이 사라지므로 공유 기능을 노출하지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B05">
+      V-UI-B05-01 → T-UI-B05-31 | 02 → T-UI-B05-32 | 03 → T-UI-B05-20 | 04 → T-UI-B05-19 |
+      05 → T-UI-B05-27 | 06 → T-UI-B05-25 | 07 → T-UI-B05-34. 7/7 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <mic:risks xml:id="wave2a-risks">
+    <mic:risk id="W2A-R1" severity="high" refs="M-UI-B05-04, M-UI-B05-05">
+      writer와 reader의 padding 해석이 어긋나면 왕복은 성공하는데 다른 구현과 호환되지 않는 링크가 나온다.
+      T-UI-B05-17이 writer를 직접 검사하고 T-UI-B05-19가 reader를 직접 검사하는 이유다.
+      왕복 test만으로는 두 오류가 상쇄되어 통과할 수 있다.
+    </mic:risk>
+    <mic:risk id="W2A-R2" severity="medium" refs="M-UI-B03-05">
+      CF4 grouping을 store 밖에서 흉내 내면 undo가 쪼개진다. grouping은 반드시 store 내부에서
+      beginGroup과 endGroup 사이에 일어나야 한다.
+    </mic:risk>
+    <mic:risk id="W2A-R3" severity="medium" refs="M-UI-B04-04">
+      persistence가 전역 localStorage나 setTimeout을 직접 잡으면 CV1이 깨지고 T-UI-B04-12부터 16까지가
+      작성 불가능해진다. 주입 구조를 우회하지 않는다.
+    </mic:risk>
+    <mic:risk id="W2A-R4" severity="low" refs="M-UI-B05-07">
+      property test의 무작위 생성기가 경계를 만들지 못하면 통과가 무의미해진다.
+      경계 포함 여부를 test가 스스로 assert하도록 한다.
+    </mic:risk>
+  </mic:risks>
+
+  <mic:open-questions xml:id="open-questions">
+    <mic:question id="OQ-W2A-1" blocking="false" refs="M-UI-B03-06">
+      note 길이 상한을 512 UTF-8 byte로 잡았다. §15 decode-pipeline의 note length 512와 맞춘 값이며
+      store 단계에서 미리 막아 URL 생성 시점의 실패를 없애려는 의도다. 이 조기 차단에 동의하는지 확인이 필요하다.
+    </mic:question>
+    <mic:question id="OQ-W2A-2" blocking="false" refs="M-UI-B04-04">
+      storage 실패 후 mode를 memory로 고정하고 재시도하지 않기로 했다. 사용자가 브라우저 설정을 바꿔
+      quota를 확보해도 새로고침 전까지는 저장이 재개되지 않는다. 이 단순함을 받아들일지 확인이 필요하다.
+    </mic:question>
+  </mic:open-questions>
+
+  <mic:approval xml:id="approval" status="awaiting-user-approval">
+    <mic:current-phase>3. Micro Blocking — Wave 2 part A</mic:current-phase>
+    <mic:validation-performed>
+      XML well-formedness, micro block과 test id 유일성,
+      Macro 검증 항목 수용 완전성(UI-B03 6/6, UI-B04 5/5, UI-B05 7/7),
+      Phase 1 §15 envelope 규범과 pseudocode 대조
+    </mic:validation-performed>
+    <mic:checkbox checked="false">Wave 2 part A Micro Blocking 승인</mic:checkbox>
+    <mic:next-phase blocked="true">Wave 2 part B — UI-B06, DX-B02, DX-B03, DX-B04</mic:next-phase>
+  </mic:approval>
+
+</mic:micro-blocking>

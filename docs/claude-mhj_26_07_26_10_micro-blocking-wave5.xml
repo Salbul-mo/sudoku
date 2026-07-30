@@ -1,0 +1,721 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mic:micro-blocking
+    xmlns:mic="urn:sudoku:micro-blocking:v1"
+    xmlns:mb="urn:sudoku:micro-block:v1"
+    xmlns:dev="urn:sudoku:deviation:v1"
+    xml:id="sudoku-micro-blocking-wave5"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="3"
+    wave="W5"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 3 Micro Blocking, Wave 5.
+    UI-B12 bootstrap 통합과 UI-B14 application shell.
+    앞선 wave에서 누적된 파일 배치 변경을 file-layout-addendum으로 한 번에 정리한다.
+  -->
+
+  <mic:document-control xml:id="document-control">
+    <mic:title>Micro Blocking — Wave 5 (bootstrap integration and application shell)</mic:title>
+    <mic:owner>claude-mhj</mic:owner>
+    <mic:baseline>
+      <mic:file>docs/claude-mhj_26_07_26_03_sudoku-master-macro-plan.xml</mic:file>
+      <mic:blocks-covered>UI-B12, UI-B14</mic:blocks-covered>
+    </mic:baseline>
+    <mic:deliverable>
+      <mic:file>docs/claude-mhj_26_07_26_10_micro-blocking-wave5.xml</mic:file>
+      <mic:scope>Micro Block 정의만 포함한다. application code는 변경하지 않았다.</mic:scope>
+    </mic:deliverable>
+    <mic:significance>
+      UI-B12는 앞선 모든 블록이 처음으로 하나의 실행 가능한 앱이 되는 지점이다.
+      MR-U1이 기술한 조작 불가 구간이 여기서 끝난다.
+      UI-B14는 H1 검토로 신설된 블록이며 Phase 1 V4-18의 귀착점이다.
+    </mic:significance>
+    <mic:approval-state current="awaiting-user-approval">
+      <mic:next-on-approval>Wave 6 Micro Blocking</mic:next-on-approval>
+      <mic:prohibited-before-approval>모든 code implementation</mic:prohibited-before-approval>
+    </mic:approval-state>
+  </mic:document-control>
+
+  <!-- ===================================== 누적 배치 변경 정리 -->
+  <mic:file-layout-addendum xml:id="file-layout-addendum" needs-approval="true">
+    <mic:note>
+      Micro Blocking 과정에서 DEC-UI-04의 20개 모듈 목록에 없던 파일이 넷 생겼다.
+      모두 "순수 함수로 떼어 자동 검증 가능하게 만든다"는 같은 이유에서 나왔다.
+      wave마다 흩어 두지 않고 여기서 한 번에 승인받는다.
+    </mic:note>
+    <mic:added path="game/static/game/js/ui/board-nav.js" origin="DV-05" wave="W2B">
+      moveSelection 이동 규칙. UI-B06 소속 순수 함수이며 UI-B07이 키를 여기에 연결한다.
+    </mic:added>
+    <mic:added path="game/static/game/js/ui/cell-label.js" origin="M-UI-B06-03" wave="W2B">
+      accessible name 조립. DOM 없이 전수 검증하기 위해 분리했다.
+    </mic:added>
+    <mic:added path="game/static/game/js/ui/key-resolve.js" origin="M-UI-B07-01" wave="W3">
+      물리 키 판정. layout 의존을 한 곳에 가두기 위해 분리했다.
+    </mic:added>
+    <mic:added path="game/static/game/js/ui/note-target.js" origin="M-UI-B10-01" wave="W4">
+      note target의 affectedCells와 label. rail, sheet, marker, list 네 곳이 공유한다.
+    </mic:added>
+    <mic:added path="game/sudoku/prefilter.py" origin="M-DX-B02-01" wave="W2B">
+      DLX 선별기. solver.py를 부풀리지 않고 폐기 시 파일 삭제로 되돌리기 위해 분리했다(OQ-W2B-3).
+    </mic:added>
+    <mic:impact>
+      DEC-UI-04의 목표 구조에 위 네 JS 모듈을 추가해야 한다. 배치 원칙은 바뀌지 않는다.
+      모두 ui/ 아래이고 DOM-free이거나 DOM 최소 접촉이다.
+    </mic:impact>
+  </mic:file-layout-addendum>
+
+  <mic:deviations xml:id="deviations">
+    <dev:deviation id="DV-07" from="UI-B04 side-effects" severity="medium" needs-approval="true"
+                   disclosed-late="true">
+      <dev:macro-text>
+        UI-B04의 side-effects는 "pagehide·visibilitychange listener 등록"이라고 적혀 있다.
+      </dev:macro-text>
+      <dev:problem>
+        그런데 DEC-UI-03과 이 문서군의 CV1은 state 계층이 window와 document를 직접 참조하지 않도록 요구한다.
+        persistence가 스스로 listener를 걸면 node:test로 검증할 수 없고 CV1이 깨진다.
+        W2A의 M-UI-B04-04에서 나는 deps 주입 구조를 택하면서 listener 등록을 넣지 않았는데,
+        그 차이를 deviation으로 표시하지 않았다. 지금 소급해 기록한다.
+      </dev:problem>
+      <dev:resolution>
+        persistence는 flushNow()를 공개하고 listener를 걸지 않는다.
+        실제 pagehide와 visibilitychange 등록은 DOM 계층인 bootstrap.js가 M-UI-B12-05에서 수행한다.
+        V-UI-B04-02는 flushNow의 동작을 검증하고, 이벤트 배선의 검증은 V-UI-B12-04 인접에서
+        T-UI-B12-11로 수행한다. 요구 자체는 하나도 사라지지 않고 소유자만 옮긴다.
+      </dev:resolution>
+      <dev:consequence>
+        Macro Plan의 UI-B04 side-effects 문구와 UI-B12 scope에 이 이동을 반영해야 한다.
+      </dev:consequence>
+    </dev:deviation>
+  </mic:deviations>
+
+  <!-- ============================================================ UI-B12 -->
+  <mic:parent-block id="UI-B12" name="Bootstrap orchestration, conflict resolution, API failure" micro-count="5">
+    <mic:objective-recap>
+      9단계 sequence가 순서대로 실행되고, CR1~CR5가 한 번만 평가되며,
+      new-puzzle 실패가 blank page 없이 재시도 가능한 terminal state로 끝난다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B12-01 → 02 → 03 → 04 → 05</mic:order>
+
+    <mb:micro id="M-UI-B12-01" parent="UI-B12" name="Bootstrap sequence orchestration">
+      <mb:rationale>
+        V4-07이 정한 순서의 요점은 "복원이 network보다 먼저"다. 순서가 틀리면 session이 있는
+        사용자도 network를 기다리게 되고, 그것이 애초에 shell 전환의 이유였다.
+      </mb:rationale>
+      <mb:objective>
+        9단계가 명세 순서대로 실행되고, session이 있으면 network 호출 없이 복원된다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/bootstrap.js"/></mb:target-files>
+      <mb:preconditions>UI-B02, UI-B04, UI-B05, UI-B06, UI-B11 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+bootstrap(deps: {
+  root: HTMLElement, hash: string, persistence: Persistence, settings: SettingsStore,
+  codec: {decode, encode}, dialogs: DialogHost, announcer: Announcer,
+  fetchPuzzle: () => Promise<{puzzle:number[], solution:number[]}>,
+  history: {replaceState: (url: string) => void}
+}) -> Promise<{ok: true, store: Store} | {ok: false, reason: string}>
+      ]]></mb:input-type>
+      <mb:input-validation>
+        deps의 모든 항목이 존재해야 한다. 누락 시 TypeError. 주입 구조 덕분에 전체 sequence를
+        node에서 stub으로 검증할 수 있다.
+      </mb:input-validation>
+      <mb:output-type>활성 store 또는 실패 사유</mb:output-type>
+      <mb:output-validation><![CDATA[
+1 inert skeleton 렌더
+2 fragment 파싱 (있을 때만)
+3 decode와 검증
+4 local session 조회
+5 충돌 해소 (한 번만)
+6 채택 session 렌더
+7 없으면 new-puzzle 호출
+8 adapter 활성화
+9 소비한 fragment 제거
+session이 있으면 7단계에 도달하지 않는다.
+      ]]></mb:output-validation>
+      <mb:exceptions>
+        TypeError(deps 누락)만 던진다. 그 외 모든 실패는 typed result다(CV2).
+      </mb:exceptions>
+      <mb:side-effects>DOM, storage, network, history 조작. 이 블록이 그 전부를 조율한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+async function bootstrap(deps) {
+    renderInertSkeleton(deps.root);
+    const url   = deps.hash ? await deps.codec.decode(deps.hash) : null;
+    const local = deps.persistence.restore();
+    const decision = await resolveConflict(url, local, deps);   // CR1..CR5, evaluated once
+    let session = decision.session;
+    if (!session) session = await createNewSession(deps);        // step 7
+    if (!session) return {ok:false, reason:"no-session"};
+    const store = createStore(session);
+    enableAdapters(store);                                       // step 8
+    if (decision.consumedFragment) deps.history.replaceState(cleanUrl());   // step 9
+    return {ok:true, store};
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B12-01" kind="unit">
+          session이 있으면 fetchPuzzle stub이 호출되지 않는다(V-UI-B12-01).
+        </mb:test>
+        <mb:test id="T-UI-B12-02" kind="unit">단계 순서가 호출 로그로 확인된다.</mb:test>
+        <mb:test id="T-UI-B12-03" kind="unit">deps 누락이 TypeError다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. 앱이 다시 빈 skeleton으로 돌아간다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B12-02" parent="UI-B12" name="Conflict resolution CR1 to CR5">
+      <mb:rationale>
+        V4-10이 정한 "생략은 삭제 명령이 아니다"가 여기서 코드가 된다.
+        URL이 notes를 담지 않았다고 local notes를 지우면 사용자 작업이 조용히 사라진다.
+      </mb:rationale>
+      <mb:objective>
+        givens identity → core selection → notes merge 순서로 한 번만 평가하고
+        CR1~CR5 각각의 기대 결과를 낸다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/bootstrap.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B12-01 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+resolveConflict(url: DecodeResult|null, local: RestoreResult, deps)
+  -> Promise<{session: GameSession|null, consumedFragment: boolean}>
+      ]]></mb:input-type>
+      <mb:input-validation>
+        url이 실패 result이면 CR5로 간다. local이 실패면 URL 또는 new puzzle로 간다.
+        두 입력 모두 신뢰할 수 없는 출처이므로 이미 typed result 형태로 들어온다.
+      </mb:input-validation>
+      <mb:output-type>채택된 session과 fragment 소비 여부</mb:output-type>
+      <mb:output-validation><![CDATA[
+CR1 givens 다름      -> local을 archive로 밀고 URL 채택, 8초 undo toast
+CR2 givens 같고 core 다름 -> filled/candidate count와 시각을 보여주고 사용자가 선택
+                            URL에 notes가 없으면 local notes 보존
+CR3 core도 같음      -> URL notes 없으면 local notes 유지, 같으면 no-op
+CR4 notes 다름       -> disjoint는 자동 union, 같은 target 충돌만 target별 선택(기본 local)
+CR5 decode 실패      -> URL 미적용, 확인 후 fragment 제거
+평가는 한 번만 수행한다. CR2와 CR4가 모두 성립하면 dialog를 순차로 연다.
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>archive slot 쓰기, dialog 최대 2회, toast 1회</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+if (!url?.ok) { if (url) await notifyDecodeFailure(url.code); return {session: local.session, consumedFragment: !!url}; }
+if (!local.ok) return {session: url.state -> session, consumedFragment: true};
+
+if (!sameGivens(url, local))                       // CR1
+    { archive(local); toastUndo(8000); return adopt(url); }
+
+let core = local;                                   // CR2 / CR3
+if (differentCore(url, local))
+    core = await dialogs.chooseCore(summaries(url, local));
+
+let notes = local.notes;                            // CR4, only when the URL carried them
+if (url.state.notes) notes = await mergeNotes(local.notes, url.state.notes, dialogs);
+// omission is never deletion (V4-10)
+return {session: combine(core, notes), consumedFragment: true};
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B12-04" kind="unit">CR1~CR5 각각의 기대 결과가 재현된다(V-UI-B12-02).</mb:test>
+        <mb:test id="T-UI-B12-05" kind="unit">
+          URL이 notes를 생략한 경우 local notes가 보존된다(V-UI-B12-03).
+        </mb:test>
+        <mb:test id="T-UI-B12-06" kind="unit">
+          CR2와 CR4가 동시에 성립할 때 dialog가 순차로 열린다(V-UI-B12-07).
+        </mb:test>
+        <mb:test id="T-UI-B12-07" kind="unit">CR1에서 archive에 이전 session이 들어간다.</mb:test>
+      </mb:tests>
+      <mb:rollback>충돌 해소를 "항상 local 우선"으로 축소한다. 기능은 줄지만 데이터 손실은 없다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B12-03" parent="UI-B12" name="new-puzzle fetch with timeout and single retry">
+      <mb:rationale>
+        M1이 지목한 신규 failure mode다. V4-07이 index에서 생성을 없애면서 cold start가
+        network에 의존하게 되었고, 그 경로에 아무 방어가 없었다.
+      </mb:rationale>
+      <mb:objective>
+        10초 timeout과 1회 재시도가 동작하고, 4xx는 재시도하지 않는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/bootstrap.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B12-01 완료</mb:preconditions>
+      <mb:input-type>createNewSession(deps) -> Promise&lt;GameSession | null&gt;</mb:input-type>
+      <mb:input-validation>
+        응답의 puzzle이 길이 81의 정수 배열인지 검사한다. 서버를 신뢰하되 검증한다.
+        solution은 읽지 않고 버린다. client state에 저장하지 않는다(V4-13).
+      </mb:input-validation>
+      <mb:output-type>GameSession 또는 null(terminal state로 감)</mb:output-type>
+      <mb:output-validation><![CDATA[
+timeout 10,000ms (AbortController)
+network error, AbortError, 5xx -> 1초 후 1회 재시도, 총 2회
+4xx -> 재시도 없이 terminal state
+navigator.onLine === false -> 호출 자체를 건너뛴다
+      ]]></mb:output-validation>
+      <mb:exceptions>
+        없음. fetch 예외를 잡아 typed 흐름으로 바꾼다. 예외가 bootstrap 밖으로 나가지 않는다.
+      </mb:exceptions>
+      <mb:side-effects>network 요청 최대 2회. 각 요청은 10초를 넘지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+async function createNewSession(deps) {
+    if (navigator.onLine === false) return showRetryPanel(deps, "offline");
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 10_000);
+        try {
+            const res = await deps.fetchPuzzle({signal: ctl.signal});
+            if (res.status >= 500) throw new RetryableError();
+            if (!res.ok) return showRetryPanel(deps, "server");      // 4xx: no retry
+            const data = await res.json();
+            if (!isValidPuzzle(data.puzzle)) return showRetryPanel(deps, "server");
+            return sessionFromPuzzle(data.puzzle);                   // solution discarded
+        } catch (e) {
+            if (attempt === 1) { await delay(1000); continue; }
+            return showRetryPanel(deps, "network");
+        } finally { clearTimeout(timer); }
+    }
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B12-08" kind="unit">
+          500 응답에서 정확히 2회 시도 후 terminal state로 간다.
+        </mb:test>
+        <mb:test id="T-UI-B12-09" kind="unit">4xx에서 재시도하지 않는다.</mb:test>
+        <mb:test id="T-UI-B12-10" kind="unit">solution이 session에 저장되지 않는다.</mb:test>
+      </mb:tests>
+      <mb:rollback>재시도 없이 1회 호출로 줄인다. 다만 M1이 다시 열린다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B12-04" parent="UI-B12" name="Retry panel terminal state and offline handling">
+      <mb:rationale>
+        V4-16이 정한 종결 형태다. blank page도 무한 spinner도 거짓 성공도 만들지 않는다는
+        세 금지가 이 micro block의 존재 이유다.
+      </mb:rationale>
+      <mb:objective>
+        실패 시 board가 inert로 남고 board 밖 error panel과 48px 재시도 button이 나타나며
+        focus가 그 button으로 간다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/bootstrap.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B12-03 완료</mb:preconditions>
+      <mb:input-type>showRetryPanel(deps, cause: "offline"|"server"|"network") -> null</mb:input-type>
+      <mb:input-validation>cause가 3종 밖이면 RangeError.</mb:input-validation>
+      <mb:output-type>null을 반환해 호출자가 종료하게 한다. panel DOM이 남는다.</mb:output-type>
+      <mb:output-validation><![CDATA[
+board는 inert skeleton 상태를 유지한다 (사라지지 않는다)
+panel은 board rectangle 밖에 있다
+재시도 button은 48x48 이상이고 focus를 받는다
+cause별 문구가 다르다 (offline은 연결 상태를 언급한다)
+online 이벤트 1회 수신 시 button을 강조하되 자동 재시도는 하지 않는다
+      ]]></mb:output-validation>
+      <mb:exceptions>RangeError</mb:exceptions>
+      <mb:side-effects>
+        online 이벤트 리스너 1개를 once로 등록한다. 자동 재시도를 하지 않는 이유는
+        사용자가 보지 않는 사이 상태가 바뀌면 혼란스럽기 때문이다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+function showRetryPanel(deps, cause) {
+    const panel = renderOutsideBoard(MESSAGES[cause]);
+    const btn = panel.querySelector("button");        // 48x48 minimum
+    btn.addEventListener("click", () => retryBootstrap(deps));
+    btn.focus();
+    window.addEventListener("online", () => btn.dataset.highlight = "1", {once: true});
+    deps.announcer.announce("session", MESSAGES[cause]);
+    return null;                                      // never a blank page
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B12-11" kind="manual">
+          offline, timeout, 500 세 조건에서 blank page가 없고 재시도 button에 도달한다(V-UI-B12-04).
+        </mb:test>
+        <mb:test id="T-UI-B12-12" kind="manual">
+          재시도로 복구되면 이후 흐름이 신규 session과 동일하다(V-UI-B12-05).
+        </mb:test>
+        <mb:test id="T-UI-B12-13" kind="manual">online 수신 시 강조되지만 자동 재시도는 없다.</mb:test>
+      </mb:tests>
+      <mb:rollback>panel 대신 정적 오류 문구로 축소한다. 재시도 경로가 사라지므로 권장하지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B12-05" parent="UI-B12" name="Lifecycle wiring and fragment cleanup">
+      <mb:rationale>
+        DV-07의 귀결이다. persistence가 DOM-free를 유지하려면 이벤트 배선을 DOM 계층이 맡아야 한다.
+        V4-12의 주소 정책도 여기서 집행된다. pushState와 hash 대입은 금지다.
+      </mb:rationale>
+      <mb:objective>
+        pagehide와 hidden visibilitychange가 flushNow를 부르고,
+        소비한 fragment가 replaceState로 제거되며, pushState를 쓰지 않는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/bootstrap.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B12-01, UI-B04 완료</mb:preconditions>
+      <mb:input-type>persistence 인스턴스와 window/document 참조</mb:input-type>
+      <mb:input-validation>
+        persistence.flushNow가 함수가 아니면 TypeError.
+      </mb:input-validation>
+      <mb:output-type>등록된 리스너와 정리된 주소</mb:output-type>
+      <mb:output-validation><![CDATA[
+pagehide -> flushNow()
+visibilitychange에서 document.visibilityState === "hidden" -> flushNow()
+beforeunload를 쓰지 않는다 (V4-08)
+fragment 제거는 history.replaceState 1회
+pushState와 location.hash 대입을 사용하지 않는다 (V4-12)
+      ]]></mb:output-validation>
+      <mb:exceptions>TypeError</mb:exceptions>
+      <mb:side-effects>
+        window와 document에 리스너 2개. SPA가 아니므로 해지 경로는 두지 않되,
+        destroy()에서 제거할 수 있게 해지 함수를 반환한다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+function wireLifecycle(persistence) {
+    const flush = () => persistence.flushNow();
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange",
+        () => { if (document.visibilityState === "hidden") flush(); });
+    // no beforeunload: it cannot be relied on and may block unload
+}
+function cleanUrl() { return location.pathname + location.search; }   // drops the fragment
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B12-14" kind="manual">
+          pagehide와 hidden 전환에서 flushNow가 호출된다(DV-07로 이관된 V-UI-B04-02의 배선 절반).
+        </mb:test>
+        <mb:test id="T-UI-B12-15" kind="manual">
+          채택 후 fragment가 replaceState로 제거되고 pushState가 쓰이지 않는다(V-UI-B12-06).
+        </mb:test>
+        <mb:test id="T-UI-B12-16" kind="unit">
+          bootstrap.js 소스에 pushState와 beforeunload가 없음을 정적으로 확인한다.
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>리스너 제거. 다만 V4-08의 유실 경계가 다시 열린다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B12">
+      V-UI-B12-01 → T-UI-B12-01 | 02 → T-UI-B12-04 | 03 → T-UI-B12-05 |
+      04 → T-UI-B12-11 | 05 → T-UI-B12-12 | 06 → T-UI-B12-15 | 07 → T-UI-B12-06. 7/7 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ UI-B14 -->
+  <mic:parent-block id="UI-B14" name="Application shell and settings" micro-count="6">
+    <mic:objective-recap>
+      규칙 확인, 파괴적 action 3종, Settings 4개 field, help, hint strip, Share 진입점이
+      실제 control로 존재한다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B14-01 → (02, 03, 04) → 05 → 06</mic:order>
+    <mic:origin>
+      Macro Plan 재검토 H1으로 신설된 블록이다. Phase 1 V4-18이 AppShell과 SettingsView를
+      component 목록에 추가하면서 소유자를 얻었다.
+    </mic:origin>
+
+    <mb:micro id="M-UI-B14-01" parent="UI-B14" name="Shell header, global actions, completion state">
+      <mb:rationale>
+        H1이 드러낸 공백의 본체다. 지금까지 어떤 블록도 "규칙 확인"이나 "새 게임" 버튼을
+        만들지 않았고, Share dialog를 여는 진입점도 없었다.
+      </mb:rationale>
+      <mb:objective>
+        header에 7개 action control이 존재하고, 완성 시 완료 상태가 표시되며 1회 알려진다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/app-shell.js"/></mb:target-files>
+      <mb:preconditions>UI-B03, UI-B04, UI-B08, UI-B11 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+mountShell(root, store, settings, deps: {
+  dialogs: DialogHost, announcer: Announcer,
+  openShare: () => void, openNotes: () => void, openSettings: () => void, openHelp: () => void
+}) -> Shell
+      ]]></mb:input-type>
+      <mb:input-validation>
+        deps의 4개 콜백이 모두 함수여야 한다. 누락 시 TypeError.
+        미구현 자리를 빈 함수로 채우지 않는다.
+      </mb:input-validation>
+      <mb:output-type>header DOM과 store 구독</mb:output-type>
+      <mb:output-validation><![CDATA[
+action control 7종: 규칙 확인, 새 게임, 전체 지우기, 메모 전체 삭제, 공유, 메모, 설정, 도움말
+전부 48x48 이상 (L3)
+완성 시 data-state="solved"가 붙고 announcer가 "completion"으로 1회 알린다
+board rectangle과 겹치지 않는다
+      ]]></mb:output-validation>
+      <mb:exceptions>TypeError</mb:exceptions>
+      <mb:side-effects>DOM, store 구독 1건. destroy에서 해지한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+render header with one <button type="button"> per action
+store.subscribe(() => {
+    const solved = rules.isSolved(store.values, store.givens);
+    if (solved && !wasSolved) deps.announcer.announce("completion", "퍼즐을 완성했습니다");
+    root.dataset.state = solved ? "solved" : "playing";
+    wasSolved = solved;
+});
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B14-01" kind="manual">7종 control이 존재하고 48x48 이상이다(V-UI-B14-07).</mb:test>
+        <mb:test id="T-UI-B14-02" kind="manual">
+          완성 시 완료 상태가 표시되고 1회 알려진다(V-UI-B14-08).
+        </mb:test>
+        <mb:test id="T-UI-B14-03" kind="manual">공유 진입점이 ShareView를 연다(V-UI-B14-06).</mb:test>
+        <mb:test id="T-UI-B14-04" kind="manual">axe critical violation이 0이다(V-UI-B14-07).</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. 다시 진입점 없는 상태로 돌아간다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B14-02" parent="UI-B14" name="Constraint-only check action">
+      <mb:rationale>
+        V4-11이 정한 통일 동작이다. client가 solution을 갖지 않으므로 자체 session과 공유 session의
+        동작과 label이 같아야 한다. rev 3은 여기서 갈렸고 그것이 결함이었다.
+      </mb:rationale>
+      <mb:objective>
+        규칙 확인이 제약 검사만 수행하고, 미완성과 완성에서 서로 다른 결과를 보고한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/app-shell.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B14-01, UI-B03 완료</mb:preconditions>
+      <mb:input-type>규칙 확인 버튼 클릭</mb:input-type>
+      <mb:input-validation>없음</mb:input-validation>
+      <mb:output-type>보고 문구와 board의 conflict 강조</mb:output-type>
+      <mb:output-validation><![CDATA[
+미완성 -> 중복 위반 개수만 보고. "정답 경로인지"는 말하지 않는다.
+완성이며 위반 없음 -> solved 판정
+solution을 참조하지 않는다. store에 solution field가 없으므로 구조적으로 불가능하다.
+자체 session과 공유 session의 label이 동일하다.
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>conflict 강조 갱신과 announce 1회</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+function onCheck() {
+    const bad = rules.conflicts(store.values, store.givens);
+    const done = rules.isSolved(store.values, store.givens);
+    const msg = bad.size ? `규칙 위반 ${bad.size}칸`
+              : done     ? "퍼즐을 완성했습니다"
+                         : "지금까지 규칙 위반이 없습니다";
+    deps.announcer.announce("completion", msg);
+    boardView.highlightConflicts(bad);
+}
+// there is no solution to compare against, by construction (V4-11)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B14-05" kind="manual">
+          미완성에서는 위반만, 완성에서는 solved를 판정한다(V-UI-B14-01).
+        </mb:test>
+        <mb:test id="T-UI-B14-06" kind="manual">
+          공유 링크로 들어온 session에서 label과 동작이 동일하다(V-UI-B14-01).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>버튼 비활성화. 기능이 사라지므로 UI-B13 전에는 되돌리지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B14-03" parent="UI-B14" name="Destructive actions behind confirmation">
+      <mb:rationale>
+        S8이 confirmation을 요구한 3종이다. 되돌릴 수 없는 손실을 만드는 유일한 경로이므로
+        우회를 허용하지 않는다.
+      </mb:rationale>
+      <mb:objective>
+        새 게임, 전체 지우기, 메모 전체 삭제가 각각 confirm을 거치고 취소 시 상태가 불변이다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/app-shell.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B14-01, UI-B11 완료</mb:preconditions>
+      <mb:input-type>action 종류와 dialogs.confirm</mb:input-type>
+      <mb:input-validation>
+        action이 3종 밖이면 RangeError. 실행 함수가 없는 action을 만들지 않는다.
+      </mb:input-validation>
+      <mb:output-type>store mutation 또는 무변화</mb:output-type>
+      <mb:output-validation><![CDATA[
+confirm이 false를 주면 store가 전혀 바뀌지 않는다
+새 게임은 bootstrap의 createNewSession을 재사용한다. 별도 경로를 만들지 않는다.
+전체 지우기는 user value와 candidate만 지우고 given은 남긴다
+메모 전체 삭제는 cellNotes와 regionNotes를 비운다
+세 action 모두 하나의 history group으로 기록되어 undo 가능하다
+      ]]></mb:output-validation>
+      <mb:exceptions>RangeError</mb:exceptions>
+      <mb:side-effects>대규모 store mutation. undo 1회로 되돌아간다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const DESTRUCTIVE = {
+  newGame:        {q: "새 게임을 시작할까요? 현재 진행은 사라집니다.", run: startNewGame},
+  clearAll:       {q: "입력한 숫자와 후보를 모두 지울까요?",            run: clearAllEntries},
+  deleteAllNotes: {q: "메모를 모두 삭제할까요?",                        run: deleteAllNotes},
+};
+async function onDestructive(kind) {
+    const spec = DESTRUCTIVE[kind];
+    if (!spec) throw new RangeError(`unknown destructive action: ${kind}`);
+    if (!(await deps.dialogs.confirm(spec.q))) return;    // cancel changes nothing
+    spec.run(store);
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B14-07" kind="manual">
+          3종 각각이 confirm을 거치고 취소 시 상태가 불변이다(V-UI-B14-02).
+        </mb:test>
+        <mb:test id="T-UI-B14-08" kind="unit">전체 지우기가 given을 남긴다.</mb:test>
+        <mb:test id="T-UI-B14-09" kind="unit">세 action 모두 undo 1회로 되돌아간다.</mb:test>
+      </mb:tests>
+      <mb:rollback>action 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B14-04" parent="UI-B14" name="Hint strip with seen-count consumption">
+      <mb:rationale>
+        H1이 드러낸 대로 hintStripSeenCount는 저장은 되는데 읽는 곳이 없었다.
+        소비자를 만들지 않으면 설정 field가 죽은 데이터로 남는다.
+      </mb:rationale>
+      <mb:objective>
+        hint strip이 최초 3회만 표시되고 4회째 세션에서는 나타나지 않는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/app-shell.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B14-01, UI-B04(settings) 완료</mb:preconditions>
+      <mb:input-type>settings.hintStripSeenCount</mb:input-type>
+      <mb:input-validation>
+        값이 음수이거나 정수가 아니면 0으로 취급한다. 손상된 설정이 strip을 영원히 띄우지 않게 한다.
+      </mb:input-validation>
+      <mb:output-type>strip DOM 표시 여부와 증가된 count</mb:output-type>
+      <mb:output-validation><![CDATA[
+count < 3일 때만 표시한다
+표시하면 즉시 count를 1 증가시켜 저장한다
+저장 실패해도 세션 내에서는 다시 뜨지 않는다 (in-memory로 유지)
+strip은 desktop ST0에서만 나타난다
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>settings 쓰기 1회</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const seen = Number.isInteger(settings.get().hintStripSeenCount)
+           ? Math.max(0, settings.get().hintStripSeenCount) : 0;
+if (seen < 3 && isDesktopIdle()) {
+    showHintStrip();
+    settings.set("hintStripSeenCount", seen + 1);   // consume immediately, not on dismiss
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B14-10" kind="manual">
+          최초 3회만 표시되고 4회째에 나타나지 않는다(V-UI-B14-05).
+        </mb:test>
+        <mb:test id="T-UI-B14-11" kind="unit">손상된 count가 0으로 취급된다.</mb:test>
+      </mb:tests>
+      <mb:rollback>strip 제거. count field는 남지만 다시 죽은 데이터가 된다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B14-05" parent="UI-B14" name="Settings form with immediate effect">
+      <mb:rationale>
+        H1의 두 번째 축이다. 4개 field를 사용자가 바꿀 방법이 전혀 없었다.
+        reload를 요구하면 설정이 있으나 마나이므로 즉시 반영이 요구사항이다.
+      </mb:rationale>
+      <mb:objective>
+        4개 field를 UI에서 바꿀 수 있고 변경이 reload 없이 즉시 동작에 반영된다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/settings-view.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B14-01, UI-B04, UI-B11 완료</mb:preconditions>
+      <mb:input-type>
+        renderSettings(settings: SettingsStore) -> Node. DialogHost의 body로 전달된다.
+      </mb:input-type>
+      <mb:input-validation>
+        control의 값은 settings.set이 검증한다. UI가 자체 검증을 중복하지 않되,
+        touchControls는 3개 라디오로 제한해 잘못된 값이 애초에 만들어지지 않게 한다.
+      </mb:input-validation>
+      <mb:output-type>설정 폼 Node</mb:output-type>
+      <mb:output-validation><![CDATA[
+autoRemoveCandidates, showConflicts, shiftQuasimode 3개 checkbox
+touchControls 3개 radio (auto, show, hide)
+변경 즉시 settings.set 호출과 저장
+shiftQuasimode 변경이 다음 키 입력부터 적용된다
+touchControls 변경이 즉시 adapter 가시성에 반영된다
+      ]]></mb:output-validation>
+      <mb:exceptions>없음. RangeError는 라디오 제한으로 도달하지 않는다.</mb:exceptions>
+      <mb:side-effects>settings 저장과 구독자 통지</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for each boolean field: <input type="checkbox" checked={value}>
+    on change -> settings.set(key, el.checked)
+touchControls: three <input type="radio" name="touchControls">
+    on change -> settings.set("touchControls", el.value)
+// subscribers (KeyboardAdapter, TouchAdapter) react through settings.subscribe,
+// so nothing here reaches into those modules directly
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B14-12" kind="manual">
+          4개 field를 바꿀 수 있고 reload 없이 반영되며 저장된다(V-UI-B14-03).
+        </mb:test>
+        <mb:test id="T-UI-B14-13" kind="manual">touchControls 변경이 즉시 adapter에 반영된다.</mb:test>
+        <mb:test id="T-UI-B14-14" kind="manual">재방문 시 값이 유지된다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. 설정은 기본값으로 고정된다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B14-06" parent="UI-B14" name="Help view sourced from KEYMAP">
+      <mb:rationale>
+        W3-R4가 경고한 대로 keymap이 두 곳에 적히면 반드시 어긋난다.
+        UI-B07이 export한 KEYMAP을 읽어 표시하는 것이 유일한 방법이다.
+      </mb:rationale>
+      <mb:objective>
+        help dialog가 ?와 F1로 열리고 §11 keymap 전체를 KEYMAP에서 읽어 표시한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/settings-view.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B14-05, UI-B07 완료</mb:preconditions>
+      <mb:input-type>renderHelp(keymap: KeymapEntry[]) -> Node</mb:input-type>
+      <mb:input-validation>
+        keymap이 빈 배열이면 Error. 도움말이 비어 있는 채로 열리면 안 된다.
+      </mb:input-validation>
+      <mb:output-type>keymap 표 Node</mb:output-type>
+      <mb:output-validation><![CDATA[
+KEYMAP의 모든 행이 표에 나타난다
+문자열을 이 파일에 다시 적지 않는다 (단일 출처)
+?와 F1 두 경로 모두 열린다
+      ]]></mb:output-validation>
+      <mb:exceptions>Error(빈 keymap)</mb:exceptions>
+      <mb:side-effects>없음. DialogHost가 표시를 담당한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+import { KEYMAP } from "./keyboard-adapter.js";
+renderHelp(keymap = KEYMAP):
+    if (!keymap.length) throw new Error("help cannot render an empty keymap");
+    build a <table> with one row per entry: combo, description
+// duplicating the strings here is exactly the drift W3-R4 warns about
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B14-15" kind="manual">
+          ?와 F1이 help를 열고 keymap 전체가 표시된다(V-UI-B14-04).
+        </mb:test>
+        <mb:test id="T-UI-B14-16" kind="unit">
+          표 행 수가 KEYMAP 길이와 같다(단일 출처 회귀).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>help 렌더 제거. 키 바인딩은 남지만 발견 경로가 사라진다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B14">
+      V-UI-B14-01 → T-UI-B14-05 | 02 → T-UI-B14-07 | 03 → T-UI-B14-12 | 04 → T-UI-B14-15 |
+      05 → T-UI-B14-10 | 06 → T-UI-B14-03 | 07 → T-UI-B14-01 | 08 → T-UI-B14-02. 8/8 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <mic:risks xml:id="wave5-risks">
+    <mic:risk id="W5-R1" severity="high" refs="M-UI-B12-02">
+      충돌 해소는 사용자 작업을 지울 수 있는 유일한 자동 경로다. "생략은 삭제가 아니다"를 어기면
+      URL 공유 한 번으로 local notes가 사라진다. T-UI-B12-05가 그 전용 회귀다.
+    </mic:risk>
+    <mic:risk id="W5-R2" severity="medium" refs="M-UI-B12-01">
+      bootstrap은 앞선 11개 블록을 모두 엮는다. 어느 하나가 미완인 상태로 통합하면
+      실패 원인이 어디인지 가려진다. 선행 블록의 validation이 전부 통과한 뒤에만 착수한다.
+    </mic:risk>
+    <mic:risk id="W5-R3" severity="medium" refs="M-UI-B14-03">
+      새 게임이 bootstrap의 createNewSession을 재사용하지 않고 별도 경로를 만들면
+      M1의 timeout·retry 방어가 그 경로에는 없게 된다. 반드시 같은 함수를 쓴다.
+    </mic:risk>
+    <mic:risk id="W5-R4" severity="low" refs="M-UI-B14-04">
+      hint strip의 count를 dismiss 시점에 증가시키면 사용자가 닫지 않은 채 떠날 때 영원히 3회가
+      소진되지 않는다. 표시 즉시 증가시키는 이유다.
+    </mic:risk>
+  </mic:risks>
+
+  <mic:open-questions xml:id="open-questions">
+    <mic:question id="OQ-W5-1" blocking="false" refs="file-layout-addendum">
+      DEC-UI-04에 JS 모듈 4개(board-nav, cell-label, key-resolve, note-target)를 추가하는
+      배치 갱신 승인이 필요하다. 원칙은 바뀌지 않고 목록만 늘어난다.
+    </mic:question>
+    <mic:question id="OQ-W5-2" blocking="false" refs="DV-07">
+      persistence의 lifecycle listener 등록을 bootstrap으로 옮기는 조정 승인이 필요하다.
+      W2A에서 이미 그렇게 설계했으나 deviation으로 표시하지 않았던 것을 지금 바로잡는다.
+    </mic:question>
+    <mic:question id="OQ-W5-3" blocking="false" refs="M-UI-B14-01">
+      shell의 action control을 8개 모두 header에 두면 좁은 화면에서 자리가 부족하다.
+      overflow 메뉴로 접을지, 아니면 일부를 설정 dialog 안으로 옮길지 확인이 필요하다.
+      현재 분해는 전부 header 배치를 전제한다.
+    </mic:question>
+  </mic:open-questions>
+
+  <mic:approval xml:id="approval" status="awaiting-user-approval">
+    <mic:current-phase>3. Micro Blocking — Wave 5</mic:current-phase>
+    <mic:validation-performed>
+      XML well-formedness, micro block과 test id 유일성,
+      Macro 검증 항목 수용 완전성(UI-B12 7/7, UI-B14 8/8),
+      DEC-UI-04 배치 대비 신규 파일 전수 대조
+    </mic:validation-performed>
+    <mic:checkbox checked="false">Wave 5 Micro Blocking 승인</mic:checkbox>
+    <mic:checkbox checked="false">file-layout-addendum 승인 (DEC-UI-04에 모듈 4개 추가)</mic:checkbox>
+    <mic:checkbox checked="false">DV-07 이탈 승인 (lifecycle 배선을 bootstrap으로)</mic:checkbox>
+    <mic:next-phase blocked="true">Wave 6 — UI-B13, DX-B08</mic:next-phase>
+  </mic:approval>
+
+</mic:micro-blocking>

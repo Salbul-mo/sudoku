@@ -47,8 +47,10 @@
 
   <sd:decision-register xml:id="decision-register">
     <sd:locked-decisions>
-      <sd:decision xml:id="U1" topic="persistence" status="locked">
-        localStorage 전용이며 server-side persistence와 database model을 추가하지 않는다.
+      <sd:decision xml:id="U1" topic="persistence" status="locked" amended="rev5">
+        localStorage 전용이며 게임 상태(진행 중인 세션)의 server-side persistence를 추가하지 않는다.
+        사용자 상태가 아닌 데이터(예: 미리 생성해 둔 퍼즐 캐시)의 서버 저장은 이 결정의 범위 밖이며
+        별도로 판단한다(rev 5, CT-01-A).
       </sd:decision>
       <sd:decision xml:id="U2" topic="frontend" status="locked">
         Vanilla JavaScript를 유지하고 build tool을 도입하지 않는다.
@@ -104,10 +106,48 @@
       <sd:decision xml:id="V4-13" topic="state-contract">
         HistoryEntry, persistence validation·migration을 명시하고 API의 solution은 client state에 저장하지 않는다.
       </sd:decision>
+      <sd:decision xml:id="V4-14" topic="url-note-capacity">
+        noteCount 상한을 임의값 100이 아니라 addressable target 총수 108로 정의한다.
+        encoder가 만든 유효 state를 decoder가 거부하는 구간을 없앤다.
+      </sd:decision>
+      <sd:decision xml:id="V4-15" topic="url-bit-padding">
+        candidate mask stream의 bit order를 LSB-first로 고정하고 말단 padding bit를 zero로 강제한다.
+        byte-level canonical form을 유일하게 만든다.
+      </sd:decision>
+      <sd:decision xml:id="V4-16" topic="bootstrap-api-failure">
+        cold start의 new-puzzle 호출에 10초 timeout과 1회 재시도를 두고, 최종 실패는 error panel과 재시도
+        button이라는 명시적 terminal state로 처리한다. V4-07이 만든 신규 failure mode를 닫는다.
+      </sd:decision>
+      <sd:decision xml:id="V4-17" topic="color-tokens">
+        light·dark color token 값을 문서에 확정하고 모든 text/background 조합의 contrast를 계산해 기록한다.
+        "4.5:1 이상"이라는 요구만 남기지 않는다.
+      </sd:decision>
+      <sd:decision xml:id="V4-18" topic="component-completeness">
+        AppShell과 SettingsView를 component 목록에 추가한다. 두 component가 없어 hint strip, 파괴적 action의
+        confirmation, help dialog, Settings 변경 UI, “규칙 확인”과 Share 진입점이 소유자 없는 요구로 남아 있었다.
+        동작 명세는 이미 존재하므로 귀속만 부여하고 새 동작을 정의하지 않는다.
+      </sd:decision>
     </sd:rev4-decisions>
   </sd:decision-register>
 
   <sd:revision-log xml:id="revision-log">
+    <sd:revision number="5" date="2026-07-30" status="approved" scope="U1 한정 개정">
+      <sd:change-set>
+        <sd:change severity="high" ref="#U1" origin="unified-plan-CT-01">
+          U1을 "게임 상태의 server-side persistence를 추가하지 않는다"로 한정 개정했다(CT-01-A 채택).
+          미리 생성해 둔 퍼즐 캐시는 사용자 게임 상태가 아니므로 이 결정의 적용 범위 밖이며,
+          그 캐시를 Cloudflare D1(서버리스 SQLite 호환 DB)에 저장하는 것을 명시적 예외로 허용한다.
+        </sd:change>
+      </sd:change-set>
+      <sd:amendment date="2026-07-30" reviewer="claude-mhj" authorized-by="user" scope="U1 한정 개정만">
+        사용자가 Cloudflare D1(서버리스 + SQLite 호환)을 인프라로 쓸 수 있다고 알려왔다. 그 인프라를
+        DX-B06의 퍼즐 캐시 저장소로 한정해 반영하기로 결정했다
+        (docs/claude-mhj_26_07_30_01_sudoku-unified-plan.xml의 CT-01-A 채택, PSD-01).
+        U1의 원래 취지 — 게임 진행 상태를 서버에 두지 않는다 — 는 그대로 유지되며 문언만 그 취지에
+        맞게 좁혔다. rev 4의 architecture, scope decision, 다른 locked decision(U2..U5)은 바뀌지 않았고
+        Phase 1 재승인은 U1 문언 개정 이 항목 하나로 한정된다.
+      </sd:amendment>
+    </sd:revision>
     <sd:revision number="4" date="2026-07-26" status="proposed">
       <sd:change-set>
         <sd:change severity="blocker" ref="#V4-01">압축 flag 순환 의존을 외부 envelope로 제거했다.</sd:change>
@@ -121,9 +161,38 @@
         <sd:change severity="high" ref="#V4-09">raw payload의 silent corruption 탐지 수단을 추가했다.</sd:change>
         <sd:change severity="high" ref="#V4-10">notes 생략·병합·동일 target 충돌 의미를 정의했다.</sd:change>
         <sd:change severity="high" ref="#V4-13">state, history, serialization, migration 계약의 구현 공백을 닫았다.</sd:change>
+        <sd:change severity="medium" ref="#V4-11">공유 session과 자체 session의 “확인” 동작 차이를 제거했다.</sd:change>
+        <sd:change severity="medium" ref="#V4-12">rev 3의 주소창 자동 동기화(AB2)를 1차 범위에서 제외했다.</sd:change>
         <sd:change severity="medium">rev 3에 남은 dvh, candidate mode, breakpoint, default-value 문구를 통일했다.</sd:change>
         <sd:change severity="medium">P3 실행 순서와 property-based test 방향을 바로잡았다.</sd:change>
+        <sd:change severity="high" ref="#V4-14" origin="rev4-review">
+          encoder가 생성 가능한 state를 자기 decoder가 거부하던 noteCount 상한 100을 108로 교정했다.
+        </sd:change>
+        <sd:change severity="high" ref="#V4-15" origin="rev4-review">
+          candidate mask stream의 bit order와 말단 padding 규범 공백을 닫아 byte-level canonical form을 유일하게 했다.
+        </sd:change>
+        <sd:change severity="medium" ref="#V4-16" origin="rev4-review">
+          V4-07이 만든 cold start network 실패 경로에 timeout, 1회 재시도, 명시적 terminal state를 정의했다.
+        </sd:change>
+        <sd:change severity="medium" ref="#V4-17" origin="rev4-review">
+          light·dark color token 값을 확정하고 76쌍 contrast 계산 결과를 문서에 기록했다.
+        </sd:change>
+        <sd:change severity="high" ref="#V4-18" origin="macro-plan-review">
+          component 목록에 AppShell과 SettingsView가 없어 hint strip, 파괴적 action confirmation, help dialog,
+          Settings 변경 UI, “규칙 확인”과 Share 진입점이 구현 소유자 없이 남아 있던 공백을 닫았다.
+        </sd:change>
+        <sd:change severity="low" origin="rev4-review">
+          CF2의 default="off" 잔재를 non-goal로 교정하고, 미정의 참조였던 48px cell floor를 §10에 정의했으며,
+          44px/48px 혼용을 48px 단일 하한으로 통일하고, digit row 60px과 button 48px의 표기 충돌을 해소했다.
+        </sd:change>
       </sd:change-set>
+      <sd:amendment date="2026-07-26" reviewer="claude-mhj" authorized-by="user"
+                    scope="V4-14..V4-18 and low-severity cleanups"
+                    second-pass="V4-18 was found during Phase 2 Macro Plan review, after rev 4 approval">
+        승인 검토에서 발견된 결함을 사용자 지시에 따라 rev 4 본문에 직접 반영했다. rev 5로 분리하지 않은 이유는
+        rev 4가 승인 시점에 이 수정을 포함하기로 합의되었고, 변경이 §8·§9·§10·§12·§15의 국소 규범과
+        traceability 보강에 한정되기 때문이다. 승인된 architecture, scope decision, locked decision은 바뀌지 않았다.
+      </sd:amendment>
     </sd:revision>
     <sd:revision number="3" date="2026-07-26" status="superseded">
       mobile candidate flow, additive adapters, dynamic keyboard scaling, component ownership을 보강했다.
@@ -337,8 +406,8 @@
 ├──────────────────────────────────────┤
 │ 선택 대상·메모 상태 요약             │ flexible
 ├──────────────────────────────────────┤
-│  1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ 60px
-│ each target = 374/9 = 41.56px, gap 0 │
+│  1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ row 60px
+│ target = 374/9 = 41.56w x 48h, gap 0 │ (button 48 + pad 6x2)
 ├──────────────────────────────────────┤
 │ 연필 │ 지움 │ 실행취소 │ 메모         │ 56px
 └──────────────────────────────────────┘
@@ -444,7 +513,11 @@ boardScale    = min(1, available / boardWidth)
 
     <ux:domain-rules>
       <ux:rule code="CF1" default="on">Duplicate value는 허용하되 underline과 color를 함께 표시한다.</ux:rule>
-      <ux:rule code="CF2" default="off">Solution과 즉시 대조하지 않는다.</ux:rule>
+      <ux:rule code="CF2" kind="non-goal" ref="#V4-11">
+        Solution 대조는 setting이 아니라 범위 제외다. rev 4 client는 solution을 보유하지 않으므로 on 상태가
+        존재할 수 없고, Settings에도 대응 field를 두지 않는다. rev 3의 default="off" 표기는 켤 수 있는 toggle을
+        암시하던 잔재였다.
+      </ux:rule>
       <ux:rule code="CF3">Peer value와 같은 candidate도 사용자가 원하면 기록할 수 있다.</ux:rule>
       <ux:rule code="CF4" default="on">Value set 시 peers의 같은 candidate를 제거하고 한 번에 undo한다.</ux:rule>
       <ux:terminology>
@@ -476,8 +549,8 @@ boardScale    = min(1, available / boardWidth)
         auto일 때만 coarse-pointer query 결과를 따른다.
       </ux:resolution-order>
       <ux:safety>
-        hide 상태에서도 44x44 이상 expand handle을 남긴다. 따라서 잘못된 media query나 분리형 keyboard 제거 후에도
-        touch controls를 복구할 수 있다.
+        hide 상태에서도 48x48 expand handle을 남긴다(§10 ux:control-floor와 동일 하한).
+        따라서 잘못된 media query나 분리형 keyboard 제거 후에도 touch controls를 복구할 수 있다.
       </ux:safety>
     </ux:adapter-policy>
 
@@ -485,7 +558,8 @@ boardScale    = min(1, available / boardWidth)
       <ux:breakpoint name="wide" min-width="1024px">
         Board는 min(70dvh, 640px)로 시작한다. TouchAdapter가 보이면 board 아래 중앙 또는 landscape right rail에 둔다.
         Notes rail 280px을 확보할 수 없으면 board를 줄여 adjacent drawer를 만들며 overlay하지 않는다.
-        48px cell floor가 불가능한 낮은 viewport에서는 board floor를 강제하지 않고 vertical scroll과 readability QA를 사용한다.
+        §10 ux:cell-target의 48px preferred cell을 확보할 수 없는 낮은 viewport에서는 board floor를 강제하지 않고
+        vertical scroll과 readability QA를 사용한다.
       </ux:breakpoint>
       <ux:breakpoint name="medium" min-width="600px" max-width="1023px">
         TouchAdapter 표시 여부는 media policy를 따르고, 표시 시 portrait bottom 또는 landscape right에 배치한다.
@@ -521,9 +595,19 @@ boardScale    = min(1, available / boardWidth)
 }
     ]]></ux:candidate-css>
     <ux:target-sizing>
-      <ux:digit-button width="board-width / 9" height="48px" gap="0"/>
-      <ux:tool-button min-width="48px" min-height="48px" gap="4px"/>
+      <ux:control-floor value="48px" applies-to="board 밖의 모든 interactive control">
+        44px과 48px을 혼용하지 않는다. TouchAdapter expand handle을 포함해 단일 하한은 48x48이다.
+      </ux:control-floor>
+      <ux:digit-button width="board-width / 9" height="48px" row-height="60px" gap="0">
+        row 60px = button 48px + 상하 padding 6px. wireframe의 60px은 row 높이이고 target 높이는 48px이다.
+      </ux:digit-button>
+      <ux:tool-button min-width="48px" min-height="48px" row-height="56px" gap="4px"/>
       <ux:marker interactive="false" cell-size="7px" region-size="5px"/>
+      <ux:cell-target xml:id="cell-target-floor" preferred="48px" enforced="false">
+        Pointer-fine breakpoint에서 목표하는 gridcell 한 변이다. 강제 하한이 아니며, 확보할 수 없는 낮은 viewport에서는
+        board를 강제로 키우지 않고 vertical scroll과 readability QA로 대응한다.
+        Narrow viewport의 실제 cell은 약 38~42px이고 이는 WCAG 2.2 target-size-minimum 24px을 상회한다.
+      </ux:cell-target>
     </ux:target-sizing>
     <ux:state-cues>
       <ux:cue state="selected">2px solid outline + background</ux:cue>
@@ -532,10 +616,61 @@ boardScale    = min(1, available / boardWidth)
       <ux:cue state="memo-present">dog-ear shape + accessible name text</ux:cue>
       <ux:cue state="focus">2px visible focus ring</ux:cue>
     </ux:state-cues>
-    <ux:themes>
-      <ux:theme name="light" source="CSS custom properties"/>
-      <ux:theme name="dark" source="prefers-color-scheme"/>
-      <ux:contrast>본문, value, candidate 모두 normal-size text 기준 4.5:1 이상이다.</ux:contrast>
+    <ux:themes xml:id="color-tokens" confidence="verified">
+      <ux:note>
+        rev 4 검토에서 "4.5:1 이상"이라는 요구만 있고 token 값이 없어 설계 시점 검증이 불가능했다.
+        아래 값은 WCAG 2.x relative luminance 식으로 전 조합을 계산해 확정한 것이다.
+        candidate는 highlight된 cell 안에도 나타나므로 모든 cell background 변형에 대해 검사했다.
+      </ux:note>
+      <ux:theme name="light" media="default">
+        <ux:token name="--bg-page" value="#F8FAFC"/>
+        <ux:token name="--bg-cell" value="#FFFFFF"/>
+        <ux:token name="--bg-cell-given" value="#E8EDF3"/>
+        <ux:token name="--bg-cell-selected" value="#CFE3FB"/>
+        <ux:token name="--bg-cell-peer" value="#EFF4FA"/>
+        <ux:token name="--bg-cell-digit" value="#DDE7FA"/>
+        <ux:token name="--bg-cell-conflict" value="#FBE4E4"/>
+        <ux:token name="--fg-body" value="#1E293B"/>
+        <ux:token name="--fg-given" value="#0F172A"/>
+        <ux:token name="--fg-user" value="#1B4FA8"/>
+        <ux:token name="--fg-candidate" value="#4A5568"/>
+        <ux:token name="--fg-conflict" value="#A32020"/>
+        <ux:token name="--line" value="#334155"/>
+        <ux:token name="--focus" value="#1B4FA8"/>
+      </ux:theme>
+      <ux:theme name="dark" media="prefers-color-scheme: dark">
+        <ux:token name="--bg-page" value="#0B1220"/>
+        <ux:token name="--bg-cell" value="#161F2E"/>
+        <ux:token name="--bg-cell-given" value="#243044"/>
+        <ux:token name="--bg-cell-selected" value="#20406E"/>
+        <ux:token name="--bg-cell-peer" value="#1C2739"/>
+        <ux:token name="--bg-cell-digit" value="#2A2F5C"/>
+        <ux:token name="--bg-cell-conflict" value="#4A1F22"/>
+        <ux:token name="--fg-body" value="#E2E8F0"/>
+        <ux:token name="--fg-given" value="#F1F5F9"/>
+        <ux:token name="--fg-user" value="#9EC5FF"/>
+        <ux:token name="--fg-candidate" value="#B3C0D1"/>
+        <ux:token name="--fg-conflict" value="#FF9E9E"/>
+        <ux:token name="--line" value="#94A3B8"/>
+        <ux:token name="--focus" value="#9EC5FF"/>
+      </ux:theme>
+      <ux:contrast-matrix computed="2026-07-26" method="WCAG 2.x relative luminance">
+        <ux:requirement scope="text" min="4.5:1">body, given, user value, candidate, conflict digit</ux:requirement>
+        <ux:requirement scope="non-text" min="3:1">grid line, focus ring</ux:requirement>
+        <ux:coverage>
+          각 text token을 6개 cell background 전부와 대조했다. light 38쌍, dark 38쌍 모두 통과했다.
+        </ux:coverage>
+        <ux:measured theme="light" pairs="38" text-min="5.75:1" text-min-pair="--fg-candidate on --bg-cell-selected"
+                     non-text-min="5.87:1" non-text-min-pair="--focus on --bg-cell-selected"/>
+        <ux:measured theme="dark" pairs="38" text-min="5.27:1" text-min-pair="--fg-conflict on --bg-cell-selected"
+                     non-text-min="4.05:1" non-text-min-pair="--line on --bg-cell-selected"/>
+        <ux:note>
+          두 theme 모두 최악 조합이 --bg-cell-selected 위다. selected background를 조정하면 반드시 재계산해야 한다.
+        </ux:note>
+        <ux:gate>
+          token을 변경하면 동일 계산을 다시 수행하고 실패가 0이어야 한다. V-B08-02가 이 계산을 자동화한다.
+        </ux:gate>
+      </ux:contrast-matrix>
     </ux:themes>
     <ux:motion max-duration="180ms">
       prefers-reduced-motion: reduce에서는 duration을 0ms로 한다.
@@ -620,6 +755,32 @@ boardScale    = min(1, available / boardWidth)
 9. Remove consumed fragment with history.replaceState.
       ]]></arch:sequence>
       <arch:failure>URL decode failure는 local session 또는 new puzzle flow로 복구하며 blank page를 만들지 않는다.</arch:failure>
+      <arch:api-failure xml:id="bootstrap-api-failure" critical="true" ref="#V4-16">
+        <arch:why>
+          index가 shell만 반환하도록 바꾸면서 step 7의 network 호출이 cold start의 단일 실패점이 되었다.
+          rev 3에서는 puzzle이 HTML에 실려 왔으므로 존재하지 않던 failure mode다.
+        </arch:why>
+        <arch:timeout>
+          AbortController로 10초 제한을 건다. server의 dim=9 DIG_TIME_LIMIT이 5.0초이므로 정상 생성은 이 안에 끝난다.
+        </arch:timeout>
+        <arch:retry>
+          network error, timeout, 5xx는 1초 후 1회 자동 재시도한다. 총 시도는 2회이며 무한 재시도는 하지 않는다.
+          4xx는 재시도하지 않는다.
+        </arch:retry>
+        <arch:terminal-state>
+          두 시도가 모두 실패하면 board를 inert skeleton으로 유지하고 board 밖에 error panel을 표시한다.
+          panel은 실패 원인 문구와 48px “다시 시도” button을 포함하며 focus를 그 button으로 옮긴다.
+          blank page, 무한 spinner, 거짓 성공 표시를 만들지 않는다.
+        </arch:terminal-state>
+        <arch:offline>
+          navigator.onLine이 false면 즉시 terminal state로 가고 network 호출을 낭비하지 않는다.
+          online event를 1회 수신하면 재시도 button을 강조한다. 자동 재시도는 하지 않는다.
+        </arch:offline>
+        <arch:scope-note>
+          이 경로는 URL snapshot도 local session도 없을 때만 도달한다. 기존 session 보유자는 영향받지 않는다.
+          offline 전용 embedded puzzle bank는 1차 범위에 넣지 않는다.
+        </arch:scope-note>
+      </arch:api-failure>
     </arch:bootstrap>
 
     <arch:state-shape><![CDATA[
@@ -708,7 +869,23 @@ HistoryEntry {
       <arch:component name="ShareView">Scope selection, length, privacy warning, copy/share</arch:component>
       <arch:component name="SettingsStore">Settings defaults, migration, persistence</arch:component>
       <arch:component name="Announcer">Polite status messages</arch:component>
+      <arch:component name="AppShell" added="rev4-review" ref="#V4-18">
+        Header와 global actions를 소유한다. “규칙 확인”(§15 url:solution-policy), New Game, Clear All,
+        Delete All Notes, Share dialog 진입, Notes 열기, ST0 hint strip(hintStripSeenCount 소비),
+        완성 상태 표시가 여기에 속한다. 파괴적 action은 DialogHost의 confirmation modal을 경유한다.
+      </arch:component>
+      <arch:component name="SettingsView" added="rev4-review" ref="#V4-18">
+        Settings 5개 field의 변경 UI와 help dialog 내용을 제공한다. 둘 다 DialogHost 안에 렌더된다.
+        autoRemoveCandidates, showConflicts, shiftQuasimode, touchControls를 사용자가 바꿀 수 있는
+        유일한 경로이며, help는 §11 keymap을 표시한다.
+      </arch:component>
     </arch:components>
+    <arch:component-gap-note ref="#V4-18">
+      rev 4 승인 후 Macro Plan 검토에서 위 두 component가 목록에 없다는 사실이 드러났다.
+      그 결과 §7 ST0의 hint strip, §8 ux:destructive의 confirmation 대상 action, §11 keymap의 help dialog,
+      §12 Settings의 4개 사용자 조정 field, §15 “규칙 확인”과 Share 진입점이 모두 소유자 없는 요구가 되어 있었다.
+      동작 명세는 이미 각 절에 존재했고 누락된 것은 component 귀속뿐이므로, 이번 추가로 새 동작을 정의하지 않는다.
+    </arch:component-gap-note>
 
     <arch:security>
       <arch:rule>Notes render는 textContent만 사용하고 innerHTML을 사용하지 않는다.</arch:rule>
@@ -730,7 +907,10 @@ HistoryEntry {
         <test:prototype code="P1" priority="2">Touch bar, Digit First, sticky candidates, adapter override</test:prototype>
         <test:prototype code="P2" priority="3">Cell/region notes, rail/sheet, non-modal focus, Notes list</test:prototype>
       </test:lane>
-      <test:prototype code="P4" priority="4">Bootstrap, local persistence, URL/local conflict integration</test:prototype>
+      <test:prototype code="P4" priority="4">
+        Bootstrap, local persistence, URL/local conflict integration,
+        new-puzzle timeout·retry·error panel 경로(V4-16)
+      </test:prototype>
     </test:execution-order>
 
     <test:codec-properties>
@@ -741,9 +921,13 @@ decode(await encode(state, scope)) == normalize(state, scope)
       <test:case>raw body와 deflate-raw body</test:case>
       <test:case>CompressionStream 부재 및 constructor format TypeError</test:case>
       <test:case>CRC mismatch, truncated body, unknown codec, unknown version</test:case>
-      <test:case>reserved flags, padding bits, duplicate notes, trailing bytes</test:case>
+      <test:case>reserved flags, presence bitmap padding, mask stream 말단 padding, duplicate notes, trailing bytes</test:case>
+      <test:case>note 108건 최대치 round-trip 성공과 noteCount 109 거부</test:case>
+      <test:case>candidate 1..81 cell 전 구간에서 mask stream 길이와 padding 검증</test:case>
       <test:case>decompression output 64KiB 초과 즉시 cancel</test:case>
-      <test:volume>Seeded random canonical states 1,000개</test:volume>
+      <test:volume>
+        Seeded random canonical states 1,000개. note 수 0~108, candidate cell 수 0~81 경계를 모두 포함한다.
+      </test:volume>
     </test:codec-properties>
 
     <test:usability-study telemetry="none">
@@ -768,6 +952,8 @@ decode(await encode(state, scope)) == normalize(state, scope)
       <test:metric name="decode latency" target="less-than 100ms at 8,000 chars"/>
       <test:metric name="accessibility" target="0 critical axe violations and manual pass"/>
       <test:metric name="lifecycle persistence" target="0 lost final mutations in 100 pagehide trials"/>
+      <test:metric name="cold start failure" target="offline과 5xx 모두에서 blank page 0회, 재시도 button 도달 100%"/>
+      <test:metric name="color contrast" target="light·dark 76쌍 계산 실패 0"/>
     </test:metrics>
 
     <test:kill-criteria>
@@ -798,6 +984,14 @@ decode(await encode(state, scope)) == normalize(state, scope)
       <sd:row item="Persistence" before="300ms debounce only" after="debounce plus pagehide/visibility flush"/>
       <sd:row item="Conflict semantics" before="progress equality ambiguous" after="core fields and notes scope defined separately"/>
       <sd:row item="Prototype P3" before="order and property direction conflicted" after="priority-1 parallel lane and decode(encode(state))"/>
+      <sd:row item="URL note capacity" before="no encoder or decoder cap" after="cap 108 equal to addressable targets, encoder contract stated"/>
+      <sd:row item="URL bit packing" before="mask stream bit order and tail padding undefined" after="LSB-first packing with zero tail padding"/>
+      <sd:row item="Check action" before="shared session differed, label-only mitigation" after="constraint-only for every session"/>
+      <sd:row item="Address bar sync" before="AB2 opt-in automatic replaceState" after="explicit snapshot only"/>
+      <sd:row item="Bootstrap failure" before="server-rendered puzzle, no network path" after="10s timeout, one retry, explicit error panel"/>
+      <sd:row item="Color tokens" before="contrast rule without values" after="light and dark token values with 76 computed pairs"/>
+      <sd:row item="Control size floor" before="44px and 48px mixed, cell floor undefined" after="single 48px control floor, 48px preferred cell target"/>
+      <sd:row item="Component inventory" before="11 components, shell and settings unowned" after="13 components including AppShell and SettingsView"/>
     </sd:change-table>
   </sd:section>
 
@@ -837,8 +1031,11 @@ BodyV1 (canonical uncompressed state)
   [variable]    candidates; present only when bit1=1
                   81-bit presence bitmap in 11 bytes; high 7 padding bits MUST be zero
                   one 9-bit non-zero mask per present cell, packed in cell order
+                  bit packing is LSB-first within each byte, same convention as the presence bitmap
+                  the mask stream is padded to a byte boundary
+                  the final byte's unused high bits MUST be zero
   [variable]    notes; present only when bit2=1
-                  unsigned LEB128 noteCount
+                  unsigned LEB128 noteCount; MUST be <= 108
                   repeated in canonical (kind,key) order:
                     kind byte: 0 cell | 1 row | 2 column | 3 box
                     key byte : cell 0..80 | region 0..8
@@ -853,6 +1050,12 @@ BodyV1 (canonical uncompressed state)
       <url:integrity>
         Decoder는 decompressed BodyV1 CRC32가 trailer와 같을 때만 parse한다. CRC32는 malicious tampering을 막는 signature가 아니다.
       </url:integrity>
+      <url:encoder-contract xml:id="url-encoder-contract" critical="true">
+        Encoder는 canonicalization 규칙을 모두 만족하는 body만 생성하며, 모든 reserved bit와 padding bit를 zero로 기록한다.
+        noteCount 상한 108은 addressable target 총수(cell 81 + region 27)와 같고 target당 note는 최대 한 건이므로,
+        유효한 GameSession은 어떤 경우에도 encode 가능하다. 따라서 decoder가 자기 encoder의 정상 출력을 거부하는
+        상태는 정의상 존재하지 않는다.
+      </url:encoder-contract>
     </url:envelope>
 
     <url:canonicalization>
@@ -860,7 +1063,14 @@ BodyV1 (canonical uncompressed state)
       <url:rule>Given cell의 value와 candidate는 zero다.</url:rule>
       <url:rule>Non-zero value cell의 candidate는 zero다.</url:rule>
       <url:rule>Candidate presence bit는 mask가 non-zero일 때만 one이다.</url:rule>
-      <url:rule>Notes는 (kind,key)로 정렬하며 target당 최대 한 건이다.</url:rule>
+      <url:rule>
+        Candidate mask stream은 LSB-first로 packing하고, byte 경계까지 채운 뒤 남는 상위 padding bit는 zero다.
+        이 규칙이 있어야 동일 canonical state가 유일한 byte sequence를 갖는다.
+      </url:rule>
+      <url:rule>
+        Notes는 (kind,key)로 정렬하며 target당 최대 한 건이다. addressable target은 cell 81 + region 27 = 108이므로
+        noteCount의 canonical 상한도 108이다.
+      </url:rule>
       <url:rule>Text는 Unicode scalar sequence를 UTF-8로 encode하고 CRLF/CR을 LF로 normalize한다.</url:rule>
       <url:rule>LF와 TAB을 제외한 C0 controls와 모든 NUL을 거부한다.</url:rule>
       <url:rule>SC1은 givens만, SC2는 values·candidates·savedAt, SC3은 SC2와 notes를 포함한다.</url:rule>
@@ -875,8 +1085,10 @@ BodyV1 (canonical uncompressed state)
       <url:step n="6">각 field read 전에 remaining buffer bound를 검사한다.</url:step>
       <url:step n="7">LEB128은 최대 5바이트이며 minimal representation만 허용한다.</url:step>
       <url:step n="8">
-        nibble, mask, padding, notes count 100, note length 512를 검사한다. UTF-8은 fatal mode로 decode하고
-        invalid sequence, duplicate target, 비정렬 note order, non-canonical newline과 금지 control을 거부한다.
+        nibble 범위, mask non-zero, presence bitmap padding, mask stream 말단 padding, noteCount 상한 108,
+        note length 512를 검사한다. padding bit 또는 reserved bit가 하나라도 non-zero이면 malformed-body로 거부한다.
+        UTF-8은 fatal mode로 decode하고 invalid sequence, duplicate target, 비정렬 note order,
+        non-canonical newline과 금지 control을 거부한다.
       </url:step>
       <url:step n="9">Given/value overlap, filled-cell candidate, presence-bit/mask 등 canonical state invariants를 검사한다.</url:step>
       <url:step n="10">Givens row/column/box contradiction을 검사한다.</url:step>
@@ -892,6 +1104,12 @@ BodyV1 (canonical uncompressed state)
       <url:case name="SC1 puzzle only">Envelope 6 + Body 43 = 49 bytes raw, base64url 66 chars</url:case>
       <url:case name="SC2 plus 20 candidate cells">Envelope 6 + Body 122 = 128 bytes raw, base64url 171 chars</url:case>
       <url:case name="SC3 notes">실제 Korean text compression ratio는 P3에서 측정한다.</url:case>
+      <url:case name="decoder worst case" confidence="verified">
+        Header 88 + candidates 최대 103(11 + 92) + notes 최대 55,729(1 + 108 x 516) = Body 55,920 bytes.
+        Envelope 포함 55,926 bytes로 decode-pipeline의 65,536 byte 한도 안에 있다.
+        같은 payload의 base64url은 약 74,568자이므로 8,000자 share 한도가 항상 먼저 걸린다.
+        즉 두 한도는 서로 모순되지 않으며 64KiB는 압축 링크에 대한 방어선으로만 작동한다.
+      </url:case>
       <url:target>일반 SC3 link 2,000자 이하</url:target>
     </url:size-budget>
 
@@ -977,6 +1195,11 @@ BodyV1 (canonical uncompressed state)
     <risk:item code="RK9" severity="medium" owner="security">
       기존 new-puzzle API는 solution을 response에 포함한다. rev 4 client는 이를 저장·사용하지 않지만 network exposure는
       기존 interface를 유지하는 동안 남으며 competition 또는 ranking 도입 전에는 별도 server 설계가 필요하다.
+    </risk:item>
+    <risk:item code="RK10" severity="medium" owner="bootstrap">
+      Shell-first bootstrap은 cold start를 network에 의존하게 만든다. V4-16의 timeout·retry·error panel로 완화하고
+      P4에서 offline과 5xx를 강제 주입해 검증한다. offline 전용 puzzle bank는 범위 밖이므로 첫 방문 offline 사용자는
+      게임을 시작할 수 없다는 한계가 남는다.
     </risk:item>
   </risk:register>
 

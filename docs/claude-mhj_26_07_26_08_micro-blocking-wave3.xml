@@ -1,0 +1,990 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mic:micro-blocking
+    xmlns:mic="urn:sudoku:micro-blocking:v1"
+    xmlns:mb="urn:sudoku:micro-block:v1"
+    xmlns:dev="urn:sudoku:deviation:v1"
+    xml:id="sudoku-micro-blocking-wave3"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="3"
+    wave="W3"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 3 Micro Blocking, Wave 3.
+    UI-B07, UI-B08, DX-B05, DX-B06.
+    DX-B06은 CT-01(OQ-M2)이 미결이라 분해는 하되 착수는 막혀 있다.
+  -->
+
+  <mic:document-control xml:id="document-control">
+    <mic:title>Micro Blocking — Wave 3 (input binding, visual system, calibration, cache)</mic:title>
+    <mic:owner>claude-mhj</mic:owner>
+    <mic:baseline>
+      <mic:file>docs/claude-mhj_26_07_26_03_sudoku-master-macro-plan.xml</mic:file>
+      <mic:blocks-covered>UI-B07, UI-B08, DX-B05, DX-B06</mic:blocks-covered>
+    </mic:baseline>
+    <mic:deliverable>
+      <mic:file>docs/claude-mhj_26_07_26_08_micro-blocking-wave3.xml</mic:file>
+      <mic:scope>Micro Block 정의만 포함한다. application code는 변경하지 않았다.</mic:scope>
+    </mic:deliverable>
+    <mic:blocked-work critical="true">
+      DX-B06은 CT-01이 해소되기 전에는 착수할 수 없다. U1의 문언("database model을 추가하지 않는다")과
+      정면으로 부딪히기 때문이다. 분해는 지금 해 두되, OQ-M2가 CT-01-A로 결정될 때까지
+      M-DX-B06-01부터 05까지 어느 것도 시작하지 않는다. CT-01-B로 결정되면 DX-B06과 그 검증 6항목은
+      DEC-M-04에 따라 범위에서 제외되고 NOT RUN으로 기록된다.
+    </mic:blocked-work>
+    <mic:approval-state current="awaiting-user-approval">
+      <mic:next-on-approval>Wave 4 Micro Blocking</mic:next-on-approval>
+      <mic:prohibited-before-approval>모든 code implementation</mic:prohibited-before-approval>
+    </mic:approval-state>
+  </mic:document-control>
+
+  <mic:established-facts xml:id="established-facts" confidence="verified">
+    <mic:fact id="EF15" file="sudoku_django/settings.py">
+      INSTALLED_APPS에 'game'이 등록되어 있고 DB는 sqlite3(BASE_DIR/db.sqlite3)다.
+      따라서 DX-B06의 모델 추가에 앱 등록 작업이 별도로 필요하지 않다.
+    </mic:fact>
+    <mic:fact id="EF16" file="game/migrations/">
+      __init__.py만 있고 migration 파일이 없다. DX-B06의 것이 이 저장소의 첫 migration이다(MR-D3).
+    </mic:fact>
+    <mic:fact id="EF17" file="game/tests/benchmarks.py">
+      iteration_distribution()이 이미 크기별 p50, p95, max와 budget, headroom을 출력한다.
+      DX-B05는 이 함수를 새로 만들지 않고 확장한다.
+    </mic:fact>
+    <mic:fact id="EF18" file="game/sudoku/dlx.py">
+      _BUDGETS는 모듈 수준 dict이고 default_budget의 docstring이 근거표를 담고 있다.
+      상수와 표가 같은 파일에 있으므로 함께 갱신할 수 있다.
+    </mic:fact>
+    <mic:fact id="EF19" source="Phase 1 §10 ux:themes">
+      color token 14종의 light와 dark 값이 이미 확정되어 있다. UI-B08은 값을 정하지 않고 옮긴다.
+      최악 대비는 light text 5.75:1, dark text 5.27:1, dark non-text 4.05:1이며 모두 selected 배경 위다.
+    </mic:fact>
+  </mic:established-facts>
+
+  <!-- ============================================================ UI-B07 -->
+  <mic:parent-block id="UI-B07" name="KeyboardAdapter" micro-count="5">
+    <mic:objective-recap>
+      keymap 전체가 동작하고, Shift quasimode와 Space sticky가 동등한 candidate 경로를 제공하며,
+      editor focus 중에는 board shortcut을 해석하지 않는다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B07-01 → 02 → 03 → 04 → 05</mic:order>
+
+    <mb:micro id="M-UI-B07-01" parent="UI-B07" name="Physical key resolution">
+      <mb:rationale>
+        RK6의 AZERTY 충돌은 layout에 따라 event.key가 달라지는 데서 온다. 물리 키 판정을
+        event.code 우선으로 두고 fallback을 명시해야 layout 의존이 한 곳에 갇힌다.
+      </mb:rationale>
+      <mb:objective>
+        digit 판정이 event.code를 우선하고 event.key를 fallback으로 쓰며, 순수 함수로 검증 가능하다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/key-resolve.js"/></mb:target-files>
+      <mb:preconditions>UI-B01 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+resolveDigit(ev: {code: string, key: string}) -> number | null      // 1..9 또는 null
+resolveAction(ev: {code, key, ctrlKey, shiftKey, metaKey}) -> Action | null
+Action = "undo" | "redo" | "clear" | "note" | "regionNote" | "notesList"
+       | "help" | "stickyToggle" | "moveUp" | "moveDown" | "moveLeft" | "moveRight"
+       | "lineStart" | "lineEnd"
+      ]]></mb:input-type>
+      <mb:input-validation>
+        ev가 code와 key 문자열을 갖지 않으면 TypeError. DOM Event가 아니라 평범한 객체도 받는다.
+        그래야 node에서 test할 수 있다(CV1).
+      </mb:input-validation>
+      <mb:output-type>digit 1..9 또는 null. Action 리터럴 또는 null.</mb:output-type>
+      <mb:output-validation><![CDATA[
+Digit1..Digit9 -> 1..9
+Numpad1..Numpad9 -> 1..9
+code가 매칭되지 않으면 key가 "1".."9"일 때만 fallback
+Digit0, Numpad0, Backspace, Delete -> "clear"
+ctrl+z -> undo, ctrl+shift+z 또는 ctrl+y -> redo
+"?" 또는 F1 -> help
+      ]]></mb:output-validation>
+      <mb:exceptions>TypeError만</mb:exceptions>
+      <mb:side-effects>없음. 순수 함수이며 preventDefault를 부르지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const CODE_DIGIT = /^(Digit|Numpad)([1-9])$/;
+resolveDigit(ev):
+    const m = CODE_DIGIT.exec(ev.code);
+    if (m) return Number(m[2]);
+    return /^[1-9]$/.test(ev.key) ? Number(ev.key) : null;   // layout fallback
+
+resolveAction(ev):
+    if (ev.metaKey) return null;                             // never claim OS shortcuts
+    if (ev.ctrlKey) return ev.code === "KeyZ" ? (ev.shiftKey ? "redo" : "undo")
+                         : ev.code === "KeyY" ? "redo" : null;
+    map ArrowUp/Down/Left/Right, Home, End, KeyN, KeyM, Space, F1, "?" ...
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B07-01" kind="unit">Digit1..9와 Numpad1..9가 code로 판정된다(V-UI-B07-01).</mb:test>
+        <mb:test id="T-UI-B07-02" kind="unit">
+          code가 KeyA인데 key가 "1"인 AZERTY 유사 입력에서 fallback이 1을 준다.
+        </mb:test>
+        <mb:test id="T-UI-B07-03" kind="unit">metaKey가 눌린 조합은 항상 null이다.</mb:test>
+        <mb:test id="T-UI-B07-04" kind="unit">ctrl+z, ctrl+shift+z, ctrl+y가 undo와 redo로 갈린다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B07-02" parent="UI-B07" name="Focus scoping and self-deactivation">
+      <mb:rationale>
+        V4-04가 정한 non-modal editor 모델의 필수 짝이다. editor에 focus가 있는 동안
+        board shortcut을 해석하면 사용자가 메모에 "5"를 쓰려다 보드에 5가 들어간다.
+      </mb:rationale>
+      <mb:objective>
+        focus가 board 밖이면 adapter가 어떤 key도 소비하지 않는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/keyboard-adapter.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B07-01, UI-B06 완료</mb:preconditions>
+      <mb:input-type>
+        boardHasFocus(activeElement: Element | null, gridRoot: Element) -> boolean
+      </mb:input-type>
+      <mb:input-validation>
+        activeElement가 null이면 false. gridRoot가 Element가 아니면 TypeError.
+      </mb:input-validation>
+      <mb:output-type>boolean</mb:output-type>
+      <mb:output-validation><![CDATA[
+activeElement가 gridRoot의 후손인 gridcell일 때만 true
+textarea, input, contenteditable, role=dialog 내부이면 false
+body에 focus가 있을 때(활성 요소 없음)도 false
+      ]]></mb:output-validation>
+      <mb:exceptions>TypeError</mb:exceptions>
+      <mb:side-effects>없음. 판정만 한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+boardHasFocus(active, gridRoot):
+    if (!active || active === document.body) return false;
+    if (active.closest('[role="dialog"]')) return false;
+    if (active.matches('textarea, input, select, [contenteditable="true"]')) return false;
+    return gridRoot.contains(active) && active.getAttribute("role") === "gridcell";
+// handler entry:  if (!boardHasFocus(...)) return;   // consume nothing, no preventDefault
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B07-05" kind="manual">
+          focus가 textarea일 때 board shortcut이 해석되지 않는다(V-UI-B07-04).
+        </mb:test>
+        <mb:test id="T-UI-B07-06" kind="manual">dialog 내부 focus에서도 소비하지 않는다.</mb:test>
+        <mb:test id="T-UI-B07-07" kind="manual">gridcell focus에서만 true다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B07-03" parent="UI-B07" name="Navigation binding to moveSelection">
+      <mb:rationale>
+        DV-05의 UI-B07 쪽 절반이다. 이동 규칙은 UI-B06의 순수 함수가 갖고,
+        이 micro block은 키를 그 함수에 연결하는 일만 한다.
+      </mb:rationale>
+      <mb:objective>
+        방향키와 Home, End가 modifier에 따라 moveSelection을 호출하고 결과로 selection을 옮긴다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/keyboard-adapter.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B07-02, M-UI-B06-02 완료</mb:preconditions>
+      <mb:input-type>KeyboardEvent와 현재 selection index</mb:input-type>
+      <mb:input-validation>
+        selection이 null이면 첫 이동에서 0을 선택한다. 예외로 만들지 않는다.
+      </mb:input-validation>
+      <mb:output-type>새 selection index. 변화가 없으면 호출하지 않는다.</mb:output-type>
+      <mb:output-validation>
+        moveSelection의 반환값이 현재와 같으면 boardView.select를 부르지 않는다.
+        불필요한 focus 재설정은 screen reader가 같은 cell을 다시 읽게 만든다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>selection 변경, focus 이동, 방향키의 preventDefault(페이지 스크롤 방지)</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const NAV = {moveUp:"up", moveDown:"down", moveLeft:"left", moveRight:"right",
+             lineStart:"lineStart", lineEnd:"lineEnd"};
+onKeyDown(ev):
+    if (!boardHasFocus(...)) return;
+    const action = resolveAction(ev);
+    if (action in NAV) {
+        const from = selection ?? 0;
+        const to = moveSelection(from, NAV[action], ev.ctrlKey ? "ctrl" : "none");
+        if (to !== from || selection === null) boardView.select(to);
+        ev.preventDefault();                       // stop the page from scrolling
+        return;
+    }
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B07-08" kind="manual">
+          방향키, Ctrl+방향키, Home/End, Ctrl+Home/End가 명세대로 이동한다(UI-B06 V-UI-B06-02의 바인딩 쪽).
+        </mb:test>
+        <mb:test id="T-UI-B07-09" kind="manual">경계에서 focus가 재설정되지 않는다.</mb:test>
+      </mb:tests>
+      <mb:rollback>navigation 분기 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B07-04" parent="UI-B07" name="Value and candidate entry with quasimode and sticky">
+      <mb:rationale>
+        S2가 정한 두 경로가 만나는 지점이다. RK6 때문에 Shift가 유일한 경로여서는 안 되며,
+        Space sticky는 gridcell focus일 때만 해석되어야 button 활성화와 충돌하지 않는다.
+      </mb:rationale>
+      <mb:objective>
+        digit이 설정에 따라 value 또는 candidate로 들어가고, Space sticky가 동등 경로로 동작한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/keyboard-adapter.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B07-03, UI-B03, UI-B04(settings) 완료</mb:preconditions>
+      <mb:input-type>KeyboardEvent, selection, settings.shiftQuasimode, sticky 상태</mb:input-type>
+      <mb:input-validation>
+        selection이 null이면 digit 입력을 무시한다. 임의로 cell을 고르지 않는다.
+      </mb:input-validation>
+      <mb:output-type>store mutation 호출 결과</mb:output-type>
+      <mb:output-validation><![CDATA[
+candidate 여부 = (ev.shiftKey && settings.shiftQuasimode) || sticky
+shiftQuasimode=false이면 Shift+digit이 value로 처리된다
+given 거부 시 announcer가 "given-rejected"로 1회 알린다
+quasimode 상태 자체는 알리지 않는다 (반복 소음 방지)
+sticky 토글만 on/off를 1회 알린다
+      ]]></mb:output-validation>
+      <mb:exceptions>없음. store의 RangeError는 발생할 수 없다. digit이 이미 1..9로 검증되었다.</mb:exceptions>
+      <mb:side-effects>store mutation, preventDefault, 조건부 announce</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const digit = resolveDigit(ev);
+if (digit !== null && selection !== null) {
+    const asCandidate = (ev.shiftKey && settings.shiftQuasimode) || sticky;
+    const r = asCandidate ? store.toggleCandidate(selection, digit)
+                          : store.setValue(selection, digit, {autoRemoveCandidates: settings.autoRemoveCandidates});
+    if (!r.ok && r.reason === "given") announcer.announce("given-rejected", "고정된 칸입니다");
+    ev.preventDefault();
+    return;
+}
+if (action === "stickyToggle" && focusedRole === "gridcell") {
+    sticky = !sticky;
+    announcer.announce("sticky-mode", sticky ? "후보 입력 모드 켜짐" : "후보 입력 모드 꺼짐");
+    ev.preventDefault();
+}
+if (action === "clear" && selection !== null) store.clearCell(selection);
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B07-10" kind="manual">Shift+digit이 candidate, digit이 value다(V-UI-B07-02).</mb:test>
+        <mb:test id="T-UI-B07-11" kind="manual">
+          shiftQuasimode=false에서 Shift+digit이 value로 처리된다(V-UI-B07-03).
+        </mb:test>
+        <mb:test id="T-UI-B07-12" kind="manual">
+          focus가 button일 때 Space가 sticky를 토글하지 않는다(V-UI-B07-05).
+        </mb:test>
+        <mb:test id="T-UI-B07-13" kind="manual">quasimode는 알리지 않고 sticky만 1회 알린다.</mb:test>
+      </mb:tests>
+      <mb:rollback>digit 분기 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B07-05" parent="UI-B07" name="Remaining keymap and help binding">
+      <mb:rationale>
+        §11 keymap의 나머지를 완결한다. help는 UI-B14가 내용을 제공하므로 여기서는
+        열기 신호만 보내고 내용을 만들지 않는다. 경계를 흐리면 keymap이 두 곳에 적힌다.
+      </mb:rationale>
+      <mb:objective>
+        N, Shift+N, M, undo, redo, help가 각각 정해진 대상에 신호를 보낸다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/keyboard-adapter.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B07-04 완료</mb:preconditions>
+      <mb:input-type>Action 리터럴과 콜백 묶음 {openNote, openRegionNote, openNotesList, openHelp}</mb:input-type>
+      <mb:input-validation>
+        콜백이 함수가 아니면 TypeError. 미구현 블록의 자리를 빈 함수로 채우지 않는다.
+        UI-B10과 UI-B14가 준비되기 전에는 adapter를 mount하지 않는다.
+      </mb:input-validation>
+      <mb:output-type>콜백 호출. adapter 자신은 DOM을 만들지 않는다.</mb:output-type>
+      <mb:output-validation>
+        keymap 정의가 이 모듈 하나에만 존재한다. UI-B14의 help는 이 정의를 읽어 표시한다.
+      </mb:output-validation>
+      <mb:exceptions>TypeError</mb:exceptions>
+      <mb:side-effects>콜백을 통한 간접 부작용만 있다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+export const KEYMAP = [                     // single source of truth, read by UI-B14 help
+  {combo: "방향키",            action: "moveUp/Down/Left/Right", desc: "한 칸 이동"},
+  {combo: "Ctrl+방향키",       action: "box jump",               desc: "한 박스 이동"},
+  ... every row of Phase 1 section 11 ...
+];
+switch (action) {
+  case "note":       return cb.openNote(selection);
+  case "regionNote": return cb.openRegionNote(selection);
+  case "notesList":  return cb.openNotesList();
+  case "help":       return cb.openHelp();
+  case "undo":       return applyHistory(store.undo());
+  case "redo":       return applyHistory(store.redo());
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B07-14" kind="manual">N, Shift+N, M, ?, F1이 각 콜백을 부른다.</mb:test>
+        <mb:test id="T-UI-B07-15" kind="unit">KEYMAP이 §11의 모든 행을 포함한다.</mb:test>
+        <mb:test id="T-UI-B07-16" kind="unit">콜백 누락 시 TypeError로 mount가 실패한다.</mb:test>
+      </mb:tests>
+      <mb:rollback>나머지 분기 제거.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B07">
+      V-UI-B07-01 → T-UI-B07-01 | 02 → T-UI-B07-10 | 03 → T-UI-B07-11 |
+      04 → T-UI-B07-05 | 05 → T-UI-B07-12. 5/5 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ UI-B08 -->
+  <mic:parent-block id="UI-B08" name="Visual system, color tokens, responsive layout" micro-count="6">
+    <mic:objective-recap>
+      token이 CSS custom property로 존재하고 자동 contrast 검사가 실패 0으로 통과하며,
+      breakpoint와 keyboard-open geometry가 명세대로 동작한다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B08-01 → 02 → (03, 04) → 05 → 06</mic:order>
+
+    <mb:micro id="M-UI-B08-01" parent="UI-B08" name="css/tokens.css with the fixed palette">
+      <mb:rationale>
+        M3의 귀착점이다. EF19가 확인한 대로 값은 Phase 1에서 이미 계산으로 확정되었으므로
+        이 micro block은 값을 정하지 않고 옮기기만 한다. 임의로 조정하면 76쌍 계산이 무효가 된다.
+      </mb:rationale>
+      <mb:objective>
+        14개 token이 light 기본값과 dark 오버라이드로 존재하고 Phase 1 값과 정확히 일치한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/css/tokens.css"/></mb:target-files>
+      <mb:preconditions>UI-B01 완료</mb:preconditions>
+      <mb:input-type>없음. 정적 CSS다.</mb:input-type>
+      <mb:input-validation>
+        Phase 1 §10 ux:themes의 값과 한 글자도 다르면 안 된다. M-UI-B08-02가 이를 기계로 검사한다.
+      </mb:input-validation>
+      <mb:output-type>CSS custom property 14종 x 2 theme</mb:output-type>
+      <mb:output-validation><![CDATA[
+light: --bg-page #F8FAFC, --bg-cell #FFFFFF, --bg-cell-given #E8EDF3,
+       --bg-cell-selected #CFE3FB, --bg-cell-peer #EFF4FA, --bg-cell-digit #DDE7FA,
+       --bg-cell-conflict #FBE4E4, --fg-body #1E293B, --fg-given #0F172A,
+       --fg-user #1B4FA8, --fg-candidate #4A5568, --fg-conflict #A32020,
+       --line #334155, --focus #1B4FA8
+dark : #0B1220 #161F2E #243044 #20406E #1C2739 #2A2F5C #4A1F22
+       #E2E8F0 #F1F5F9 #9EC5FF #B3C0D1 #FF9E9E #94A3B8 #9EC5FF
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        prefers-color-scheme: dark 미디어 쿼리로 오버라이드한다. 수동 theme 토글은 1차 범위가 아니다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+:root { --bg-page:#F8FAFC; ... 14 properties ... }
+@media (prefers-color-scheme: dark) { :root { ...same 14 names, dark values... } }
+/* values are fixed by Phase 1 V4-17; changing one invalidates the 76-pair計算 */
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B08-01" kind="unit">두 theme 모두 14개 token이 정의된다.</mb:test>
+        <mb:test id="T-UI-B08-02" kind="unit">값이 Phase 1 표와 정확히 일치한다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B08-02" parent="UI-B08" name="tools/check-contrast.mjs gate">
+      <mb:rationale>
+        DV-01로 UI-B01에서 이관된 도구다. M3가 "요구만 있고 값이 없음"이었다면 이 도구는
+        "값이 있어도 나중에 조용히 깨짐"을 막는다. 문서 주장이 아니라 실행되는 검사가 되는 지점이다.
+      </mb:rationale>
+      <mb:objective>
+        tokens.css를 파싱해 76쌍을 재계산하고, 하나라도 기준 미달이면 0이 아닌 exit code를 반환한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="tools/check-contrast.mjs"/></mb:target-files>
+      <mb:preconditions>M-UI-B08-01 완료. 파싱 대상 파일이 실재해야 한다(DV-01의 근거).</mb:preconditions>
+      <mb:input-type>
+        argv[2]로 tokens.css 경로를 받는다. 생략 시 기본 경로를 쓴다.
+      </mb:input-type>
+      <mb:input-validation>
+        파일이 없으면 명확한 메시지와 함께 exit 2. token이 14개보다 적으면 exit 2.
+        조용히 통과시키지 않는다. 검사 대상이 없는데 통과하면 gate가 무의미해진다.
+      </mb:input-validation>
+      <mb:output-type>
+        표준 출력의 쌍별 결과와 exit code(0 통과, 1 대비 미달, 2 입력 오류)
+      </mb:output-type>
+      <mb:output-validation><![CDATA[
+text 5종 x cell background 6종 = 30쌍, non-text 2종 x 배경 = 나머지, theme당 38쌍
+전 쌍 통과 시 최악값이 light text 5.75, dark text 5.27, dark non-text 4.05로 재현된다
+      ]]></mb:output-validation>
+      <mb:exceptions>없음. 실패는 exit code다.</mb:exceptions>
+      <mb:side-effects>없음. 파일을 읽기만 한다. 외부 의존성을 쓰지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+parse :root { ... } and the dark media block with a small regex reader
+srgbToLin(c) = c<=0.04045 ? c/12.92 : ((c+0.055)/1.055)**2.4
+luminance = 0.2126R + 0.7152G + 0.0722B
+ratio(a,b) = (max+0.05)/(min+0.05)
+for each theme, for each required (fg, bg) pair: compare against 4.5 or 3.0
+print每 pair; exit 1 on any failure, echoing the worst pair
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B08-03" kind="integration">
+          현재 token으로 실행 시 실패 0이고 최악값이 기대치와 일치한다(V-UI-B08-02).
+        </mb:test>
+        <mb:test id="T-UI-B08-04" kind="negative">
+          token 하나를 일부러 흐리게 바꾸면 exit 1과 해당 쌍이 보고된다.
+        </mb:test>
+        <mb:test id="T-UI-B08-05" kind="negative">파일이 없으면 exit 2다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. 다만 M3 재발 방지가 사라지므로 token을 바꾸지 않는 조건에서만 허용한다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B08-03" parent="UI-B08" name="css/board.css grid, tiers, state cues">
+      <mb:rationale>
+        §10의 시각 규범을 옮긴다. 색 단독 신호 금지와 candidate 하한 9px이 여기서 코드가 된다.
+      </mb:rationale>
+      <mb:objective>
+        3단계 격자선, 세 숫자 tier, 다섯 상태 cue가 구현되고 모든 cue가 색 외 신호를 동반한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/css/board.css"/></mb:target-files>
+      <mb:preconditions>M-UI-B08-01, UI-B06 완료</mb:preconditions>
+      <mb:input-type>data-* 속성(given, conflict, note, peer, digit)과 token</mb:input-type>
+      <mb:input-validation>없음. 선언적 CSS다.</mb:input-validation>
+      <mb:output-type>렌더된 격자</mb:output-type>
+      <mb:output-validation><![CDATA[
+outer 3px, box 2px, cell 1px
+given/user value 52% of cell, weight 600/400
+candidate font-size: 9px 선언 후 max(9px, 24cqi) 선언 (cqi 미지원 자연 fallback)
+.cell { container-type: inline-size }
+selected 2px solid outline + 배경, candidate-mode 2px dashed + 텍스트 배지,
+conflict 2px underline + 색, memo dog-ear 형태, focus 2px ring
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        dog-ear는 pointer-events:none이며 aria-hidden이다(V4-05). 상호작용 대상이 아니다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+.cell { container-type: inline-size; background: var(--bg-cell); }
+.cell[data-given="1"] { background: var(--bg-cell-given); font-weight: 600; }
+.cell[data-conflict="1"] { text-decoration: underline 2px; color: var(--fg-conflict); }
+.candidate { font-size: 9px; font-size: max(9px, 24cqi); color: var(--fg-candidate); }
+.cell[data-note="1"]::after { /* dog-ear triangle */ pointer-events: none; }
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B08-06" kind="manual">세 격자선 두께가 구분된다.</mb:test>
+        <mb:test id="T-UI-B08-07" kind="manual">모든 상태 cue가 색 외 신호를 함께 갖는다.</mb:test>
+        <mb:test id="T-UI-B08-08" kind="manual">dog-ear가 pointer event를 받지 않는다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B08-04" parent="UI-B08" name="css/layout.css breakpoints and control floor">
+      <mb:rationale>
+        §9의 3개 breakpoint와 §10의 48px 단일 하한(L3)을 구현한다.
+        100vh 금지와 safe-area 처리도 여기 속한다.
+      </mb:rationale>
+      <mb:objective>
+        wide, medium, narrow 배치가 명세대로 동작하고 board 밖 control이 모두 48x48 이상이다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/css/layout.css"/></mb:target-files>
+      <mb:preconditions>M-UI-B08-01 완료</mb:preconditions>
+      <mb:input-type>viewport 크기와 pointer 미디어 쿼리</mb:input-type>
+      <mb:input-validation>없음</mb:input-validation>
+      <mb:output-type>반응형 배치</mb:output-type>
+      <mb:output-validation><![CDATA[
+wide >=1024px : board min(70dvh, 640px), notes rail 280px, 확보 불가 시 board 축소(overlay 금지)
+medium 600..1023px : portrait bottom 또는 landscape right, notes는 bottom sheet
+narrow <=599px : board calc(100vw - 16px), digit target = board/9, gap 0, button 48px
+100vh 미사용, dvh/svh 사용, bottom control에 env(safe-area-inset-bottom) 가산
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+:root { --control-floor: 48px; }                    /* L3: single floor, never 44 */
+.control { min-inline-size: var(--control-floor); min-block-size: var(--control-floor); }
+.digit-bar button { inline-size: calc(var(--board-width) / 9); block-size: 48px; }
+.digit-bar { block-size: 60px; }                    /* L2: row 60 = button 48 + pad 6*2 */
+@media (min-width:1024px){...} @media (min-width:600px) and (max-width:1023px){...}
+@media (max-width:599px){ .board { inline-size: calc(100vw - 16px); } }
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B08-09" kind="manual">3개 breakpoint 배치가 명세와 일치한다(V-UI-B08-01).</mb:test>
+        <mb:test id="T-UI-B08-10" kind="manual">
+          board 밖 모든 interactive control이 48x48 이상이다(V-UI-B08-06).
+        </mb:test>
+        <mb:test id="T-UI-B08-11" kind="unit">소스에 100vh가 없음을 정적으로 확인한다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B08-05" parent="UI-B08" name="ui/viewport.js VisualViewport geometry">
+      <mb:rationale>
+        R4가 확인한 대로 on-screen keyboard는 layout viewport를 유지한 채 visual viewport를 줄인다.
+        RK2가 지적한 event timing 차이 때문에 rAF 1회로 합치는 처리가 필수다.
+      </mb:rationale>
+      <mb:objective>
+        boardScale 산식이 명세대로 계산되고, resize와 scroll이 rAF 1회로 합쳐지며,
+        VisualViewport 미지원에서 fallback한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/viewport.js"/></mb:target-files>
+      <mb:preconditions>UI-B01 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+computeGeometry(vv: {height, offsetTop, scale} | null, fallbackHeight: number,
+                boardWidth: number, reserved: number) -> {visibleTop, boardScale}
+      ]]></mb:input-type>
+      <mb:input-validation>
+        boardWidth가 0 이하이면 RangeError. reserved가 음수면 RangeError.
+        vv가 null이면 fallbackHeight를 쓴다. 이 주입 구조 덕에 node에서 test할 수 있다(CV1).
+      </mb:input-validation>
+      <mb:output-type>{visibleTop: number, boardScale: number} (0 &lt; boardScale &lt;= 1)</mb:output-type>
+      <mb:output-validation><![CDATA[
+available  = max(0, visibleHeight - reserved)
+boardScale = min(1, available / boardWidth)
+available이 0이면 boardScale이 0이 아니라 최소 하한으로 clamp된다 (board가 사라지면 안 됨)
+      ]]></mb:output-validation>
+      <mb:exceptions>RangeError</mb:exceptions>
+      <mb:side-effects>
+        구독 시 visualViewport의 resize와 scroll listener를 등록한다. 해지 함수를 반환한다.
+        pinch zoom 중에는 scale을 읽어 layout 좌표와 혼동하지 않는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+computeGeometry(vv, fallbackHeight, boardWidth, reserved):
+    const visibleTop    = vv?.offsetTop ?? 0;
+    const visibleHeight = vv?.height ?? fallbackHeight;
+    const available = Math.max(0, visibleHeight - reserved);
+    const scale = Math.min(1, available / boardWidth);
+    return {visibleTop, boardScale: Math.max(scale, MIN_SCALE)};
+
+observe(cb): let queued = false;
+    const on = () => { if (queued) return; queued = true;
+                       requestAnimationFrame(() => { queued = false; cb(compute()); }); };
+    vv.addEventListener("resize", on); vv.addEventListener("scroll", on);
+    return () => { vv.removeEventListener(...); };
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B08-12" kind="unit">reserved=72, 산식대로 boardScale이 계산된다.</mb:test>
+        <mb:test id="T-UI-B08-13" kind="unit">vv=null에서 fallbackHeight를 쓴다.</mb:test>
+        <mb:test id="T-UI-B08-14" kind="unit">available=0에서도 boardScale이 0이 아니다.</mb:test>
+        <mb:test id="T-UI-B08-15" kind="manual">
+          software keyboard를 연 상태에서 편집 surface가 board를 가리지 않는다(V-UI-B08-05).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B08-06" parent="UI-B08" name="Reduced motion and small-viewport legibility record">
+      <mb:rationale>
+        RK3의 9px 판독성은 kill criterion이 걸린 미검증 가설이다. 측정 결과를 기록하지 않으면
+        UI-B13에서 판정할 근거가 없다. reduced motion은 같은 파일에서 함께 닫는다.
+      </mb:rationale>
+      <mb:objective>
+        prefers-reduced-motion에서 transition이 0ms이고, 3개 폭에서 candidate 판독 여부가 기록된다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/static/game/css/board.css"/>
+        <mb:file action="create" path="docs/legibility-record.md" note="측정 결과 기록"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B08-03, 04 완료</mb:preconditions>
+      <mb:input-type>320, 360, 390px 뷰포트에서의 실제 렌더</mb:input-type>
+      <mb:input-validation>실측이므로 검증할 입력이 없다. 조건(기기, 배율)을 함께 기록한다.</mb:input-validation>
+      <mb:output-type>CSS 규칙 1개와 측정 기록 문서</mb:output-type>
+      <mb:output-validation>
+        motion max-duration 180ms, reduce에서 0ms. 기록에 각 폭의 실제 candidate px과 판독 여부가 있다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        판독 불가로 판정되면 RK3 kill criterion이 발동해 Phase 1 재검토로 돌아간다.
+        이 micro block은 그 판정 근거를 만들 뿐 스스로 대안을 구현하지 않는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 0ms !important; } }
+measure at 320 / 360 / 390 CSS px: record computed candidate font-size and a
+  legible / marginal / illegible judgement with the device and zoom used
+if illegible at any width -> raise RK3 kill criterion, do not silently redesign
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B08-16" kind="manual">
+          reduced-motion에서 transition duration이 0ms다(V-UI-B08-03).
+        </mb:test>
+        <mb:test id="T-UI-B08-17" kind="manual">
+          320/360/390px에서 candidate가 9px 이상이며 판독 여부가 기록된다(V-UI-B08-04).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>CSS 규칙 제거. 측정 기록은 남긴다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B08">
+      V-UI-B08-01 → T-UI-B08-09 | 02 → T-UI-B08-03 | 03 → T-UI-B08-16 |
+      04 → T-UI-B08-17 | 05 → T-UI-B08-15 | 06 → T-UI-B08-10. 6/6 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ DX-B05 -->
+  <mic:parent-block id="DX-B05" name="Budget and difficulty recalibration" micro-count="3">
+    <mic:objective-recap>
+      반복 분포를 재측정해 근거표와 상수를 갱신하고 난이도 이동을 가시화한다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B05-01 → 02 → 03</mic:order>
+    <mic:conditional ref="DEC-M-04">
+      DX-B02, DX-B03, DX-B04가 모두 폐기되면 엔진 속도가 변하지 않았으므로 이 블록은 수행하지 않는다.
+      "근거표 유효, 재측정 불요"로 종결하고 검증 5항목을 NOT RUN으로 기록한다.
+    </mic:conditional>
+
+    <mb:micro id="M-DX-B05-01" parent="DX-B05" name="Iteration distribution re-measurement">
+      <mb:rationale>
+        EF17이 확인한 대로 측정 함수는 이미 있다. 새로 만들 것이 아니라 채택된 변경 이후의 값으로
+        다시 돌리고 이전 값과 나란히 두는 것이 요점이다.
+      </mb:rationale>
+      <mb:objective>
+        크기별 200회 판정의 p50, p95, max를 재측정하고 이전 표와 함께 제시한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/tests/benchmarks.py"/></mb:target-files>
+      <mb:preconditions>DX-B02, B03, B04의 채택 여부가 확정된 뒤</mb:preconditions>
+      <mb:input-type>iteration_distribution(trials=200)</mb:input-type>
+      <mb:input-validation>trials가 200 미만이면 꼬리 추정이 불안정하다. 경고를 출력한다.</mb:input-validation>
+      <mb:output-type>크기별 p50, p95, max, budget, headroom 표</mb:output-type>
+      <mb:output-validation>
+        headroom이 각 크기에서 20배 이상이다. 미만이면 M-DX-B05-02가 예산을 올린다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>16x16 200회가 수십 초 걸린다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+run iteration_distribution(trials=200) after adoption
+record: dim, givens, p50, p95, max, current budget, headroom, worst-case seconds
+place next to the pre-change table from dlx-refactor-plan.md
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B05-01" kind="measurement">
+          크기별 p50, p95, max가 표로 기록된다(V-DX-B05-01).
+        </mb:test>
+        <mb:test id="T-DX-B05-02" kind="measurement">headroom이 20배 이상이다(V-DX-B05-02).</mb:test>
+      </mb:tests>
+      <mb:rollback>측정만 하므로 되돌릴 것이 없다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B05-02" parent="DX-B05" name="Budget constants and docstring table in one change">
+      <mb:rationale>
+        EF18이 확인한 대로 상수와 근거표가 같은 파일에 있다. 둘 중 하나만 고치면
+        문서가 코드를 설명하지 못하게 된다. 반드시 함께 바꾼다.
+      </mb:rationale>
+      <mb:objective>
+        _BUDGETS와 default_budget docstring의 표가 M-DX-B05-01의 실측과 일치한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/sudoku/dlx.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B05-01 완료</mb:preconditions>
+      <mb:input-type>실측 표</mb:input-type>
+      <mb:input-validation>
+        표의 각 행이 실제 측정에서 나온 값이어야 한다. 이전 값을 그대로 옮겨 적지 않는다.
+      </mb:input-validation>
+      <mb:output-type>갱신된 상수와 docstring</mb:output-type>
+      <mb:output-validation>
+        docstring의 headroom 열이 budget / max와 실제로 일치한다. 산술을 검산한다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        예산을 낮추면 어려운 퍼즐이 더 자주 되돌려져 단서가 늘고 난이도가 이동한다(MR-D6).
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+update _BUDGETS only when headroom < 20 or the tail moved materially
+update the docstring table in the same edit; never one without the other
+re-run the property test that uniqueness holds at budgets 1, 10, 100, default
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B05-03" kind="unit">
+          예산 1, 10, 100, 기본값에서 유일해가 유지된다(V-DX-B05-03).
+        </mb:test>
+        <mb:test id="T-DX-B05-04" kind="manual">docstring 표가 실측과 일치한다(V-DX-B05-05).</mb:test>
+      </mb:tests>
+      <mb:rollback>이전 상수와 표를 함께 되돌린다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B05-03" parent="DX-B05" name="Difficulty clue-count distribution record">
+      <mb:rationale>
+        MR-D6이 요구한 가시화다. 예산을 바꾸면 난이도가 조용히 이동하는데, 단서 수 분포를
+        기록해 두지 않으면 사용자 체감이 달라진 이유를 나중에 설명할 수 없다.
+      </mb:rationale>
+      <mb:objective>
+        난이도별 결과 단서 수 분포를 이전 값과 비교해 기록한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/tests/benchmarks.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B05-02 완료</mb:preconditions>
+      <mb:input-type>dim x difficulty 조합별 생성 표본</mb:input-type>
+      <mb:input-validation>표본 수와 seed를 함께 출력한다.</mb:input-validation>
+      <mb:output-type>난이도별 단서 수의 중앙값과 범위</mb:output-type>
+      <mb:output-validation>
+        DIFFICULTIES의 목표값과 실제 결과의 차이가 표로 드러난다. 목표 미달이 잦으면 DIG_TIME_LIMIT을 본다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for dim, difficulty: generate N puzzles; record median and range of clue counts
+compare against DIFFICULTIES target; flag rows where the gap grew after recalibration
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B05-05" kind="measurement">
+          난이도별 단서 수 분포가 기록되고 이전과 비교된다(V-DX-B05-04).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>측정 전용이라 되돌릴 것이 없다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B05">
+      V-DX-B05-01 → T-DX-B05-01 | 02 → T-DX-B05-02 | 03 → T-DX-B05-03 |
+      04 → T-DX-B05-05 | 05 → T-DX-B05-04. 5/5 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ DX-B06 -->
+  <mic:parent-block id="DX-B06" name="Pre-generated puzzle cache" micro-count="5"
+                    blocked-by="CT-01" gate="OQ-M2">
+    <mic:objective-recap>
+      관리 커맨드로 미리 생성해 저장하고 API가 캐시에서 꺼내되 비면 동기 생성으로 강등한다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B06-01 → 02 → 03 → (04, 05)</mic:order>
+    <mic:blocking-notice critical="true">
+      CT-01이 해소되기 전에는 M-DX-B06-01부터 05까지 어느 것도 착수하지 않는다.
+      U1은 "database model을 추가하지 않는다"이고 이 블록은 정확히 그것을 한다.
+      CT-01-A(U1 한정 개정)로 결정되어야 착수 가능하다.
+    </mic:blocking-notice>
+
+    <mb:micro id="M-DX-B06-01" parent="DX-B06" name="Puzzle model and first migration">
+      <mb:rationale>
+        EF16이 확인한 대로 이 저장소의 첫 migration이다. MR-D3이 요구한 백업과 역적용 검증이
+        여기에 붙는다.
+      </mb:rationale>
+      <mb:objective>
+        Puzzle 모델이 정의되고 migration이 적용과 역적용 모두 성공한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/models.py"/>
+        <mb:file action="create" path="game/migrations/0001_initial.py" note="makemigrations 산출물"/>
+      </mb:target-files>
+      <mb:preconditions>CT-01-A 결정. db.sqlite3 백업.</mb:preconditions>
+      <mb:input-type><![CDATA[
+class Puzzle(models.Model):
+    dim         = models.PositiveSmallIntegerField()
+    difficulty  = models.CharField(max_length=16)
+    givens      = models.TextField()      # dim*dim digits, 0 = blank
+    solution    = models.TextField()      # dim*dim digits
+    created_at  = models.DateTimeField(auto_now_add=True)
+    consumed    = models.BooleanField(default=False)
+    class Meta:
+        indexes = [models.Index(fields=["dim", "difficulty", "consumed"])]
+      ]]></mb:input-type>
+      <mb:input-validation>
+        givens와 solution의 길이가 dim*dim이어야 한다. 모델 clean()에서 검사한다.
+        문자열 저장을 택한 이유는 sqlite에 배열 타입이 없고 JSON 필드는 조회 이점이 없어서다.
+      </mb:input-validation>
+      <mb:output-type>DB 테이블과 migration 파일</mb:output-type>
+      <mb:output-validation>
+        migrate 후 테이블이 생기고 migrate game zero로 되돌아간다(V-DX-B06-05).
+      </mb:output-validation>
+      <mb:exceptions>ValidationError(길이 불일치)</mb:exceptions>
+      <mb:side-effects>
+        DB 스키마 변경. 되돌리기 부담이 있는 유일한 micro block이다. 적용 전 백업이 전제다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+python manage.py makemigrations game
+python manage.py migrate
+python manage.py migrate game zero      # verify reversibility, then migrate again
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B06-01" kind="integration">migration이 적용·역적용된다(V-DX-B06-05).</mb:test>
+        <mb:test id="T-DX-B06-02" kind="unit">길이가 틀린 givens가 ValidationError다.</mb:test>
+      </mb:tests>
+      <mb:rollback>migrate game zero 후 모델과 migration 파일 삭제. 백업본으로 db 복원.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B06-02" parent="DX-B06" name="generate_puzzles management command">
+      <mb:rationale>
+        DEC-M-03에 따라 기본 대상은 dim=9지만 command는 dim 파라미터를 유지해야
+        UI가 확장될 때 코드 변경 없이 대형 크기를 채울 수 있다.
+      </mb:rationale>
+      <mb:objective>
+        지정한 dim, difficulty, count만큼 생성해 저장하고 진행 상황을 출력한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="game/management/__init__.py"/>
+        <mb:file action="create" path="game/management/commands/__init__.py"/>
+        <mb:file action="create" path="game/management/commands/generate_puzzles.py"/>
+      </mb:target-files>
+      <mb:preconditions>M-DX-B06-01 완료</mb:preconditions>
+      <mb:input-type>
+        --dim (default 9), --difficulty (default medium), --count (default 100)
+      </mb:input-type>
+      <mb:input-validation>
+        count가 1 미만이면 CommandError. difficulty가 DIFFICULTIES 밖이면 CommandError.
+        dim이 spec_for가 거부하는 값이면 CommandError로 번역한다.
+      </mb:input-validation>
+      <mb:output-type>저장된 Puzzle 행 수와 소요 시간</mb:output-type>
+      <mb:output-validation>정확히 count개가 저장되고 전부 consumed=False다.</mb:output-validation>
+      <mb:exceptions>CommandError만 사용자에게 노출한다. 내부 예외는 번역한다.</mb:exceptions>
+      <mb:side-effects>
+        16x16 hard 100개는 수 분이 걸린다. 진행률을 출력해 멈춘 것처럼 보이지 않게 한다.
+        bulk_create로 트랜잭션 수를 줄인다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for i in range(count):
+    puzzle, solution = generator.generate_puzzle(dim=dim, difficulty=difficulty)
+    rows.append(Puzzle(dim=dim, difficulty=difficulty,
+                       givens="".join(map(str, puzzle)),
+                       solution="".join(map(str, solution))))
+    if (i + 1) % 10 == 0: self.stdout.write(f"{i+1}/{count}")
+Puzzle.objects.bulk_create(rows)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B06-03" kind="integration">
+          지정 개수가 저장된다(V-DX-B06-01).
+        </mb:test>
+        <mb:test id="T-DX-B06-04" kind="unit">잘못된 difficulty가 CommandError다.</mb:test>
+      </mb:tests>
+      <mb:rollback>command 파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B06-03" parent="DX-B06" name="Cache-first new_puzzle with graceful fallback">
+      <mb:rationale>
+        CT-02가 지정한 계약 지점이다. UI-B02가 만든 T-UI-B02-07이 여기서 회귀 기준으로 작동한다.
+        캐시 고갈이 오류가 되면 안 된다는 것이 핵심 제약이다.
+      </mb:rationale>
+      <mb:objective>
+        캐시에 행이 있으면 그것을 소비해 반환하고, 없으면 기존 동기 생성으로 강등하되
+        응답 shape는 어느 경로에서도 동일하다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/views.py" note="new_puzzle만. index는 UI-B02가 이미 정리"/></mb:target-files>
+      <mb:preconditions>M-DX-B06-02 완료. UI-B02 완료(CT-02, sync point S1).</mb:preconditions>
+      <mb:input-type>HttpRequest (GET /api/new-puzzle/)</mb:input-type>
+      <mb:input-validation>
+        query parameter를 새로 해석하지 않는다. 기존 API가 인자를 받지 않으므로 계약을 넓히지 않는다.
+      </mb:input-validation>
+      <mb:output-type>
+        JsonResponse. key 집합은 정확히 {"puzzle", "solution"}이며 값은 길이 81 정수 배열이다.
+      </mb:output-type>
+      <mb:output-validation>
+        T-UI-B02-07이 계속 통과해야 한다. key를 추가하면 그 test가 실패한다(의도된 설계).
+      </mb:output-validation>
+      <mb:exceptions>
+        DB 오류 시 동기 생성으로 강등한다. 사용자에게 5xx를 주지 않는다.
+      </mb:exceptions>
+      <mb:side-effects>
+        선택된 행의 consumed를 True로 갱신한다. 동시 요청이 같은 행을 집지 않도록
+        select_for_update 또는 조건부 update를 쓴다. sqlite에서는 후자가 안전하다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+def new_puzzle(request):
+    row = _take_cached(dim=9, difficulty="medium")
+    if row is not None:
+        return JsonResponse({"puzzle": _to_ints(row.givens),
+                             "solution": _to_ints(row.solution)})
+    puzzle, solution = generator.generate_puzzle()          # unchanged fallback
+    return JsonResponse({"puzzle": puzzle, "solution": solution})
+
+def _take_cached(dim, difficulty):
+    # conditional update avoids two workers taking the same row on sqlite
+    pk = Puzzle.objects.filter(dim=dim, difficulty=difficulty, consumed=False)\
+                       .values_list("pk", flat=True).first()
+    if pk is None: return None
+    updated = Puzzle.objects.filter(pk=pk, consumed=False).update(consumed=True)
+    return Puzzle.objects.get(pk=pk) if updated else None    # lost the race, fall back
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B06-05" kind="integration">
+          캐시가 있을 때 응답이 동기 생성보다 유의하게 빠르다(V-DX-B06-02).
+        </mb:test>
+        <mb:test id="T-DX-B06-06" kind="integration">
+          캐시가 비어도 정상 응답이며 shape가 동일하다(V-DX-B06-03).
+        </mb:test>
+        <mb:test id="T-DX-B06-07" kind="contract">
+          T-UI-B02-07이 계속 통과한다(V-DX-B06-06, CT-02).
+        </mb:test>
+        <mb:test id="T-DX-B06-08" kind="unit">동일 행이 두 번 소비되지 않는다.</mb:test>
+      </mb:tests>
+      <mb:rollback>view를 이전 3줄로 되돌린다. 모델과 데이터는 남겨도 무해하다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B06-04" parent="DX-B06" name="Oracle verification of stored puzzles">
+      <mb:rationale>
+        캐시는 생성 시점과 사용 시점이 분리된다. 잘못된 퍼즐이 저장되면 오래 살아남으므로
+        저장 시점에 독립 오라클로 검증해야 한다.
+      </mb:rationale>
+      <mb:objective>저장된 모든 퍼즐이 오라클 기준 유일해임을 test가 확인한다.</mb:objective>
+      <mb:target-files><mb:file action="create" path="game/tests/test_puzzle_cache.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B06-02 완료</mb:preconditions>
+      <mb:input-type>저장된 Puzzle 행</mb:input-type>
+      <mb:input-validation>없음. 검증 전용이다.</mb:input-validation>
+      <mb:output-type>test 결과</mb:output-type>
+      <mb:output-validation>
+        표본의 모든 행에서 오라클 해 개수가 1이고 solution이 solve 결과와 일치한다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>test DB에 소량 생성. dim=9로 제한해 시간을 억제한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+call the command with --dim 9 --count 5
+for row in Puzzle.objects.all():
+    board = _to_ints(row.givens)
+    assert reference.count_solutions(board, 9, limit=2) == 1
+    assert solver.solve(board, 9) == _to_ints(row.solution)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B06-09" kind="property">
+          저장된 모든 퍼즐이 오라클 기준 유일해다(V-DX-B06-04).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>test 파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B06-05" parent="DX-B06" name="Cache default scope limited to dim 9">
+      <mb:rationale>
+        CT-03과 DEC-M-03의 귀결이다. UI가 dim=9만 수용하므로 대형 크기를 기본으로 채우면
+        아무도 쓰지 않는 행을 만든다. 능력은 남기되 기본값만 좁힌다.
+      </mb:rationale>
+      <mb:objective>
+        command 기본값과 view 조회가 dim=9를 쓰고, 다른 크기는 명시적 인자로만 생성된다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/management/commands/generate_puzzles.py"/>
+      </mb:target-files>
+      <mb:preconditions>M-DX-B06-03 완료</mb:preconditions>
+      <mb:input-type>--dim 기본값</mb:input-type>
+      <mb:input-validation>
+        기본값은 9다. 12나 16을 넣으면 동작하되 경고를 출력해 소비처가 없음을 알린다.
+      </mb:input-validation>
+      <mb:output-type>기본 dim=9로 채워진 캐시</mb:output-type>
+      <mb:output-validation>인자 없이 실행하면 dim=9 행만 생긴다.</mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+parser.add_argument("--dim", type=int, default=9)
+if dim != 9: self.stderr.write("warning: the current UI only renders dim=9; "
+                               "these rows will not be served until that changes")
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B06-10" kind="unit">인자 없이 실행하면 dim=9 행만 생긴다.</mb:test>
+        <mb:test id="T-DX-B06-11" kind="unit">--dim 16에서 경고가 출력되지만 실패하지는 않는다.</mb:test>
+      </mb:tests>
+      <mb:rollback>기본값 변경만 되돌린다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B06">
+      V-DX-B06-01 → T-DX-B06-03 | 02 → T-DX-B06-05 | 03 → T-DX-B06-06 |
+      04 → T-DX-B06-09 | 05 → T-DX-B06-01 | 06 → T-DX-B06-07. 6/6 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <mic:risks xml:id="wave3-risks">
+    <mic:risk id="W3-R1" severity="high" refs="DX-B06">
+      CT-01 미해소 상태에서 DX-B06을 착수하면 승인된 locked decision U1을 위반한다.
+      분해가 끝났다는 사실이 착수 허가로 오해되지 않도록 blocking-notice를 블록 머리에 두었다.
+    </mic:risk>
+    <mic:risk id="W3-R2" severity="medium" refs="M-UI-B08-01, M-UI-B08-02">
+      token 값을 "보기 좋게" 미세 조정하고 싶은 유혹이 크다. 한 글자만 바꿔도 76쌍 계산이 무효가 되고
+      M3가 재발한다. 조정이 필요하면 반드시 check-contrast를 다시 돌려 표를 갱신한다.
+    </mic:risk>
+    <mic:risk id="W3-R3" severity="medium" refs="M-DX-B06-03">
+      sqlite에서 두 요청이 같은 행을 집을 수 있다. 조건부 update의 반환값을 확인해
+      경쟁에서 진 쪽이 fallback으로 가도록 해야 한다. 확인을 빠뜨리면 같은 퍼즐이 두 번 나간다.
+    </mic:risk>
+    <mic:risk id="W3-R4" severity="low" refs="M-UI-B07-05">
+      keymap이 adapter와 help 두 곳에 적히면 반드시 어긋난다. KEYMAP export를 단일 출처로 두고
+      UI-B14가 그것을 읽도록 강제한다.
+    </mic:risk>
+  </mic:risks>
+
+  <mic:open-questions xml:id="open-questions">
+    <mic:question id="OQ-W3-1" blocking="true" refs="CT-01, OQ-M2">
+      DX-B06 착수 가부가 여전히 미결이다. Wave 3 구현에 들어가기 전 CT-01-A 또는 CT-01-B 결정이 필요하다.
+    </mic:question>
+    <mic:question id="OQ-W3-2" blocking="false" refs="M-DX-B06-01">
+      givens와 solution을 문자열로 저장하기로 했다. sqlite에 배열 타입이 없고 JSON 필드는 조회 이점이
+      없기 때문이다. dim이 10 이상이면 한 칸이 두 자리가 되어 이 표현이 깨지므로, 그때는 구분자가 필요하다.
+      dim=9 전용으로 두고 확장 시 형식을 바꿀지 확인이 필요하다.
+    </mic:question>
+    <mic:question id="OQ-W3-3" blocking="false" refs="M-UI-B08-06">
+      legibility 측정 기록을 docs/legibility-record.md로 남기기로 했다. 이 파일은 계획 문서가 아니라
+      측정 산출물이므로 claude-mhj 접두사 규칙 적용 대상인지 확인이 필요하다(OQ-M1과 연관).
+    </mic:question>
+  </mic:open-questions>
+
+  <mic:approval xml:id="approval" status="awaiting-user-approval">
+    <mic:current-phase>3. Micro Blocking — Wave 3</mic:current-phase>
+    <mic:validation-performed>
+      XML well-formedness, micro block과 test id 유일성,
+      Macro 검증 항목 수용 완전성(UI-B07 5/5, UI-B08 6/6, DX-B05 5/5, DX-B06 6/6),
+      settings.py와 migrations 디렉터리 실제 상태 대조
+    </mic:validation-performed>
+    <mic:checkbox checked="false">Wave 3 Micro Blocking 승인</mic:checkbox>
+    <mic:next-phase blocked="true">Wave 4 — UI-B09, UI-B10, UI-B11</mic:next-phase>
+  </mic:approval>
+
+</mic:micro-blocking>

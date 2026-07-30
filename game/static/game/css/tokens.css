@@ -1,0 +1,38 @@
+/* Color tokens. Values are fixed by Phase 1 V4-17's 76-pair contrast
+   calculation -- changing one here invalidates that calculation, so this
+   file only moves the values into CSS, it does not choose them. */
+:root {
+    --bg-page: #F8FAFC;
+    --bg-cell: #FFFFFF;
+    --bg-cell-given: #E8EDF3;
+    --bg-cell-selected: #CFE3FB;
+    --bg-cell-peer: #EFF4FA;
+    --bg-cell-digit: #DDE7FA;
+    --bg-cell-conflict: #FBE4E4;
+    --fg-body: #1E293B;
+    --fg-given: #0F172A;
+    --fg-user: #1B4FA8;
+    --fg-candidate: #4A5568;
+    --fg-conflict: #A32020;
+    --line: #334155;
+    --focus: #1B4FA8;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-page: #0B1220;
+        --bg-cell: #161F2E;
+        --bg-cell-given: #243044;
+        --bg-cell-selected: #20406E;
+        --bg-cell-peer: #1C2739;
+        --bg-cell-digit: #2A2F5C;
+        --bg-cell-conflict: #4A1F22;
+        --fg-body: #E2E8F0;
+        --fg-given: #F1F5F9;
+        --fg-user: #9EC5FF;
+        --fg-candidate: #B3C0D1;
+        --fg-conflict: #FF9E9E;
+        --line: #94A3B8;
+        --focus: #9EC5FF;
+    }
+}

@@ -1,0 +1,728 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mic:micro-blocking
+    xmlns:mic="urn:sudoku:micro-blocking:v1"
+    xmlns:mb="urn:sudoku:micro-block:v1"
+    xmlns:dev="urn:sudoku:deviation:v1"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xml:id="sudoku-micro-blocking-wave0"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="3"
+    wave="W0"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 3 Micro Blocking, Wave 0 한정.
+    통합 Macro Plan의 UI-B01과 DX-B01만 분해한다. 두 블록은 서로 독립이며 선행 의존이 없다.
+    Wave 1 이후는 이 문서 승인 뒤 별도 문서로 작성한다.
+  -->
+
+  <mic:document-control xml:id="document-control">
+    <mic:title>Micro Blocking — Wave 0 (foundations)</mic:title>
+    <mic:owner>claude-mhj</mic:owner>
+    <mic:baseline>
+      <mic:file>docs/claude-mhj_26_07_26_03_sudoku-master-macro-plan.xml</mic:file>
+      <mic:blocks-covered>UI-B01, DX-B01</mic:blocks-covered>
+      <mic:immutable>
+        승인된 Macro Block의 objective, scope, exclusions, validation 항목은 이 문서에서 바꾸지 않는다.
+        불가피한 조정은 dev:deviation으로 분리해 명시한다.
+      </mic:immutable>
+    </mic:baseline>
+    <mic:deliverable>
+      <mic:file>docs/claude-mhj_26_07_26_04_micro-blocking-wave0.xml</mic:file>
+      <mic:scope>Micro Block 정의만 포함한다. 이 문서 작성 과정에서 application code는 변경하지 않았다.</mic:scope>
+    </mic:deliverable>
+    <mic:wave-plan>
+      <mic:wave id="W0" status="this-document">UI-B01, DX-B01</mic:wave>
+      <mic:wave id="W1" status="pending">UI-B02</mic:wave>
+      <mic:wave id="W2" status="pending">UI-B03, UI-B04, UI-B05, UI-B06, DX-B02, DX-B03, DX-B04</mic:wave>
+      <mic:wave id="W3..W7" status="pending">나머지</mic:wave>
+      <mic:why-staged>
+        22개 블록을 한 문서에 분해하면 검토가 불가능한 크기가 된다. wave 단위로 끊으면 각 문서가
+        선행 의존이 모두 확정된 상태에서 작성되므로 재작업이 줄어든다.
+      </mic:why-staged>
+    </mic:wave-plan>
+    <mic:approval-state current="awaiting-user-approval">
+      <mic:next-on-approval>Phase 4 — Wave 0 code implementation, 또는 Wave 1 Micro Blocking</mic:next-on-approval>
+      <mic:prohibited-before-approval>모든 code implementation</mic:prohibited-before-approval>
+    </mic:approval-state>
+  </mic:document-control>
+
+  <!-- ============================================== 사전 조사 -->
+  <mic:established-facts xml:id="established-facts" confidence="verified">
+    <mic:note>아래는 이 문서를 쓰기 위해 실제 코드에서 확인한 사실이다. 추정이 아니다.</mic:note>
+    <mic:fact id="EF1" file="game/sudoku/generator.py">
+      generator는 <mic:code>from .solver import alternative_exists, matrix_for, rows_to_board</mic:code>로
+      함수를 자기 모듈 이름공간에 바인딩한다. 따라서 solver.alternative_exists만 monkeypatch하면
+      generator는 여전히 원본을 호출한다. 계측은 두 이름을 모두 교체해야 한다.
+    </mic:fact>
+    <mic:fact id="EF2" file="game/tests/benchmarks.py">
+      기존 진입점은 main()이며 compare_uniqueness_checks, iteration_distribution, generation_cost 세 절을
+      순서대로 출력한다. 파일명이 test*.py가 아니라 러너가 수집하지 않는다.
+    </mic:fact>
+    <mic:fact id="EF3" file="game/sudoku/spec.py">
+      SudokuSpec은 dataclass이며 cells, num_rows, num_cols는 property다.
+      spec_for(int | SudokuSpec) -> SudokuSpec이 정규화 진입점이다.
+    </mic:fact>
+    <mic:fact id="EF4" file="game/sudoku/dlx.py">
+      계측 대상 메서드는 DancingLinks._apply_row, DancingLinks.givens, DancingLinks.search다.
+      givens는 @contextmanager로 감싼 generator 함수다.
+    </mic:fact>
+    <mic:fact id="EF5" file="game/templates/game/index.html">
+      현재 head에 charset만 있고 viewport meta가 없다. body 끝에서 json_script 2개와 game.js를 로드한다.
+    </mic:fact>
+    <mic:fact id="EF6" environment="true">
+      node v24.14.0에서 node:test와 ESM이 사용 가능하다. Django 6.0.7, DEBUG=True, STATIC_URL='static/'이며
+      개발 서버가 game/static을 직접 서빙한다.
+    </mic:fact>
+  </mic:established-facts>
+
+  <!-- ============================================== 이탈 사항 -->
+  <mic:deviations xml:id="deviations">
+    <mic:note>
+      Macro Block을 분해하는 과정에서 그대로 실행할 수 없는 지점 두 곳이 나왔다. 조정 내용과 근거를 남긴다.
+    </mic:note>
+
+    <dev:deviation id="DV-01" from="UI-B01 scope" severity="low" needs-approval="true">
+      <dev:macro-text>UI-B01 scope에 "tools/check-contrast.mjs 뼈대"가 포함되어 있다.</dev:macro-text>
+      <dev:problem>
+        AGENTS.md는 placeholder를 엄격히 금지한다. 그런데 이 도구는 css/tokens.css를 파싱하는데 그 파일은
+        UI-B08에서 생성된다. UI-B01 시점에 만들면 존재하지 않는 파일을 읽는 미완성 코드가 되거나 빈 뼈대가 된다.
+      </dev:problem>
+      <dev:resolution>
+        tools/check-contrast.mjs를 UI-B01에서 제외하고 UI-B08에서 tokens.css와 함께 완전 구현한다.
+        UI-B01은 tools/ 디렉터리도 만들지 않는다. UI-B01의 validation 항목 3개는 이 도구를 참조하지 않으므로
+        영향이 없다.
+      </dev:resolution>
+    </dev:deviation>
+
+    <dev:deviation id="DV-02" from="UI-B01 pseudocode" severity="low" needs-approval="false">
+      <dev:macro-text>
+        UI-B01 pseudocode는 "write tests/js/smoke.test.mjs: import a trivial core module, assert"라고 적었다.
+      </dev:macro-text>
+      <dev:problem>
+        placeholder 금지 때문에 DEC-UI-04의 20개 모듈을 빈 파일로 만들 수 없다. 그러면 smoke spec이 import할
+        "trivial core module"이 존재하지 않는다.
+      </dev:problem>
+      <dev:resolution>
+        main.js가 init(root) 함수를 export하고 브라우저에서만 자동 실행하도록 구성한다.
+        그러면 node에서 부작용 없이 import할 수 있어 smoke spec이 실제 대상을 검사한다.
+        빈 모듈을 만들지 않으며, 나머지 19개 모듈은 각자의 블록에서 처음 생성된다.
+        디렉터리는 파일과 함께 생기므로 UI-B01은 디렉터리를 미리 만들지 않는다.
+      </dev:resolution>
+      <dev:consequence>
+        DEC-UI-04의 배치는 계속 유효한 목표 구조이지만 UI-B01 완료 시점의 실제 트리는 main.js 하나뿐이다.
+      </dev:consequence>
+    </dev:deviation>
+  </mic:deviations>
+
+  <!-- ============================================================ UI-B01 -->
+  <mic:parent-block id="UI-B01" name="Module scaffolding and test harness" micro-count="5">
+    <mic:objective-recap>
+      tests/js에서 node:test 명령 하나로 spec을 실행할 수 있고, browser가 main.js를 module로 로드해
+      빈 skeleton을 그린다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B01-01 → 02 → 03 → 04 → 05</mic:order>
+
+    <mb:micro id="M-UI-B01-01" parent="UI-B01" name="Legacy asset relocation">
+      <mb:rationale>
+        DEC-UI-05는 기존 자산을 삭제하지 않고 보존하라고 정한다. 새 진입점을 붙이기 전에 옮겨야
+        index.html이 두 벌의 script를 동시에 참조하는 순간이 생기지 않는다. MR-U4의 순서 위험이 여기서 시작한다.
+      </mb:rationale>
+      <mb:objective>
+        game.js와 style.css가 legacy/ 아래로 이동하고, 원래 경로에 남은 파일이 없으며, git이 이동으로 인식한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="move" from="game/static/game/js/game.js" to="game/static/game/legacy/game.js"/>
+        <mb:file action="move" from="game/static/game/css/style.css" to="game/static/game/legacy/style.css"/>
+      </mb:target-files>
+      <mb:preconditions>
+        작업 트리에 game/ 관련 미커밋 변경이 없다. git status로 확인한다.
+      </mb:preconditions>
+      <mb:input-type>없음. 파일시스템 조작이다.</mb:input-type>
+      <mb:input-validation>
+        이동 전 두 원본 파일이 존재함을 확인한다. 대상 경로에 동일 이름 파일이 이미 있으면 중단한다.
+      </mb:input-validation>
+      <mb:output-type>이동된 파일 2개</mb:output-type>
+      <mb:output-validation>
+        원래 경로 2곳이 비어 있고 legacy/ 아래 두 파일의 내용이 이동 전과 바이트 단위로 동일하다.
+      </mb:output-validation>
+      <mb:exceptions>
+        FileNotFoundError 또는 대상 충돌 시 어떤 파일도 옮기지 않고 중단한다. 부분 이동 상태를 남기지 않는다.
+      </mb:exceptions>
+      <mb:side-effects>
+        static 경로 변경. 이 시점에서 index.html은 아직 옛 경로를 참조하므로 앱이 일시적으로 style을 잃는다.
+        M-UI-B01-03에서 즉시 해소된다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+assert both source files exist
+assert neither destination exists
+git mv game/static/game/js/game.js   game/static/game/legacy/game.js
+git mv game/static/game/css/style.css game/static/game/legacy/style.css
+verify with: git status --short   (expect two R entries)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B01-01" kind="manual">
+          git status가 두 항목을 rename으로 표시하고 내용 변경이 0줄이다.
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>git mv로 되돌린다. 내용을 수정하지 않으므로 완전 가역이다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B01-02" parent="UI-B01" name="Entry module main.js with init and browser guard">
+      <mb:rationale>
+        DV-02의 귀결이다. init을 export하고 자동 실행을 브라우저 조건으로 감싸면 node에서 부작용 없이
+        import할 수 있어, placeholder 없이도 smoke spec이 실제 대상을 검사한다.
+        동시에 이후 모든 블록이 붙을 단일 진입점이 된다.
+      </mb:rationale>
+      <mb:objective>
+        main.js가 init(root)를 export하고, 브라우저에서 DOMContentLoaded에 스스로 실행하며,
+        node import 시에는 아무 것도 실행하지 않는다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="game/static/game/js/main.js"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B01-01 완료</mb:preconditions>
+      <mb:input-type>
+        init(root: HTMLElement) -> void. root는 skeleton을 넣을 컨테이너다.
+      </mb:input-type>
+      <mb:input-validation>
+        root가 null이거나 Element가 아니면 TypeError를 던진다. 조용히 무시하지 않는다.
+      </mb:input-validation>
+      <mb:output-type>void. 부작용으로 root 하위에 skeleton DOM을 만든다.</mb:output-type>
+      <mb:output-validation>
+        호출 후 root가 data-state="skeleton" 속성을 가진 자식 1개를 갖는다. 중복 호출해도 자식이 늘지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>
+        TypeError(잘못된 root). 그 외 예외를 삼키지 않는다.
+      </mb:exceptions>
+      <mb:side-effects>
+        브라우저에서 document에 DOMContentLoaded listener 1개를 등록한다. node에서는 등록하지 않는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+export function init(root) {
+    if (!root || typeof root.appendChild !== "function")
+        throw new TypeError("init(root): root must be an Element");
+    if (root.querySelector('[data-state="skeleton"]')) return;   // idempotent
+    const shell = document.createElement("div");
+    shell.dataset.state = "skeleton";
+    shell.setAttribute("aria-busy", "true");
+    root.appendChild(shell);
+}
+
+// Browser only.  Keeps the module importable from node:test without side effects.
+if (typeof document !== "undefined") {
+    document.addEventListener("DOMContentLoaded", () => {
+        const root = document.getElementById("app");
+        if (root) init(root);
+    });
+}
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B01-02" kind="unit" file="tests/js/main.test.mjs">
+          init이 함수로 export된다.
+        </mb:test>
+        <mb:test id="T-UI-B01-03" kind="unit" file="tests/js/main.test.mjs">
+          init(null)과 init({})이 TypeError를 던진다.
+        </mb:test>
+        <mb:test id="T-UI-B01-04" kind="unit" file="tests/js/main.test.mjs">
+          module import 자체가 예외 없이 끝나고 전역에 부작용을 남기지 않는다.
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. 다른 파일이 아직 import하지 않으므로 영향이 없다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B01-03" parent="UI-B01" name="index.html module bootstrap and viewport contract">
+      <mb:rationale>
+        Phase 1의 viewport 계약(§9)과 DEC-UI-01의 module 로딩이 만나는 지점이다.
+        MR-U4가 지목한 대로 이 파일은 UI-B02도 수정하므로, 여기서는 script와 meta만 다루고
+        json_script 제거는 UI-B02에 남긴다.
+      </mb:rationale>
+      <mb:objective>
+        head에 viewport meta가 있고, body에 id="app" 컨테이너가 있으며,
+        script가 type="module"로 main.js를 로드하고, legacy 경로를 더 이상 참조하지 않는다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/templates/game/index.html"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B01-02 완료. main.js가 존재해야 404가 나지 않는다.</mb:preconditions>
+      <mb:input-type>Django template. context는 이 단계에서 변경하지 않는다.</mb:input-type>
+      <mb:input-validation>
+        기존 json_script 두 줄은 UI-B02의 대상이므로 여기서 건드리지 않는다.
+        legacy game.js script 태그는 제거한다. 제거하지 않으면 존재하지 않는 DOM을 참조해 console error가 난다.
+      </mb:input-validation>
+      <mb:output-type>렌더된 HTML</mb:output-type>
+      <mb:output-validation>
+        응답에 viewport meta, id="app", type="module" script가 각각 정확히 1개씩 있다.
+        legacy/game.js 참조가 0개다.
+      </mb:output-validation>
+      <mb:exceptions>
+        template 문법 오류는 500을 만든다. manage.py check와 실제 GET으로 확인한다.
+      </mb:exceptions>
+      <mb:side-effects>
+        이 단계 이후 화면은 style 없는 빈 skeleton이다. 의도된 중간 상태이며 MR-U1이 기술한 구간이다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+head:  <meta name="viewport" content="width=device-width, initial-scale=1">
+       keep <meta charset="UTF-8"> and <title>
+       remove the stylesheet link to the moved style.css
+body:  <main id="app"></main>
+       keep the two json_script lines for now      (UI-B02 removes them)
+       replace  <script src="{% static 'game/js/game.js' %}"></script>
+       with     <script type="module" src="{% static 'game/js/main.js' %}"></script>
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B01-05" kind="integration" file="game/tests/test_views.py">
+          GET / 응답에 viewport meta와 type="module" script가 포함된다.
+        </mb:test>
+        <mb:test id="T-UI-B01-06" kind="manual">
+          개발 서버에서 페이지를 열어 console error가 0이고 Network 탭에서 main.js가
+          module로 200 응답한다(V-UI-B01-02).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>template을 이전 상태로 되돌린다. 단일 파일 편집이라 가역이다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B01-04" parent="UI-B01" name="node:test harness and ESM smoke spec">
+      <mb:rationale>
+        DEC-UI-02가 승인한 러너를 실제로 세운다. 이후 모든 DOM-free 블록의 검증 수단이므로
+        경로 규약과 실행 명령을 여기서 고정한다.
+      </mb:rationale>
+      <mb:objective>
+        저장소 루트에서 node --test tests/js가 0 exit로 끝나고, spec이 main.js를 실제로 import해 검사한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="tests/js/main.test.mjs"/>
+        <mb:file action="create" path="tests/js/README.md" note="실행 명령과 경로 규약 1쪽"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B01-02 완료. node 18 이상.</mb:preconditions>
+      <mb:input-type>
+        없음. spec이 상대 경로로 ../../game/static/game/js/main.js를 import한다.
+      </mb:input-type>
+      <mb:input-validation>
+        import specifier가 실제 파일을 가리키는지 실행으로 확인한다. 경로 오타는 ERR_MODULE_NOT_FOUND로 즉시 드러난다.
+      </mb:input-validation>
+      <mb:output-type>프로세스 exit code와 TAP 출력</mb:output-type>
+      <mb:output-validation>exit 0, 실패 0, 건너뜀 0. 최소 3개 assertion이 실행된다.</mb:output-validation>
+      <mb:exceptions>
+        ERR_MODULE_NOT_FOUND는 경로 규약 오류다. ERR_UNKNOWN_FILE_EXTENSION은 .mjs 누락을 뜻한다.
+        둘 다 실패로 처리하고 우회하지 않는다.
+      </mb:exceptions>
+      <mb:side-effects>
+        저장소 루트에 tests/ 디렉터리가 생긴다. STATICFILES 경로 밖이므로 배포되지 않는다(DEC-UI-04).
+        package.json은 만들지 않는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+// tests/js/main.test.mjs
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { init } from "../../game/static/game/js/main.js";
+
+test("init is exported as a function", () => {
+    assert.equal(typeof init, "function");
+});
+
+test("init rejects a non-element root", () => {
+    assert.throws(() => init(null), TypeError);
+    assert.throws(() => init({}), TypeError);
+});
+
+test("importing the entry module has no side effects in node", () => {
+    assert.equal(typeof globalThis.document, "undefined");
+});
+
+// run:  node --test tests/js
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B01-07" kind="unit">node --test tests/js가 exit 0으로 통과한다(V-UI-B01-01).</mb:test>
+        <mb:test id="T-UI-B01-08" kind="negative">
+          import 경로를 일부러 틀리면 실패가 보고되는지 1회 확인해 러너가 실제로 검사 중임을 입증한다.
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>tests/ 디렉터리 삭제. 다른 코드가 의존하지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B01-05" parent="UI-B01" name="Django check and static ESM delivery verification">
+      <mb:rationale>
+        ESM은 파일이 존재해도 MIME이나 경로가 어긋나면 브라우저가 조용히 거부한다.
+        UI-B01의 완료 조건에 이 확인이 들어가 있어야 이후 블록이 원인 불명의 로딩 실패를 만나지 않는다.
+      </mb:rationale>
+      <mb:objective>
+        manage.py check가 통과하고, 개발 서버가 main.js를 JavaScript MIME으로 200 응답하며,
+        기존 Django test가 계속 통과한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="game/tests/test_views.py" note="T-UI-B01-05 수용, UI-B02가 확장한다"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B01-03, M-UI-B01-04 완료</mb:preconditions>
+      <mb:input-type>HttpRequest — GET / 및 GET /static/game/js/main.js</mb:input-type>
+      <mb:input-validation>없음. 읽기 전용 확인이다.</mb:input-validation>
+      <mb:output-type>
+        HttpResponse. status 200이며 static 응답의 Content-Type이 text/javascript 계열이다.
+      </mb:output-type>
+      <mb:output-validation>
+        manage.py check가 0 issue, manage.py test game이 기존 74개를 유지한 채 통과한다.
+      </mb:output-validation>
+      <mb:exceptions>
+        static 404는 STATICFILES 경로 문제다. MIME 불일치는 서버 설정 문제이며 우회하지 않고 원인을 고친다.
+      </mb:exceptions>
+      <mb:side-effects>새 test 파일 1개가 러너에 수집된다. 테스트 수가 74에서 늘어난다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+# game/tests/test_views.py
+class IndexShellTests(TestCase):
+    def test_viewport_meta_present(self):
+        html = self.client.get(reverse("game:index")).content.decode()
+        self.assertIn('name="viewport"', html)
+
+    def test_entry_script_is_a_module(self):
+        html = self.client.get(reverse("game:index")).content.decode()
+        self.assertIn('type="module"', html)
+        self.assertNotIn("js/game.js", html)     # legacy entry is gone
+
+# manual: python manage.py check
+# manual: python manage.py runserver, then GET /static/game/js/main.js -> 200, JS MIME
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B01-09" kind="integration">위 두 TestCase가 통과한다.</mb:test>
+        <mb:test id="T-UI-B01-10" kind="regression">manage.py test game이 전부 통과한다(V-UI-B01-03).</mb:test>
+        <mb:test id="T-UI-B01-11" kind="manual">static main.js가 200과 JS MIME으로 응답한다.</mb:test>
+      </mb:tests>
+      <mb:rollback>test 파일 삭제. 확인 전용이라 production 코드에 영향이 없다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B01">
+      V-UI-B01-01 → T-UI-B01-07 | V-UI-B01-02 → T-UI-B01-06 | V-UI-B01-03 → T-UI-B01-10.
+      Macro 검증 3항목이 모두 micro test로 수용되었다.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ DX-B01 -->
+  <mic:parent-block id="DX-B01" name="Reproducible measurement harness" micro-count="5">
+    <mic:objective-recap>
+      명령 하나로 호출 수 계측, cProfile 요약, 크기별 A/B timing을 재현할 수 있고
+      F1~F3의 수치가 오차 범위 안에서 재현된다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B01-01 → 02 → (03, 04, 05는 서로 독립)</mic:order>
+
+    <mb:micro id="M-DX-B01-01" parent="DX-B01" name="Counter accumulator and instrument context manager">
+      <mb:rationale>
+        DEC-DX-01의 게이트를 집행하려면 호출 수를 재현 가능하게 세야 한다.
+        EF1이 보여주듯 patch 대상이 두 이름공간에 걸쳐 있어, 이 부분을 한 곳에 캡슐화하지 않으면
+        이후 절마다 같은 실수를 반복하게 된다.
+      </mb:rationale>
+      <mb:objective>
+        instrument()가 계측을 켜고 블록을 벗어나면 원본 함수를 반드시 복원하며,
+        누적값을 불변 스냅샷으로 돌려준다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/tests/benchmarks.py" note="새 절 추가, 기존 함수는 수정하지 않는다"/>
+      </mb:target-files>
+      <mb:preconditions>없음</mb:preconditions>
+      <mb:input-type>
+        instrument() -> ContextManager[Accumulator]. 인자는 없다.
+      </mb:input-type>
+      <mb:input-validation>
+        중첩 진입을 금지한다. 이미 계측 중이면 RuntimeError를 던진다. 중첩되면 복원 순서가 꼬여
+        원본 대신 계측 wrapper가 영구히 남는다.
+      </mb:input-validation>
+      <mb:output-type><![CDATA[
+@dataclass(frozen=True)
+class CallCounts:
+    apply_row: int
+    givens_enter: int
+    search: int
+    iterations: int
+    alternative_calls: int
+    probes: int
+    zero_probe_calls: int
+
+class Accumulator:
+    def snapshot(self) -> CallCounts: ...
+      ]]></mb:output-type>
+      <mb:output-validation>
+        블록 종료 후 DancingLinks._apply_row, .givens, .search와 solver.alternative_exists,
+        generator.alternative_exists가 모두 원본 객체와 동일해야 한다(is 비교).
+      </mb:output-validation>
+      <mb:exceptions>
+        RuntimeError(중첩 진입). 블록 본문이 예외를 던져도 finally에서 복원한다. 예외는 그대로 전파한다.
+      </mb:exceptions>
+      <mb:side-effects>
+        module attribute를 일시적으로 교체한다. 계측 중에는 호출당 오버헤드가 붙으므로
+        timing 측정과 동시에 쓰지 않는다(M-DX-B01-05 참조).
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+_active = False
+
+@contextmanager
+def instrument() -> Iterator[Accumulator]:
+    global _active
+    if _active:
+        raise RuntimeError("instrument() is not re-entrant")
+    acc = Accumulator()
+    originals = {
+        (DancingLinks, "_apply_row"): DancingLinks._apply_row,
+        (DancingLinks, "givens"):     DancingLinks.givens,
+        (DancingLinks, "search"):     DancingLinks.search,
+        (solver, "alternative_exists"):    solver.alternative_exists,
+        (generator, "alternative_exists"): generator.alternative_exists,   # EF1
+    }
+    _active = True
+    try:
+        install counting wrappers that delegate to originals and bump acc
+        yield acc
+    finally:
+        for (owner, name), fn in originals.items():
+            setattr(owner, name, fn)
+        _active = False
+
+# the alternative_exists wrapper also records the probe histogram:
+#   n = count of values that pass peers_forbid and differ from `exclude`
+#   acc.alternative_calls += 1 ; acc.probes += n ; acc.zero_probe_calls += (n == 0)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B01-01" kind="unit" file="game/tests/test_benchmarks.py">
+          instrument() 블록 종료 후 다섯 attribute가 모두 원본과 is 동일하다(V-DX-B01-04).
+        </mb:test>
+        <mb:test id="T-DX-B01-02" kind="unit" file="game/tests/test_benchmarks.py">
+          블록 본문이 예외를 던져도 복원되고 예외가 전파된다.
+        </mb:test>
+        <mb:test id="T-DX-B01-03" kind="unit" file="game/tests/test_benchmarks.py">
+          중첩 진입이 RuntimeError를 던지고 바깥 블록의 복원이 여전히 정상 동작한다.
+        </mb:test>
+        <mb:test id="T-DX-B01-04" kind="unit" file="game/tests/test_benchmarks.py">
+          generator.alternative_exists도 교체되었음을 계측 중에 확인한다(EF1 회귀).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>추가한 절만 제거한다. 기존 benchmarks 함수를 건드리지 않으므로 독립적이다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B01-02" parent="DX-B01" name="Workload runner shared by all measurement sections">
+      <mb:rationale>
+        세 절이 같은 workload를 서로 다르게 재현하면 비교가 성립하지 않는다.
+        seed와 시행 수를 한 곳에서 정의해 절 사이의 동일성을 보장한다. MR-D4가 요구하는 조건 명시이기도 하다.
+      </mb:rationale>
+      <mb:objective>
+        (dim, trials, seed)를 받아 정해진 퍼즐 생성을 수행하는 단일 함수가 존재하고,
+        같은 인자로 두 번 부르면 같은 퍼즐 열이 나온다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/tests/benchmarks.py"/>
+      </mb:target-files>
+      <mb:preconditions>없음</mb:preconditions>
+      <mb:input-type><![CDATA[
+def workload(dim: int, trials: int, seed: int) -> list[tuple[list[int], list[int]]]
+      ]]></mb:input-type>
+      <mb:input-validation>
+        dim은 spec_for가 수용하는 값이어야 한다(EF3). trials >= 1, seed는 int.
+        위반 시 ValueError를 던진다.
+      </mb:input-validation>
+      <mb:output-type>길이 trials의 (puzzle, solution) 리스트. 각 board는 list[int] 길이 spec.cells다.</mb:output-type>
+      <mb:output-validation>
+        동일 (dim, trials, seed)로 두 번 호출하면 결과가 완전히 같다. 이것이 A/B 비교의 전제다.
+      </mb:output-validation>
+      <mb:exceptions>ValueError(잘못된 인자). generator가 던지는 예외는 그대로 전파한다.</mb:exceptions>
+      <mb:side-effects>없음. 순수 계산이며 전역 rng를 쓰지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+def workload(dim, trials, seed):
+    if trials < 1: raise ValueError(f"trials must be >= 1, got {trials}")
+    spec = spec_for(dim)                       # raises for unsupported dims
+    rng = random.Random(seed)                  # local rng, never random.seed()
+    return [generator.generate_puzzle(dim=spec, rng=rng) for _ in range(trials)]
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B01-05" kind="unit">동일 인자 2회 호출 결과가 동일하다(결정성).</mb:test>
+        <mb:test id="T-DX-B01-06" kind="unit">trials=0과 지원하지 않는 dim이 ValueError를 던진다.</mb:test>
+      </mb:tests>
+      <mb:rollback>함수 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B01-03" parent="DX-B01" name="Call-count section reproducing F2 and F3">
+      <mb:rationale>
+        F2와 F3은 게이트 판정의 근거 수치다. 저장소 밖 spike로만 존재하면 DX-B02의 개선 주장을
+        검증할 기준선이 없다.
+      </mb:rationale>
+      <mb:objective>
+        dim별 호출 수 표를 출력하고, dim=9에서 호출당 평균 probe가 0.7 내외로 재현된다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/tests/benchmarks.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B01-01, M-DX-B01-02 완료</mb:preconditions>
+      <mb:input-type>def call_counts(dims: tuple[int, ...] = (9, 12), trials: int = 20, seed: int = 7) -> None</mb:input-type>
+      <mb:input-validation>workload가 인자를 검증한다. 여기서 중복 검증하지 않는다.</mb:input-validation>
+      <mb:output-type>표준 출력 표. 반환값 없음.</mb:output-type>
+      <mb:output-validation>
+        각 행에 dim, trials, seed, givens 진입 수, _apply_row 수, search 수, 반복 수,
+        alternative_exists 호출 수, 호출당 평균 probe, probe 0인 호출 비율이 포함된다.
+      </mb:output-validation>
+      <mb:exceptions>없음. 측정 실패는 예외가 아니라 출력으로 드러난다.</mb:exceptions>
+      <mb:side-effects>계측 wrapper가 일시 설치된다. timing은 측정하지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+def call_counts(dims=(9, 12), trials=20, seed=7):
+    print header including trials and seed          # MR-D4: conditions are part of the number
+    for dim in dims:
+        with instrument() as acc:
+            workload(dim, trials, seed)
+        c = acc.snapshot()
+        print(dim, trials, seed,
+              c.givens_enter / trials, c.apply_row / trials, c.search / trials,
+              c.iterations / trials, c.alternative_calls / trials,
+              c.probes / max(c.alternative_calls, 1),
+              c.zero_probe_calls / max(c.alternative_calls, 1))
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B01-07" kind="manual">
+          dim=9에서 호출당 평균 probe가 0.6~0.9 구간에 든다(V-DX-B01-03, F3 재현).
+        </mb:test>
+        <mb:test id="T-DX-B01-08" kind="manual">
+          givens 진입 1회당 _apply_row가 20 내외로 나온다(F2 재현).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>함수 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B01-04" parent="DX-B01" name="Profile section reproducing F1">
+      <mb:rationale>
+        F1은 이번 라운드 전체의 근거다. 생성 시간의 83.5%가 단서 층이라는 사실이 재현되지 않으면
+        DX-B02와 DX-B03의 전제가 무너진다.
+      </mb:rationale>
+      <mb:objective>
+        cProfile 요약을 출력하고 givens와 search의 cumtime 비중을 명시적으로 계산해 보여준다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/tests/benchmarks.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B01-02 완료. 계측기는 쓰지 않는다.</mb:preconditions>
+      <mb:input-type>def profile_section(dims: tuple[int, ...] = (9, 16), trials: int = 25, seed: int = 7) -> None</mb:input-type>
+      <mb:input-validation>workload에 위임한다.</mb:input-validation>
+      <mb:output-type>표준 출력. tottime 상위 함수와 givens/search cumtime 비중.</mb:output-type>
+      <mb:output-validation>
+        givens cumtime 비중과 search cumtime 비중이 각각 백분율로 출력되고 총 실행 시간이 함께 표시된다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        cProfile이 전체 실행을 느리게 만든다. 이 절의 절대 시간은 timing 근거로 쓰지 않는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+def profile_section(dims=(9, 16), trials=25, seed=7):
+    for dim in dims:
+        pr = cProfile.Profile(); pr.enable()
+        workload(dim, trials, seed)
+        pr.disable()
+        stats = pstats.Stats(pr)
+        total = stats.total_tt
+        givens_cum = cumtime_of(stats, "dlx.py", "givens")
+        search_cum = cumtime_of(stats, "dlx.py", "search")
+        print(dim, total, givens_cum / total, search_cum / total)
+        print top 7 by tottime
+# note: givens is a @contextmanager generator, so its cumtime excludes the
+# `with` body; the two shares can be read as disjoint (see F1 msr:reading)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B01-09" kind="manual">
+          dim=9에서 givens cumtime 비중이 80%대로 재현된다(V-DX-B01-02, F1 재현).
+        </mb:test>
+        <mb:test id="T-DX-B01-10" kind="manual">search cumtime 비중이 15% 미만으로 재현된다.</mb:test>
+      </mb:tests>
+      <mb:rollback>함수 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B01-05" parent="DX-B01" name="A/B timing section and unified entry point">
+      <mb:rationale>
+        DEC-DX-03이 성능 판정 권한을 benchmarks A/B에 부여한다. 계측과 profile이 붙지 않은
+        순수 timing 경로가 따로 있어야 그 판정이 왜곡되지 않는다.
+      </mb:rationale>
+      <mb:objective>
+        계측 없이 dim별 생성 시간을 측정해 출력하고, main()이 기존 세 절과 새 세 절을 모두 실행한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/tests/benchmarks.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B01-02 완료</mb:preconditions>
+      <mb:input-type>def ab_timing(dims: tuple[int, ...] = (9, 12, 16), trials: int = 10, seed: int = 7) -> None</mb:input-type>
+      <mb:input-validation>workload에 위임한다.</mb:input-validation>
+      <mb:output-type>표준 출력. dim별 ms/puzzle의 median과 max.</mb:output-type>
+      <mb:output-validation>
+        각 행에 trials와 seed가 함께 출력된다. 단일 값만 적지 않는다(MR-D4).
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        16x16 포함 시 수 초가 걸린다. 러너가 수집하지 않는 모듈이므로 테스트 시간에 영향은 없다(EF2).
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+def ab_timing(dims=(9, 12, 16), trials=10, seed=7):
+    for dim in dims:
+        rng_free_times = []
+        for i in range(trials):
+            t0 = perf_counter(); workload(dim, 1, seed + i); rng_free_times.append(perf_counter() - t0)
+        print(dim, trials, seed, median(rng_free_times), max(rng_free_times))
+
+def main():
+    compare_uniqueness_checks(); iteration_distribution(); generation_cost()   # existing
+    call_counts(); profile_section(); ab_timing()                              # new
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B01-11" kind="manual">
+          main()이 오류 없이 끝나고 여섯 절을 모두 출력한다(V-DX-B01-01).
+        </mb:test>
+        <mb:test id="T-DX-B01-12" kind="regression">
+          manage.py test game이 계속 통과한다(V-DX-B01-05). benchmarks는 수집되지 않으나
+          새 test_benchmarks.py는 수집된다.
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>새 절과 main() 호출 두 줄을 제거하면 원래 main()으로 돌아간다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B01">
+      V-DX-B01-01 → T-DX-B01-11 | V-DX-B01-02 → T-DX-B01-09 | V-DX-B01-03 → T-DX-B01-07 |
+      V-DX-B01-04 → T-DX-B01-01,02,03,04 | V-DX-B01-05 → T-DX-B01-12.
+      Macro 검증 5항목이 모두 micro test로 수용되었다.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================== 위험과 미결 -->
+  <mic:risks xml:id="wave0-risks">
+    <mic:risk id="W0-R1" severity="medium" refs="M-UI-B01-01, M-UI-B01-03">
+      MR-U4의 구체화다. legacy 이동과 index.html 편집 사이에 앱이 style 없는 상태를 지난다.
+      두 micro block을 연속 실행해 구간을 짧게 유지하고, 중간 상태로 커밋하지 않는다.
+    </mic:risk>
+    <mic:risk id="W0-R2" severity="medium" refs="M-DX-B01-01">
+      계측 복원 실패는 이후 모든 측정을 조용히 오염시킨다. EF1의 이중 바인딩 때문에 특히 놓치기 쉽다.
+      T-DX-B01-01부터 04까지가 이 위험 전용 검증이다.
+    </mic:risk>
+    <mic:risk id="W0-R3" severity="low" refs="M-UI-B01-04">
+      tests/를 저장소 루트에 두면 Django의 test 수집 대상과 이름이 겹쳐 보일 수 있다.
+      실제로는 game.tests 패키지만 수집되므로 충돌하지 않으나, 신규 기여자가 혼동할 수 있어
+      tests/js/README.md에 경계를 적는다.
+    </mic:risk>
+    <mic:risk id="W0-R4" severity="low" refs="M-DX-B01-04">
+      cProfile 하에서 측정한 절대 시간을 성능 근거로 오용할 수 있다.
+      profile 절 출력에 "timing 근거로 쓰지 말 것"을 명시한다.
+    </mic:risk>
+  </mic:risks>
+
+  <mic:open-questions xml:id="open-questions">
+    <mic:question id="OQ-W0-1" blocking="false" refs="DV-01">
+      tools/check-contrast.mjs를 UI-B01에서 UI-B08로 옮기는 조정에 동의하는지 확인이 필요하다.
+      Macro Plan의 UI-B01 scope 문구를 함께 수정해야 한다.
+    </mic:question>
+    <mic:question id="OQ-W0-2" blocking="false">
+      Wave 0 구현을 지금 진행할지, Wave 1과 Wave 2의 micro 문서를 먼저 작성한 뒤 한꺼번에 구현할지.
+      전자는 피드백이 빠르고 후자는 문맥 전환이 적다.
+    </mic:question>
+    <mic:question id="OQ-W0-3" blocking="false" refs="OQ-M1">
+      Phase 4 source file 명명 규칙(OQ-M1)이 아직 미결이다. main.js와 benchmarks.py 확장에 곧 적용되므로
+      Wave 0 구현 착수 전에는 정해져야 한다.
+    </mic:question>
+  </mic:open-questions>
+
+  <mic:approval xml:id="approval" status="awaiting-user-approval">
+    <mic:current-phase>3. Micro Blocking — Wave 0</mic:current-phase>
+    <mic:validation-performed>
+      XML well-formedness, micro block id 유일성, test id 유일성,
+      Macro 검증 항목 대 micro test 수용 완전성(UI-B01 3/3, DX-B01 5/5),
+      대상 파일과 API 표면의 실제 코드 대조
+    </mic:validation-performed>
+    <mic:checkbox checked="false">Wave 0 Micro Blocking 승인</mic:checkbox>
+    <mic:checkbox checked="false">DV-01 이탈 승인 (check-contrast를 UI-B08로 이동)</mic:checkbox>
+    <mic:checkbox checked="false">Wave 0 code implementation 착수 승인</mic:checkbox>
+    <mic:next-phase blocked="true">Phase 4 — Wave 0 구현, 또는 Wave 1 Micro Blocking</mic:next-phase>
+  </mic:approval>
+
+</mic:micro-blocking>

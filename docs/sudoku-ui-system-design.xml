@@ -1,0 +1,2135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system-design
+    version="3.0"
+    phase="1"
+    status="approved"
+    language="ko-KR"
+    domain="web-sudoku"
+    repository="sudoku_django"
+    date="2026-07-26"
+    xmlns:ctx="urn:sudoku:context"
+    xmlns:ux="urn:sudoku:ux"
+    xmlns:research="urn:sudoku:research"
+    xmlns:arch="urn:sudoku:architecture"
+    xmlns:a11y="urn:sudoku:accessibility"
+    xmlns:plan="urn:sudoku:plan">
+
+  <!--
+    Phase 1 산출물. 승인 전까지 확정 아님.
+    표기 규약:
+      confidence="verified"    조사 또는 코드 확인으로 사실 확인됨
+      confidence="reasoned"    확립된 UX 원칙에서 도출, 개별 검증은 안 함
+      confidence="hypothesis"  사용자 테스트로 검증 필요
+  -->
+
+  <decisions-locked-by-user>
+    <decision id="U1" topic="persistence">localStorage 전용. 서버 모델 없음.</decision>
+    <decision id="U2" topic="frontend">바닐라 JS 유지. 빌드 도구 없음.</decision>
+    <decision id="U3" topic="memo-scope">셀 메모 + 영역 메모(행/열/박스). 퍼즐 전체 노트 제외.</decision>
+    <decision id="U4" topic="deliverable">이번 워크플로는 설계 문서까지. 코드 구현 없음.</decision>
+    <decision id="U5" topic="url-state" added="2026-07-26">
+      URL에 퍼즐과 메모를 저장해 상태를 유지·공유할 수 있어야 한다. 설계는 섹션 15.
+    </decision>
+  </decisions-locked-by-user>
+
+  <revision-log>
+    <revision rev="3" date="2026-07-26" trigger="rev 2 재검토에서 발견된 12건" approved-by-user="true">
+      <note>
+        rev 2가 스스로 만든 결함 4건, 갱신 누락 2건, 1차 검토에서 놓친 명세 공백 6건을 반영했다.
+        모두 구현 단계에서 막히거나 임의 판단을 강요했을 항목이다.
+      </note>
+
+      <fix id="E1" severity="산식 오류" where="섹션 7 ST4, 섹션 8 S5, 섹션 9 keyboard-open">
+        배율 산식이 두 군데에 서로 다르게 적혀 있었고(여백 16 누락) 헤더 48px을 어디에도 계상하지 않았다.
+        다시 계산하면 배율 1.0이 성립하지 않는다(0.90). 단일 산식으로 통일하고
+        <emphasis>편집 중 헤더 접기</emphasis>를 전제 조건으로 명시했다. 실측치도 1.00 / 0.68로 정정.
+      </fix>
+      <fix id="E2" severity="설계 오류" where="섹션 9 AD2">
+        숫자 바 표시 조건의 "뷰포트 폭 1024px 미만"이 AD 규칙 전체가 없애려던 입력 불능을 되살렸다.
+        iPad Pro 가로(1366px, pointer coarse, 키보드 없음)에서 바가 숨는다. 폭 조건 삭제.
+        결합 순서 모호성도 함께 해소.
+      </fix>
+      <fix id="E3" severity="정합성" where="섹션 10 candidates">
+        후보 크기 비율 분기(42px 경계 0.24/0.26)가 셀이 작아질수록 글자가 커지는 역전을 만들었다.
+        단일 식 max(9px, 셀 x 0.24)로 교체. 분기 없이도 하한이 충족된다.
+      </fix>
+      <fix id="E4" severity="정합성" where="섹션 15 savedAt, SC1">
+        savedAt이 SC1에도 붙는지 미정이었고, 상태가 같아도 시각 때문에 링크가 달라지는 부작용이 있었다.
+        SC2·SC3 한정으로 규정하고 AB2 도입 시 제외 규칙을 명시.
+      </fix>
+
+      <fix id="F1" severity="갱신 누락" where="섹션 5 대안 E">
+        추천안 정의부가 A4로 폐기한 "마지막 사용 입력 기기로 갈린다"를 그대로 유지하고 있었다.
+        가산 어댑터 서술로 교체하고 risk 문구도 재작성.
+      </fix>
+      <fix id="F2" severity="갱신 누락" where="섹션 6 C5">
+        채점 근거가 A1으로 뒤집은 "dvh 기반 시트"로 남아 있었다.
+      </fix>
+
+      <fix id="G1" severity="설계 오류" where="섹션 5 대안 E mobile">
+        "연필 버튼 홀드 = 준모드"는 두 손을 요구해 시나리오 S4(한 손 조작)와 충돌한다.
+        준모드의 근거인 근육 유지가 터치에서는 성립하지 않는다. 모바일은 고정 토글만으로 변경.
+      </fix>
+      <fix id="G2" severity="명세 공백" where="섹션 8 S4b 신설">
+        후보 입력은 필수 기능인데 모바일 흐름이 어느 시나리오에도 없었다. S4b 추가.
+      </fix>
+      <fix id="G3" severity="자기모순" where="섹션 7 layer-hierarchy">
+        z=3에 확인 대화상자를 넣어두고 "z=3은 보드를 절대 덮지 않는다"고 규정했다.
+        불변식을 z=1·2 절대 / z=3 조건부로 분리.
+      </fix>
+      <fix id="G4" severity="접근성" where="섹션 8 S2, 섹션 11 live-region">
+        Shift 준모드에 aria-live를 걸면 후보 5개 입력에 5번 낭독된다.
+        섹션 11의 "입력 1건마다 떠들지 말 것"과 충돌했다.
+        준모드는 셀 레이블 접두사로, 고정 토글만 live 알림으로 분리.
+      </fix>
+      <fix id="G5" severity="명세 공백" where="섹션 12 components, state-shape">
+        세션 충돌 대화상자, 단축키 도움말, 힌트 스트립에 소유 컴포넌트가 없었고
+        설정 4종이 상태 모델에 없었다. DialogHost, SettingsStore, HintStrip 추가 + Settings 구조 정의.
+        UiState의 inputAdapter 필드는 가산 어댑터와 모순이라 삭제.
+      </fix>
+      <fix id="G6" severity="명세 공백" where="섹션 8 S4">
+        Digit First에서 다른 값이 든 셀을 탭했을 때의 동작이 없었다.
+        교체로 규정(데스크톱 S1과 대칭). 고정 셀 탭, 활성 숫자 해제도 함께 명시.
+      </fix>
+    </revision>
+
+    <revision rev="2" date="2026-07-26" trigger="문서 재검토에서 발견된 14건" approved-by-user="true">
+      <note>
+        승인 직전 수행한 재검토에서 나온 결함을 전부 반영한 개정이다.
+        설계 오류 4건, 정합성 결함 6건, 사양 공백 4건.
+        아래 항목은 모두 사용자에게 제시된 뒤 승인되었으므로 무단 개정이 아니다.
+      </note>
+
+      <fix id="A1" severity="설계 오류" where="섹션 8 S5, 섹션 9 keyboard-open, viewport-note">
+        dvh와 VisualViewport의 주종이 반대로 적혀 있었다. 가상 키보드는 dvh에 반영되지 않으며
+        interactive-widget=resizes-content는 WebKit 미지원이다. VisualViewport를 주로 승격.
+      </fix>
+      <fix id="A2" severity="설계 오류" where="섹션 7 ST4, 섹션 8 S5, 섹션 9, RK2">
+        모바일 편집 시 고정 0.62배 축소를 동적 배율로 교체.
+        계산해보면 390x844에서는 축소가 아예 불필요하고 최악의 소형 기기도 0.73배다.
+      </fix>
+      <fix id="A3" severity="설계 오류" where="섹션 8 S2 key-detection, 섹션 11, RK10">
+        Shift+숫자의 event.key 문제와 AZERTY 충돌이 문서 어디에도 없었다. 판정 규칙과 한계, 완화책 추가.
+      </fix>
+      <fix id="A4" severity="설계 오류" where="섹션 9 adaptation-rule">
+        "마지막 사용 입력 수단으로 전환"이 폰에서 입력 불능 상태를 만들 수 있었다.
+        어댑터를 배타에서 가산으로 변경.
+      </fix>
+
+      <fix id="B1" severity="정합성" where="섹션 15 레이아웃, CR2">
+        CR2가 요구하는 최종 수정 시각이 URL 포맷에 없었다. savedAt 4바이트 추가.
+      </fix>
+      <fix id="B2" severity="정합성" where="섹션 10 candidates">
+        후보 최소 10px 규칙의 탈출구("셀을 키운다")가 모바일에서 실행 불가능했다.
+        비율 가변 + 절대 하한 9px으로 교체.
+      </fix>
+      <fix id="B3" severity="정합성" where="섹션 15 레이아웃, test-plan">
+        후보 밀집 형식의 손익분기를 60개로 잘못 적었다(실제 72개). 최대 절감이 11바이트뿐이라
+        형식 자체를 삭제하고 희소 형식만 남김.
+      </fix>
+      <fix id="B4" severity="정합성" where="섹션 10 dark-mode, OQ4">
+        섹션 10은 다크 모드를 확정으로, OQ4는 미결로 적고 있었다. 포함으로 확정.
+      </fix>
+      <fix id="B5" severity="정합성" where="섹션 12 persistence">
+        CR1의 "이전 게임 슬롯"을 담을 localStorage 키가 정의되지 않았다. archive, settings 키 추가.
+      </fix>
+      <fix id="B6" severity="정합성" where="섹션 11 keymap">
+        섹션 15가 제안한 Shift+S가 키맵 표에 없었다. 표는 전체 매핑이므로 결함. 추가.
+      </fix>
+
+      <fix id="C1" severity="사양 공백" where="섹션 15 레이아웃, 검증">
+        varint 인코딩을 LEB128로 명시하고 5바이트 상한 검사를 추가.
+      </fix>
+      <fix id="C2" severity="사양 공백" where="섹션 15 레이아웃">
+        URL 헤더에 dim 1바이트 추가. OQ3(12x12, 16x16)이 열려 있고 RK7이 포맷 영구성을 인정한 상태에서
+        가장 싼 보험.
+      </fix>
+      <fix id="C3" severity="사양 공백" where="섹션 7 와이어프레임, 섹션 9 portrait">
+        보드 크기 기준이 섹션마다 달랐다(390/844 대 374/768). 390x768 하나로 통일.
+      </fix>
+      <fix id="C4" severity="사양 공백" where="섹션 11 keymap">
+        인용한 W3C APG grid 패턴이 권장하는 Ctrl+Home, Ctrl+End 누락. 추가.
+      </fix>
+
+      <fix id="D" severity="원칙 판단" where="섹션 8 CF1">
+        CF1 기본 on의 근거가 없었다. "중복은 종이에서도 보이는 사실이고 CF1은 세는 노동만 제거한다"는
+        논거를 명시하고 기본 on 유지. 설정으로 끌 수 있게 함.
+      </fix>
+
+      <unchanged>
+        평가 매트릭스 가중 총점 5건, 니블 팩 41바이트, 희소 후보 20셀 34바이트, base64 확장률,
+        fragment 선택 근거, 시드 방식 기각 근거, 17힌트 최소값, Safari replaceState 제한은
+        재검산 결과 이상 없어 그대로 둔다.
+      </unchanged>
+    </revision>
+    <revision rev="1" date="2026-07-26">최초 System Design + 섹션 15 URL 상태 저장.</revision>
+  </revision-log>
+
+  <!-- ============================================================ 1 -->
+  <section order="1" id="executive-summary">
+    <title>결론 요약</title>
+
+    <recommendation id="E" name="플랫폼 분기 하이브리드">
+      <one-line>
+        데스크톱은 준모드(quasimode) 키보드 + 여백 노트 레일, 모바일은 하단 숫자 바 digit-first
+        + 임시 메모 시트. 개념 모델 하나, 입력 경로 둘.
+      </one-line>
+
+      <rationale-5-sentences>
+        <s n="1">
+          "UI 최소화"와 "보드 최대화"는 같은 말이 아니다. 세로 화면 휴대폰에서 정사각 보드는
+          가로 폭에 갇히므로 보드 아래 약 400px은 어차피 죽은 공간이고, 그 자리에 숫자 바를 두어도
+          보드는 1px도 줄지 않는다.
+        </s>
+        <s n="2">
+          반대로 데스크톱은 세로 제약이라 하단 바가 곧 보드 축소이며, 대신 물리 키보드가 있어
+          바가 필요 없다. 제약 축이 반대이므로 입력 방식도 반대여야 한다.
+        </s>
+        <s n="3">
+          후보 입력은 켜고 끄는 토글 모드가 아니라 Shift를 누르고 있는 동안만 유지되는 준모드로 한다.
+          누르고 있다는 근육 감각 자체가 모드 표시라서 모드 착각이 구조적으로 불가능하다.
+        </s>
+        <s n="4">
+          텍스트 메모는 보드 위에 띄우지 않고 종이의 여백에 해당하는 자리(데스크톱은 우측 여백 레일,
+          모바일은 키보드 위 한 줄)로 보내 퍼즐 격자를 절대 가리지 않는다.
+        </s>
+        <s n="5">
+          숨은 제스처는 가속기로만 쓰고 모든 기능에 항상 보이는 대체 경로를 두어 몰입과 발견성을 동시에 만족시킨다.
+        </s>
+      </rationale-5-sentences>
+
+      <verdict-on-initial-concept>
+        <kept>보드 중심 구성, 셀 내부 3x3 후보 표기, 텍스트 메모의 임시 입력 UI, 플랫폼별 입력 분리</kept>
+        <modified>
+          후보 입력 전환(토글 모드 → 준모드), 텍스트 메모 위치(셀 주변 팝오버 → 여백 영역),
+          메모 존재 표시(모서리 점 → 형태 기반 dog-ear + 스크린 리더 텍스트)
+        </modified>
+        <replaced>
+          모바일 "상시 UI 최소화" 원칙(숨김 → 하단 상시 바). 근거는 위 s1, s2.
+          모바일 길게 누르기 기반 메모 진입(단독 경로 → 가속기로 강등).
+        </replaced>
+      </verdict-on-initial-concept>
+    </recommendation>
+  </section>
+
+  <!-- ============================================================ 2 -->
+  <section order="2" id="problem-definition">
+    <title>사용자 문제 재정의</title>
+
+    <restated-problem>
+      표면 요청은 "UI를 숨겨 종이처럼 만들기"다.
+      실제 문제는 <emphasis>주의 지점과 입력 지점의 분리</emphasis>다.
+      종이에서는 눈이 보는 칸에 연필 끝이 있다. 디지털에서는 눈은 셀에, 손은 화면 하단 패드에 있어
+      한 번 입력할 때마다 시선이 왕복하고 그때 추론 맥락이 끊긴다.
+      UI를 숨기는 것은 이 문제의 해법이 아니라 부작용 회피일 뿐이며,
+      숨기면 발견성만 잃고 시선 왕복은 그대로 남는다.
+    </restated-problem>
+
+    <paper-experience-decomposition>
+      <element name="시각적 단순성" keep="yes">
+        보드 외 요소가 시야에서 경쟁하지 않음. 디지털에서도 보존 가능하고 보존해야 함.
+      </element>
+      <element name="입력 속도" keep="yes">
+        연필은 이동 거리 0. 데스크톱은 키보드로, 모바일은 digit-first로 근사.
+      </element>
+      <element name="자유도" keep="partial">
+        종이는 아무 데나 아무 표기나 가능. 디지털은 구조를 요구.
+        타협점: 후보는 구조화(3x3 고정 위치), 텍스트 메모는 완전 자유 문자열.
+      </element>
+      <element name="오류 허용성" keep="no" replace-with="undo/redo">
+        종이 지우개는 느리고 지저분하다. 디지털 실행 취소가 명백히 우월하므로 재현하지 말고 대체.
+      </element>
+      <element name="직접 조작감" keep="yes">
+        표시는 손가락/커서가 가리킨 그 자리에 즉시 나타나야 함. 확인 대화상자 금지.
+      </element>
+      <element name="후보 관리 부담" keep="no" replace-with="자동 후보(옵션, 기본 off)">
+        종이에서 확정 숫자 하나 넣을 때 관련 칸 후보를 손으로 지우는 노동은 재현할 가치 없음.
+        확정 입력 시 동료 셀 후보 자동 제거를 옵션으로 제공.
+      </element>
+      <element name="메모 재탐색" keep="no" replace-with="여백 레일 목록">
+        종이는 메모를 다시 찾기 어렵다. 디지털은 목록화가 가능하므로 개선.
+      </element>
+    </paper-experience-decomposition>
+
+    <core-question-answer ref="ux:core-problem">
+      기능을 숨겨서 몰입을 얻는 대신, <emphasis>입력 수단 자체를 보드로 끌어와</emphasis> 몰입을 얻는다.
+      데스크톱은 키보드가 이미 보드 밖에 있으면서 시선을 뺏지 않는 입력기다.
+      모바일은 죽은 공간에 상시 바를 두어 숨기지 않고도 보드를 침해하지 않는다.
+      결과적으로 발견성을 희생할 이유가 사라진다.
+    </core-question-answer>
+  </section>
+
+  <!-- ============================================================ 3 -->
+  <section order="3" id="research-findings">
+    <title>조사 및 사례 분석</title>
+
+    <research:scope-executed>
+      웹 검색 4건 수행. 조사 범위 중 "종이 대비 디지털 메모 행동 차이"와
+      "숨은 제스처 발견성 정량 데이터"는 신뢰할 만한 1차 자료를 확보하지 못함.
+      해당 항목은 UX 원칙 기반 추론으로 표기하고 검증 계획(섹션 13)에 포함.
+    </research:scope-executed>
+
+    <finding id="R1" confidence="verified">
+      <source name="sudoku9x9 User Manual" url="https://www.sudoku9x9.com/manual/"/>
+      <observation>
+        입력 방식이 Digit First(숫자 먼저 고르고 셀 클릭)와 Cell First(셀 먼저 고르고 숫자 클릭)로 갈린다.
+        키보드 사용자는 Cell First만 가능하다.
+      </observation>
+      <implication>
+        Digit First는 "이 숫자가 들어갈 자리 찾기" 스캔 전략에 최적이고 탭 수를 절반으로 줄인다.
+        Cell First는 "이 칸에 뭐가 들어가지" 전략에 맞고 키보드와 자연스럽다.
+        두 전략은 사용자 취향이 아니라 <emphasis>입력 기기</emphasis>가 강제한다.
+        모바일 Digit First, 데스크톱 Cell First 분기의 직접 근거.
+      </implication>
+    </finding>
+
+    <finding id="R2" confidence="verified">
+      <source name="7sudoku - Entering numbers and pencil marks" url="https://www.7sudoku.com/instructions/entering-numbers"/>
+      <observation>
+        Shift를 누른 채 숫자를 입력하면 후보(pencil mark)로 들어간다.
+        연필/펜 아이콘 토글보다 이 방식을 선호하는 사용자가 있다고 명시.
+      </observation>
+      <implication>
+        후보 입력 준모드가 실제 서비스에서 검증된 패턴임을 확인.
+        토글 모드는 "지금 무슨 모드인지" 기억 부담을 사용자에게 전가한다.
+      </implication>
+    </finding>
+
+    <finding id="R3" confidence="verified">
+      <source name="W3C ARIA APG - Grid Pattern" url="https://www.w3.org/WAI/ARIA/apg/patterns/grid/"/>
+      <observation>
+        격자는 roving tabindex 사용. 한 번에 한 셀만 tabindex="0", 나머지는 -1.
+        방향키로 포커스 이동하며 tabindex를 옮긴다. aria-label 또는 aria-labelledby로 격자를 이름 짓는다.
+      </observation>
+      <implication>
+        현재 구현은 셀마다 input 요소라 Tab 81번이 필요하다. role="grid" + roving tabindex로 교체 필요.
+        부수 효과가 더 중요하다. input을 제거하면 모바일에서 셀 탭 시 소프트 키보드가 뜨지 않는다.
+      </implication>
+    </finding>
+
+    <finding id="R4" confidence="verified">
+      <source name="MDN VisualViewport / 관련 기사" url="https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport"/>
+      <observation>
+        모바일에는 layout viewport와 visual viewport가 따로 있고, 소프트 키보드는 visual viewport만 줄인다.
+        VisualViewport API는 2021년 8월부터 주요 브라우저 지원.
+        최근 권장은 JS 옵저버 대신 dvh 단위 우선 사용이며, 옵저버 방식은 깜빡임과 레이아웃 점프를 유발할 수 있다.
+      </observation>
+      <implication>
+        메모 편집 시 레이아웃은 100dvh 기반으로 짜고, VisualViewport는 보정용 보조 수단으로만 쓴다.
+        키보드가 열려도 보드가 키보드 뒤로 숨지 않게 하는 문제의 표준 해법.
+      </implication>
+    </finding>
+
+    <finding id="R5" confidence="reasoned">
+      <observation>
+        WCAG 2.2 SC 2.5.8 Target Size (Minimum)은 24x24 CSS px, SC 2.5.5 (AAA)는 44x44를 요구한다.
+      </observation>
+      <implication>
+        360px 폭 기기에서 셀 한 변은 약 40px로 AA는 충족하나 AAA는 미달.
+        9칸 격자를 44px로 만들려면 396px 폭이 필요해 물리적으로 불가능.
+        따라서 정확도 요구가 높은 조작(메모 열기 등)은 셀 탭이 아니라 하단 바의 큰 버튼으로 뺀다.
+      </implication>
+    </finding>
+
+    <finding id="R6" confidence="reasoned">
+      <observation>
+        길게 누르기, 스와이프 등 잔여 제스처는 시각적 어포던스가 없어 사용자가 존재 자체를 모른다.
+        모바일 OS 관례상 길게 누르기는 "가속기 또는 부가 메뉴"이지 주 경로가 아니다.
+      </observation>
+      <implication>
+        초기 구상의 "길게 누르기로 메모 입력"을 단독 경로로 두면 메모 기능 발견율이 사실상 0에 수렴할 위험.
+        가속기로 유지하되 하단 바에 항상 보이는 메모 버튼을 병치.
+      </implication>
+    </finding>
+
+    <research:not-copied>
+      특정 서비스 UI를 복제하지 않았다. 추출한 반복 원칙은 세 가지다.
+      (1) 입력 기기가 입력 전략을 결정한다.
+      (2) 모드는 유지 비용이 있으므로 근육으로 유지하거나 아예 없애라.
+      (3) 격자 위에 무언가를 띄우면 추론에 필요한 이웃 셀이 가려진다.
+    </research:not-copied>
+  </section>
+
+  <!-- ============================================================ 4 -->
+  <section order="4" id="assumption-audit">
+    <title>초기 구상 검토</title>
+
+    <audit-table>
+      <row>
+        <assumption>화면 중앙에 퍼즐판만 표시</assumption>
+        <verdict>조건부 유지</verdict>
+        <analysis>
+          데스크톱은 옳다. 모바일 세로에서는 보드 아래 공간이 남으므로 "판만 표시"가 공간을 절약하지 않는다.
+          아낀 것은 픽셀이 아니라 발견성뿐이며, 그건 손해다.
+        </analysis>
+        <action>데스크톱 유지, 모바일은 하단 상시 입력 바 허용</action>
+      </row>
+      <row>
+        <assumption>상시 노출 UI 최소화</assumption>
+        <verdict>변경 권장</verdict>
+        <analysis>
+          최소화 대상은 "요소 개수"가 아니라 "보드가 잃는 면적"과 "시선 경쟁"이어야 한다.
+          죽은 공간의 저채도 컨트롤은 시선을 뺏지 않는다.
+        </analysis>
+        <action>원칙 재정의: 상시 노출 최소화 → 보드 면적 불가침 + 저시선비용</action>
+      </row>
+      <row>
+        <assumption>셀 선택 후 키보드 또는 제스처로 입력</assumption>
+        <verdict>유지 권장(데스크톱) / 변경 권장(모바일)</verdict>
+        <analysis>
+          모바일에서 셀 먼저 선택하면 입력 1건당 탭 2회 + 시선 왕복 1회. Digit First는 탭 1회로 줄인다.
+        </analysis>
+        <action>모바일은 활성 숫자(Digit First) 기본, 셀 먼저 선택도 병행 허용</action>
+      </row>
+      <row>
+        <assumption>후보 숫자는 셀 내부 3x3 위치에 작게 표시</assumption>
+        <verdict>유지 권장</verdict>
+        <analysis>
+          숫자 자리를 고정해야 격자 전체를 스캔할 때 위치만으로 판독 가능. 종이 관습과도 일치. 대안 없음.
+        </analysis>
+        <action>그대로 채택. 최소 글자 크기만 규정(섹션 10)</action>
+      </row>
+      <row>
+        <assumption>텍스트 메모는 입력할 때만 임시 UI 표시</assumption>
+        <verdict>조건부 유지</verdict>
+        <analysis>
+          임시 표시는 옳다. 그러나 "셀 주변"에 띄우면 추론에 쓰는 이웃 셀을 가리고,
+          가장자리 셀에서는 배치가 무너진다.
+        </analysis>
+        <action>표시 위치를 셀 주변에서 여백 영역으로 이전</action>
+      </row>
+      <row>
+        <assumption>저장 후 셀 모서리 표시 또는 숨김</assumption>
+        <verdict>조건부 유지</verdict>
+        <analysis>
+          완전 숨김은 메모를 죽은 데이터로 만든다. 모서리 표시는 좋으나 색 점은 접근성 요건 위반 소지.
+        </analysis>
+        <action>형태 기반 dog-ear 마커 + 여백 레일 목록 병행</action>
+      </row>
+      <row>
+        <assumption>PC 단축키 / 모바일 길게 누르기</assumption>
+        <verdict>변경 권장</verdict>
+        <analysis>PC 단축키는 옳다. 모바일 길게 누르기 단독은 발견성 위험(R6).</analysis>
+        <action>길게 누르기는 가속기로 강등, 항상 보이는 버튼 경로 필수화</action>
+      </row>
+      <row>
+        <assumption>Space로 후보 입력 모드 전환</assumption>
+        <verdict>변경 권장</verdict>
+        <analysis>
+          토글 모드는 모드 착각을 만든다. 후보를 넣으려다 확정 숫자를 박으면 퍼즐이 오염되고 복구가 필요하다.
+          Space는 스크롤/버튼 활성화와도 충돌 소지.
+        </analysis>
+        <action>Shift 준모드를 기본, Space 고정 토글은 한손 사용자용 보조 경로로 격하</action>
+      </row>
+      <row>
+        <assumption>N으로 메모 시작, Enter 저장, Esc 취소</assumption>
+        <verdict>유지 권장</verdict>
+        <analysis>표준적이고 충돌 없음. 단 텍스트 편집 중 보드 단축키 차단 규칙이 반드시 필요.</analysis>
+        <action>채택 + 포커스 트랩 규칙 명시(섹션 8)</action>
+      </row>
+      <row>
+        <assumption>행/열/박스/전체 메모 지원</assumption>
+        <verdict>조건부 유지</verdict>
+        <analysis>
+          영역 메모는 실제 추론 단위와 일치해 가치가 높다("이 박스에서 5는 두 칸 중 하나").
+          전체 퍼즐 메모는 소속이 없어 탐색과 표시가 애매하다.
+        </analysis>
+        <action>셀 + 영역(행/열/박스) 채택. 전체 노트 제외(사용자 결정 U3과 일치)</action>
+      </row>
+      <row>
+        <assumption>(암묵) 숨겨진 UI가 곧 몰입이다</assumption>
+        <verdict>제거 권장</verdict>
+        <analysis>
+          몰입을 깨는 것은 요소의 존재가 아니라 시선 이동과 모드 관리 부담이다.
+          숨김은 후자를 오히려 늘린다(무엇이 가능한지 기억해야 함).
+        </analysis>
+        <action>원칙 P2를 P2'로 교체(섹션 14)</action>
+      </row>
+      <row>
+        <assumption>(암묵) 새로고침하면 퍼즐을 다시 받아도 된다</assumption>
+        <verdict>변경 권장</verdict>
+        <analysis>
+          현재 views.index는 요청마다 새 퍼즐을 생성한다(game/views.py:7). 메모를 저장하는 순간
+          새로고침이 곧 메모 유실이 되어 기능 자체가 무의미해진다.
+        </analysis>
+        <action>클라이언트 부트스트랩 순서 변경(섹션 6 arch:bootstrap)</action>
+      </row>
+    </audit-table>
+  </section>
+
+  <!-- ============================================================ 5 -->
+  <section order="5" id="alternatives">
+    <title>대안 설계 비교</title>
+
+    <alternative id="A" name="무UI 키보드/제스처 전용" maps-to="M1">
+      <core-interaction>
+        화면에 보드만. 데스크톱은 전 기능을 단축키로, 모바일은 스와이프/롱프레스/더블탭 조합으로 호출.
+      </core-interaction>
+      <desktop>방향키 이동, 숫자키 확정, Shift+숫자 후보, N 메모. 완전 무마우스.</desktop>
+      <mobile>셀 탭 선택 후 상하 스와이프로 숫자 증감, 롱프레스로 메모. 화면에 힌트 없음.</mobile>
+      <pros>몰입도 최고. 숙련 데스크톱 사용자 속도 최고. 구현 단순.</pros>
+      <cons>모바일에서 숫자 입력 수단이 사실상 없음. 초보자 진입 불가.</cons>
+      <risk level="critical">모바일 사용자는 기능 존재를 알 방법이 없다. 실사용 실패.</risk>
+      <fit-user>데스크톱 숙련자 전용</fit-user>
+    </alternative>
+
+    <alternative id="B" name="셀 컨텍스트 팝오버" maps-to="M2">
+      <core-interaction>
+        셀을 선택하면 그 셀 주변에 3x3 미니 숫자판 또는 방사형 메뉴가 뜨고 거기서 숫자/후보/메모를 고른다.
+      </core-interaction>
+      <desktop>클릭 후 팝오버. 키보드 사용자는 팝오버 내부를 다시 방향키로 탐색해야 해 이중 내비게이션.</desktop>
+      <mobile>탭 후 팝오버. 손가락이 팝오버를 가리고, 팝오버가 이웃 셀을 가린다.</mobile>
+      <pros>입력 지점과 시선 지점이 가장 가깝다. 발견성 양호(탭하면 나온다).</pros>
+      <cons>
+        스도쿠는 이웃 셀을 보면서 판단하는 게임인데 팝오버가 정확히 그 이웃을 덮는다.
+        가장자리/모서리 셀에서는 팝오버가 반대편으로 튀어 위치가 매번 달라진다.
+      </cons>
+      <risk level="critical">
+        위치 불안정 + 이웃 가림. 9개 타겟을 40px 셀 주변에 배치하면 타겟 크기도 부족.
+      </risk>
+      <fit-user>후보 입력이 드문 초보 모바일 사용자</fit-user>
+    </alternative>
+
+    <alternative id="C" name="하단 접이식 입력 영역" maps-to="M3">
+      <core-interaction>
+        화면 하단에 숫자 1-9 바 + 연필/지움/실행취소/메모 버튼. 접기 가능.
+      </core-interaction>
+      <desktop>하단 바가 세로 공간을 먹어 보드가 작아진다. 키보드가 있어 중복.</desktop>
+      <mobile>보드 아래 죽은 공간에 배치. 엄지 도달 범위. 상시 노출이라 발견성 완전.</mobile>
+      <pros>발견성 최고. 학습비용 최저. 구현 단순. 터치 타겟 크게 확보 가능.</pros>
+      <cons>데스크톱에서는 공간 낭비이자 시선 왕복 유발. 텍스트 메모 해법이 별도로 필요.</cons>
+      <risk level="low">데스크톱 단독 적용 시 몰입도 저하</risk>
+      <fit-user>모바일 전 사용자</fit-user>
+    </alternative>
+
+    <alternative id="D" name="여백 노트 중심" maps-to="M4">
+      <core-interaction>
+        보드 바깥 여백을 실제 노트 면으로 취급. 메모는 전부 여백에 쌓이고 보드의 셀과 선으로 연결.
+      </core-interaction>
+      <desktop>우측 여백 레일에 메모 카드 목록. 카드에 마우스를 올리면 대상 셀/영역이 보드에서 강조.</desktop>
+      <mobile>여백이 없어 성립하지 않음. 별도 시트로 대체해야 함.</mobile>
+      <pros>텍스트 메모 작성/재확인 최고. 보드를 절대 가리지 않음. 확장성 좋음.</pros>
+      <cons>숫자/후보 입력 문제를 전혀 해결하지 않음. 단독으로는 불완전한 설계.</cons>
+      <risk level="medium">단독 사용 불가. 다른 안과 결합 필수.</risk>
+      <fit-user>논리 추론을 글로 적는 중상급자</fit-user>
+    </alternative>
+
+    <alternative id="E" name="플랫폼 분기 하이브리드" recommended="true" composed-of="A+C+D">
+      <core-interaction revised="2026-07-26" rev="3">
+        개념 모델은 하나. 셀은 3계층 상태(확정값 / 후보집합 / 텍스트 메모)를 가진다.
+        입력 경로는 <emphasis>동시에 둘 다 존재</emphasis>하며 어느 하나로 전환되지 않는다.
+        키보드는 언제나 살아 있고, 터치용 숫자 바는 매체 특성으로만 표시 여부가 결정된다(섹션 9 AD1~AD3).
+      </core-interaction>
+      <desktop>
+        A 채택. 보드만 표시 + 준모드 키보드. 텍스트 메모는 D의 우측 여백 레일.
+        마우스 사용자를 위해 셀 우클릭 컨텍스트 메뉴가 동일 기능 전부를 제공.
+      </desktop>
+      <mobile revised="2026-07-26" rev="3">
+        C 채택. 하단 상시 숫자 바 + Digit First. 연필은 <emphasis>고정 토글만</emphasis> 제공한다.
+        텍스트 메모는 키보드 위 한 줄 시트(D의 모바일 변형).
+        <why-no-quasimode-on-touch>
+          직전 설계는 "연필 버튼을 홀드하면 준모드"였다. 홀드하려면 손가락 하나가 버튼에 묶여 있어야 하고
+          셀은 다른 손가락으로 탭해야 하므로 두 손이 필요하다. 시나리오 S4의 이름이 "한 손으로 숫자 입력"인데
+          정면으로 충돌한다. 준모드의 근거였던 "근육으로 유지되므로 잊을 수 없다"는 물리 키보드에서만
+          성립하고 터치에서는 성립하지 않는다. 터치에서는 고정 토글 + 강한 상태 표시가 옳다.
+        </why-no-quasimode-on-touch>
+      </mobile>
+      <pros>각 플랫폼의 제약 축에 맞는 최적해. 발견성과 몰입을 동시에 확보. 메모 재확인 경로 확보.</pros>
+      <cons>입력 레이어 두 벌 유지. 데스크톱과 모바일의 후보 입력 조작이 서로 다름(준모드 대 토글).</cons>
+      <risk level="medium" revised="2026-07-26">
+        같은 개념(후보 입력)을 플랫폼마다 다른 조작으로 제공하므로, 두 환경을 오가는 사용자가 혼동할 수 있다.
+        완화는 상태 표시를 양쪽 모두 동일한 시각 언어(점선 테두리 + "후보" 배지)로 통일하는 것.
+        기기 판정 자체는 하지 않으므로 판정 실패 위험은 존재하지 않는다(섹션 9 AD1~AD3).
+      </risk>
+      <fit-user>전 사용자</fit-user>
+    </alternative>
+  </section>
+
+  <!-- ============================================================ 6 -->
+  <section order="6" id="evaluation-matrix">
+    <title>평가 매트릭스</title>
+
+    <matrix scale="1-5" weight-total="44" max-possible="220">
+      <criterion id="C1" weight="5" name="퍼즐 몰입도">
+        <score alt="A" v="5">보드만 존재</score>
+        <score alt="B" v="4">팝오버가 간헐적으로 시야 침범</score>
+        <score alt="C" v="3">상시 바 존재(모바일은 무해, 데스크톱은 손해)</score>
+        <score alt="D" v="3">여백 레일 상시 노출 시 주의 분산</score>
+        <score alt="E" v="5">플랫폼별로 침범 0에 근접</score>
+      </criterion>
+      <criterion id="C2" weight="5" name="숫자·후보 입력 속도">
+        <score alt="A" v="3">데스크톱 5, 모바일 1의 평균</score>
+        <score alt="B" v="3">팝오버 대기시간 + 조준 비용</score>
+        <score alt="C" v="4">Digit First로 탭 절반</score>
+        <score alt="D" v="2">숫자 입력 미해결</score>
+        <score alt="E" v="5">플랫폼별 최적 경로</score>
+      </criterion>
+      <criterion id="C3" weight="5" name="메모 기능 발견성">
+        <score alt="A" v="1">단서 없음</score>
+        <score alt="B" v="4">탭하면 나타남</score>
+        <score alt="C" v="5">상시 버튼</score>
+        <score alt="D" v="4">레일이 곧 단서</score>
+        <score alt="E" v="4">모바일 5, 데스크톱은 힌트 스트립 의존으로 3.5</score>
+      </criterion>
+      <criterion id="C4" weight="4" name="텍스트 메모 작성·재확인">
+        <score alt="A" v="2">저장 후 다시 찾기 어려움</score>
+        <score alt="B" v="3">셀 단위만, 목록 없음</score>
+        <score alt="C" v="3">시트 기반, 목록 별도 필요</score>
+        <score alt="D" v="5">목록 + 역참조 강조</score>
+        <score alt="E" v="5">D 계승</score>
+      </criterion>
+      <criterion id="C5" weight="4" name="모바일 키보드 사용성">
+        <score alt="A" v="1">숫자 입력에도 키보드가 뜰 위험</score>
+        <score alt="B" v="2">팝오버와 키보드 충돌</score>
+        <score alt="C" v="3">숫자에는 키보드 불필요</score>
+        <score alt="D" v="2">모바일 미대응</score>
+        <score alt="E" v="4">숫자 입력에는 소프트 키보드가 아예 뜨지 않음. 텍스트만 VisualViewport 기반 시트</score>
+      </criterion>
+      <criterion id="C6" weight="4" name="PC 키보드 효율">
+        <score alt="A" v="5">완전 무마우스</score>
+        <score alt="B" v="2">이중 내비게이션</score>
+        <score alt="C" v="3">바는 마우스 전제</score>
+        <score alt="D" v="3">레일 이동 단축키 필요</score>
+        <score alt="E" v="5">A 계승</score>
+      </criterion>
+      <criterion id="C7" weight="4" name="오입력 방지·복구">
+        <score alt="A" v="3">토글 모드 착각 위험 잔존</score>
+        <score alt="B" v="3">오탭 위험</score>
+        <score alt="C" v="4">모드 상태가 눈에 보임</score>
+        <score alt="D" v="3">해당 없음</score>
+        <score alt="E" v="5">준모드로 모드 착각 구조적 제거 + 단일 undo 스택</score>
+      </criterion>
+      <criterion id="C8" weight="4" name="접근성">
+        <score alt="A" v="3">키보드는 좋으나 스크린 리더 단서 부족</score>
+        <score alt="B" v="2">동적 팝오버 포커스 관리 난이도</score>
+        <score alt="C" v="4">버튼 기반이라 레이블링 쉬움</score>
+        <score alt="D" v="4">목록 구조가 리더 친화적</score>
+        <score alt="E" v="5">grid 패턴 + 버튼 경로 + live region</score>
+      </criterion>
+      <criterion id="C9" weight="3" name="초기 학습 비용">
+        <score alt="A" v="1"/>
+        <score alt="B" v="4"/>
+        <score alt="C" v="5"/>
+        <score alt="D" v="4"/>
+        <score alt="E" v="4">모바일 즉시, 데스크톱은 힌트 1회 필요</score>
+      </criterion>
+      <criterion id="C10" weight="3" name="구현 복잡도(높을수록 단순)">
+        <score alt="A" v="4"/>
+        <score alt="B" v="2">위치 계산·충돌 회피가 난제</score>
+        <score alt="C" v="4"/>
+        <score alt="D" v="3"/>
+        <score alt="E" v="2">입력 레이어 2벌 + 기기 적응</score>
+      </criterion>
+      <criterion id="C11" weight="3" name="확장성">
+        <score alt="A" v="2"/>
+        <score alt="B" v="3"/>
+        <score alt="C" v="4"/>
+        <score alt="D" v="5"/>
+        <score alt="E" v="4"/>
+      </criterion>
+    </matrix>
+
+    <totals>
+      <total alt="A" weighted="122"/>
+      <total alt="B" weighted="130"/>
+      <total alt="C" weighted="167"/>
+      <total alt="D" weighted="149"/>
+      <total alt="E" weighted="196" rank="1"/>
+    </totals>
+
+    <critical-risks separate-from-score="true">
+      <risk alt="A" level="fatal">모바일 사용 불가. 총점과 무관하게 탈락.</risk>
+      <risk alt="B" level="fatal">가장자리 셀 팝오버 배치 붕괴 + 추론 대상 이웃 셀 가림.</risk>
+      <risk alt="C" level="none"/>
+      <risk alt="D" level="blocking">숫자 입력 경로 부재로 단독 채택 불가.</risk>
+      <risk alt="E" level="manageable">
+        코드 경로 이원화. 완화: 상태/도메인 로직은 공용 1벌, 입력 어댑터만 2벌로 분리.
+      </risk>
+    </critical-risks>
+
+    <conclusion>
+      총점 1위(E)와 치명 위험 부재가 일치하므로 E 채택.
+      단 E는 구현 복잡도에서 최하점이며, 이는 인지하고 감수하는 비용이다.
+    </conclusion>
+  </section>
+
+  <!-- ============================================================ 7 -->
+  <section order="7" id="recommended-design">
+    <title>권장 UI 구조</title>
+
+    <layer-hierarchy>
+      <layer z="0" name="board">9x9 격자. 어떤 상황에서도 다른 레이어가 그 위를 덮지 않는다.</layer>
+      <layer z="1" name="input-adapter">데스크톱: 없음(키보드) / 모바일: 하단 숫자 바</layer>
+      <layer z="2" name="margin-notes">데스크톱: 우측 레일 / 모바일: 하단 시트</layer>
+      <layer z="3" name="transient">토스트, 단축키 도움말, 확인 대화상자(파괴적 조작 한정), 세션 충돌 대화상자</layer>
+      <invariant revised="2026-07-26" rev="3">
+        <rule scope="z=1, z=2" strength="절대">
+          입력 어댑터와 메모 영역은 보드 사각형과 겹치지 않는다. 공간이 없으면 보드를 축소·이동시킨다.
+          이 계층은 풀이 중 상시 또는 반복적으로 존재하므로 예외를 두지 않는다.
+        </rule>
+        <rule scope="z=3" strength="조건부">
+          일시 계층은 보드를 덮을 수 있다. 모달 대화상자는 정의상 화면 중앙을 점유하므로
+          "절대 겹치지 않는다"는 규칙을 적용할 수 없고, 보드를 축소해 피하는 것도 맞지 않다.
+          대신 세 가지 조건을 건다.
+          (1) 사용자의 명시적 조작으로만 열린다. (2) Esc 또는 바깥 클릭으로 즉시 닫힌다.
+          (3) 열려 있는 동안 풀이 조작을 요구하지 않는다.
+          토스트는 이 예외에서 제외한다. 보드 바깥 하단에만 배치한다.
+        </rule>
+        <why>
+          직전 판은 z=3에 확인 대화상자를 넣어두고 "z=3은 보드를 절대 덮지 않는다"고 적어 자기모순이었다.
+        </why>
+      </invariant>
+    </layer-hierarchy>
+
+    <state-catalog>
+      <state id="ST0" name="기본">
+        선택 셀 없음. 보드만. 데스크톱은 첫 3회 세션에 한해 하단 힌트 스트립 노출.
+      </state>
+      <state id="ST1" name="셀 선택">
+        선택 셀 강조, 같은 행/열/박스 약한 배경, 같은 숫자 동수 강조(옵션).
+      </state>
+      <state id="ST2" name="확정 입력">
+        숫자 즉시 기입. 애니메이션 없음(80ms 페이드 이내). 충돌 시 섹션 8 규칙 적용.
+      </state>
+      <state id="ST3" name="후보 입력">
+        Shift 유지 중 또는 연필 고정 중. 선택 셀 테두리가 점선으로 바뀌고 상태 표시가 켜진다.
+      </state>
+      <state id="ST4" name="텍스트 메모 작성">
+        보드 그대로. 데스크톱은 레일 상단에 편집 카드 열림, 모바일은 키보드 위 한 줄 시트.
+        대상(셀 또는 영역)이 보드에서 지속 강조된다.
+      </state>
+      <state id="ST5" name="메모 확인">
+        dog-ear 마커에 포인터를 올리거나 포커스하면 여백 레일의 해당 카드가 강조.
+        역방향도 성립(카드 → 보드 강조).
+      </state>
+    </state-catalog>
+
+    <wireframe platform="desktop" state="ST0">
+      <![CDATA[
+ ┌───────────────────────────────────────────────────────────────┐
+ │                                                    [?] [⋯]    │  아이콘 2개, 24px, 저채도
+ │                                                               │
+ │        ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                        │
+ │        ┃ 5 3 · │ · 7 · │ · · · ┃      │  여백 레일           │
+ │        ┃ 6 · · │ 1 9 5 │ · · · ┃      │  (메모 0건이면        │
+ │        ┃ · 9 8 │ · · · │ · 6 · ┃      │   완전 비표시)        │
+ │        ┠───────┼───────┼───────┨      │                       │
+ │        ┃ 8 · · │ · 6 · │ · · 3 ┃      │                       │
+ │        ┃ 4 · · │ 8 · 3 │ · · 1 ┃      │                       │
+ │        ┃ 7 · · │ · 2 · │ · · 6 ┃      │                       │
+ │        ┠───────┼───────┼───────┨      │                       │
+ │        ┃ · 6 · │ · · · │ 2 8 · ┃      │                       │
+ │        ┃ · · · │ 4 1 9 │ · · 5 ┃      │                       │
+ │        ┃ · · · │ · 8 · │ · 7 9 ┃      │                       │
+ │        ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                        │
+ │                                                               │
+ │      숫자키 입력 · Shift+숫자 후보 · N 메모 · ? 전체 단축키   │  힌트 스트립
+ └───────────────────────────────────────────────────────────────┘
+      ]]>
+    </wireframe>
+
+    <wireframe platform="desktop" state="ST4">
+      <![CDATA[
+ ┌───────────────────────────────────────────────────────────────┐
+ │        ┏━━━━━━━━━━━━━━━━━━━━━┓   ┌─────────────────────────┐  │
+ │        ┃ ...                 ┃   │ 메모 · 3행5열           │  │  편집 카드
+ │        ┃      ╔═══╗          ┃   │ ┌─────────────────────┐ │  │  (레일 최상단)
+ │        ┃      ║ ▓ ║ ← 대상   ┃   │ │ 5가 여기 아니면     │ │  │
+ │        ┃      ╚═══╝          ┃   │ │ 7행으로 밀린다_     │ │  │
+ │        ┃ ...                 ┃   │ └─────────────────────┘ │  │
+ │        ┗━━━━━━━━━━━━━━━━━━━━━┛   │  Enter 저장 · Esc 취소  │  │
+ │                                  ├─────────────────────────┤  │
+ │                                  │ ▸ 4박스 : 5는 두 칸 중  │  │  기존 메모 목록
+ │                                  │ ▸ 7열   : 1,8 쌍 확정   │  │
+ │                                  └─────────────────────────┘  │
+ └───────────────────────────────────────────────────────────────┘
+ 보드는 이동하지 않는다. 레일은 여백 안에서만 열린다.
+      ]]>
+    </wireframe>
+
+    <wireframe platform="mobile" state="ST1" viewport="390x844">
+      <![CDATA[
+ ┌─────────────────────────┐
+ │ 스도쿠            [?][⋯]│  48px  헤더
+ ├─────────────────────────┤
+ │                         │
+ │      9x9 보드           │  374px  (100vw - 16, 셀 41.6px)
+ │      선택 셀 강조       │
+ │                         │
+ ├─────────────────────────┤
+ │  (여백 · 메모 마커 요약)│  가변
+ ├─────────────────────────┤
+ │  1  2  3  4  5  6  7  8  9 │  60px  숫자 바
+ │  ─    ▲활성=5             │        각 숫자 아래 잔여 개수 점
+ ├─────────────────────────┤
+ │ ✎연필  ⌫지움  ↩취소  ✐메모 │  56px  도구 바
+ └─────────────────────────┘  안전영역 여백 포함
+ 기준 뷰포트는 390x844에서 브라우저 UI를 뺀 390x768로 잡는다(주소창 노출 상태).
+ 보드 374 + 상하 UI 164 = 538 < 768. 보드는 절대 축소되지 않는다.
+ 이 문서의 모든 모바일 수치는 이 768 기준을 쓴다.
+      ]]>
+    </wireframe>
+
+    <wireframe platform="mobile" state="ST4" note="소프트 키보드 열림">
+      <![CDATA[
+ ┌─────────────────────────┐
+ │ (헤더 없음 - 편집 중 접힘)│  0px    ← 헤더를 접어야 배율 1.0이 성립
+ ├─────────────────────────┤
+ │  보드 (동적 배율, 상단 고정)│ 편집 중에만 일시 축소. 대개 축소 없음
+ │  선택 셀·영역 강조 유지  │
+ ├─────────────────────────┤
+ │ 4박스 ▸ [입력_        ] ✓│  56px   한 줄 시트, 키보드 바로 위
+ ├─────────────────────────┤
+ │                         │
+ │      소프트 키보드      │  291~336px (visualViewport에서 이미 제외됨)
+ │                         │
+ └─────────────────────────┘
+
+ 단일 산식
+   가용높이 = visualViewport.height - 헤더높이 - 입력줄 56 - 여백 16
+   배율     = min(1, 가용높이 / 보드폭)
+   편집 중에는 헤더높이 = 0 (접힘). 그 외에는 48.
+
+ 실측 (visualViewport.height 는 키보드와 브라우저 UI를 이미 뺀 값)
+   iPhone 390x844   : vv.height 약 458 -> 458 - 0 - 56 - 16 = 386 >= 보드 374 => 배율 1.00
+   iPhone SE 375x667: vv.height 약 317 -> 317 - 0 - 56 - 16 = 245 <  보드 359 => 배율 0.68
+   헤더를 접지 않으면 390x844 에서도 338 < 374 가 되어 배율이 0.90 으로 떨어진다.
+
+ 즉 헤더 접기는 미관이 아니라 배율 1.0 을 만드는 필수 조건이다.
+ 높이의 기준은 window.visualViewport.height 다. dvh 가 아니다(섹션 9 viewport-note 참조).
+ 저장/취소하면 헤더가 돌아오고 즉시 원래 배율로 복귀(180ms, reduced-motion 시 0ms).
+      ]]>
+    </wireframe>
+  </section>
+
+  <!-- ============================================================ 8 -->
+  <section order="8" id="interaction-specification">
+    <title>상세 인터랙션 명세</title>
+
+    <scenario id="S1" platform="desktop" name="확정 숫자 입력">
+      <step n="1" trigger="클릭 또는 방향키" response="셀 선택" feedback="2px 실선 테두리 + 행/열/박스 8% 배경"/>
+      <step n="2" trigger="숫자키 1-9" response="확정값 기입, 해당 셀 후보 전량 삭제" feedback="숫자 즉시 표시(사용자값 색), 60ms 페이드"/>
+      <step n="3" trigger="같은 숫자 재입력" response="값 삭제(토글)" feedback="빈 셀 복귀"/>
+      <step n="4" trigger="다른 숫자 입력" response="값 교체" feedback="교체된 숫자 표시"/>
+      <step n="5" trigger="Backspace/Delete/0" response="확정값 있으면 값 삭제, 없으면 후보 전량 삭제" feedback="스크린 리더 live 알림"/>
+      <note>고정 숫자(given) 셀에서는 2-5단계 전부 무시하고 60ms 짧은 흔들림 없이 무반응 + live 알림 "고정된 칸입니다".</note>
+    </scenario>
+
+    <scenario id="S2" platform="desktop" name="후보 연속 입력">
+      <primary-path>
+        Shift를 누른 채 숫자키 연타. 누르고 있는 동안 선택 셀 테두리가 점선, 좌하단에 "후보" 배지 표시.
+        Shift를 떼면 즉시 확정 모드로 복귀. 모드 상태를 기억할 필요가 없다.
+      </primary-path>
+      <key-detection critical="true" added="2026-07-26">
+        <problem>
+          US 배열에서 Shift+1의 event.key는 "1"이 아니라 "!" 다. event.key만 보면 후보 입력이 아예 동작하지 않는다.
+        </problem>
+        <rule>
+          숫자 판정은 event.code(Digit1..Digit9, Numpad1..Numpad9)를 1순위로 쓰고,
+          event.key가 "1".."9"인 경우도 함께 받는다. 후보 여부는 event.shiftKey로만 판정한다.
+        </rule>
+        <limitation confidence="verified" severity="known-unfixable">
+          AZERTY 계열에서는 숫자를 치는 것 자체에 Shift가 필요하다. 그 배열 사용자가 그냥 1을 누르면
+          shiftKey가 true라서 후보로 들어간다. 어떤 수정자+숫자 조합을 골라도 어떤 배열에서는 같은 충돌이 생긴다.
+        </limitation>
+        <mitigation>
+          Space 고정 토글은 배열과 무관하게 동작하므로 이 사용자들의 정식 경로가 된다.
+          도움말(?)에 배열 관련 안내를 한 줄 넣고, 설정에서 "Shift 준모드 끄기"를 제공한다.
+          navigator.keyboard.getLayoutMap은 Chromium 전용이라 의존하지 않는다.
+        </mitigation>
+      </key-detection>
+      <secondary-path reason="한손 조작·운동 제약">
+        Space 단독 입력으로 후보 고정 모드 토글. 고정 시 배지가 상시 표시되고 보드 외곽선이 점선으로 바뀐다.
+        모드 지속 중 15초간 입력이 없으면 배지를 1회 깜빡여 상기시킨다(reduced-motion 시 생략).
+      </secondary-path>
+      <mode-awareness revised="2026-07-26" rev="3">
+        모드 표시는 3중이다. (1) 배지 텍스트 (2) 선택 셀 테두리 형태(실선/점선)
+        (3) 보조기술 전달 — 단 전달 방식이 준모드와 고정 토글에서 다르다.
+        색상은 어디에도 단독으로 쓰이지 않는다.
+        <assistive-tech-rule critical="true">
+          <quasimode>
+            Shift 준모드는 <emphasis>aria-live로 알리지 않는다</emphasis>.
+            Shift는 후보 하나 넣을 때마다 눌렸다 떼어지므로 live 알림을 걸면 5개 입력에 5번 낭독된다.
+            대신 셀 레이블 앞에 "후보 입력 중, "을 붙여 다음 포커스 이동이나 값 변경 때 자연스럽게 전달한다.
+          </quasimode>
+          <sticky-toggle>
+            Space 고정 토글과 모바일 연필 토글은 지속 상태이므로 켜짐·꺼짐 시점에 각 1회만 aria-live로 알린다.
+          </sticky-toggle>
+          <why>
+            섹션 11이 "입력 1건마다 떠드는 것은 금지"라고 정해놓고 모드 알림에는 예외를 적용하지 않아
+            준모드에서 정확히 그 금지 사항이 발생하고 있었다.
+          </why>
+        </assistive-tech-rule>
+      </mode-awareness>
+    </scenario>
+
+    <scenario id="S3" platform="desktop" name="텍스트 추론 메모">
+      <open trigger="N" target="선택 셀">레일 상단 편집 카드 열림 + textarea 자동 포커스</open>
+      <open trigger="Shift+N" target="영역">
+        영역 선택 미니 팝업(행/열/박스 3버튼, 좌우 방향키+Enter로도 선택) 후 편집 카드 열림
+      </open>
+      <focus-trap critical="true">
+        편집 카드 포커스 중 보드 단축키 전부 비활성. 숫자키는 텍스트로 입력된다.
+        Tab은 카드 안(입력 → 저장 → 취소)에서만 순환한다.
+      </focus-trap>
+      <save trigger="Enter 또는 저장 버튼">
+        빈 문자열이면 메모 삭제로 처리. 저장 후 포커스는 직전 보드 셀로 복귀.
+      </save>
+      <newline trigger="Shift+Enter">줄바꿈</newline>
+      <cancel trigger="Esc">변경 폐기. 내용이 수정된 상태라면 확인 대화상자 1회.</cancel>
+      <reopen trigger="N 재입력 / dog-ear 클릭 / 레일 카드 클릭">기존 내용이 채워진 편집 카드</reopen>
+    </scenario>
+
+    <scenario id="S4" platform="mobile" name="한 손 숫자 입력">
+      <default-mode>Digit First. 하단 바에서 숫자를 탭하면 그 숫자가 활성 상태가 되고 눌린 상태로 유지된다.</default-mode>
+      <step n="1" trigger="숫자 5 탭" response="활성 숫자=5" feedback="버튼 반전 + 보드의 기존 5 전부 약하게 강조"/>
+      <step n="2" trigger="셀 탭" response="그 셀에 5 기입" feedback="숫자 표시, 바의 5 잔여 개수 점 1개 감소"/>
+      <step n="3" trigger="같은 값이 든 셀 재탭" response="그 값 삭제(토글)"/>
+      <step n="4" trigger="다른 값이 든 셀 탭" response="활성 숫자로 교체" added="2026-07-26"
+            feedback="교체된 숫자 표시. 데스크톱 S1 step 4와 동일한 규칙"/>
+      <step n="5" trigger="고정 숫자 셀 탭" response="무반응 + live 알림 '고정된 칸입니다'" added="2026-07-26"/>
+      <alt-mode name="Cell First">
+        활성 숫자가 없는 상태에서 셀을 먼저 탭하면 그 셀이 선택되고, 이후 숫자 탭이 그 셀에 들어간다.
+        두 모드는 별도 설정 없이 사용자의 첫 탭 대상으로 자동 결정된다.
+      </alt-mode>
+      <deselect trigger="활성 숫자 버튼 재탭" response="활성 해제. Cell First로 돌아감" added="2026-07-26"/>
+      <board-visibility>보드는 축소되지 않는다. 바는 보드 아래 잔여 공간에만 존재한다.</board-visibility>
+      <thumb-reach>숫자 바와 도구 바는 화면 하단 116px 이내. 헤더 아이콘은 드물게 쓰는 기능만 배치.</thumb-reach>
+    </scenario>
+
+    <scenario id="S4b" platform="mobile" name="후보 연속 입력" added="2026-07-26" rev="3">
+      <why-this-exists>
+        후보 입력은 필수 기능인데 직전 판에는 데스크톱 시나리오(S2)만 있고 모바일 흐름이 어디에도 없었다.
+      </why-this-exists>
+      <mode-model>
+        터치에서는 준모드를 쓰지 않고 <emphasis>고정 토글만</emphasis> 제공한다(섹션 5 why-no-quasimode-on-touch).
+        연필 버튼은 켜기/끄기 두 상태뿐이며, 켜져 있는 동안 계속 후보 입력이다.
+      </mode-model>
+      <step n="1" trigger="도구 바 연필 탭" response="후보 모드 켜짐"
+            feedback="버튼 반전 + 보드 외곽선 점선 + 숫자 바 배경 톤 변경 + live 알림 1회"/>
+      <step n="2" trigger="숫자 탭" response="활성 숫자 설정" feedback="버튼 반전"/>
+      <step n="3" trigger="셀 탭" response="그 셀의 해당 후보 토글" feedback="셀 안 3x3 위치에 숫자 표시 또는 제거"/>
+      <step n="4" trigger="연필 재탭" response="후보 모드 꺼짐. 활성 숫자는 유지"/>
+      <mode-awareness>
+        상태 신호 3종은 색에 의존하지 않는다. (1) 버튼 눌림 형태 (2) 보드 외곽선 점선
+        (3) 선택 셀 테두리 점선. 데스크톱과 같은 시각 언어를 쓴다.
+      </mode-awareness>
+      <mistake-guard>
+        후보 모드가 켜진 채 방치되어 확정 숫자를 넣으려다 후보가 들어가는 것이 이 방식의 유일한 실패 모드다.
+        완화는 상태 신호 3종과 실행 취소 1회 복구다. 자동 해제는 하지 않는다.
+        사용자가 의도적으로 켠 상태를 시스템이 임의로 끄면 그것대로 예측 불가능해진다.
+      </mistake-guard>
+      <verification confidence="hypothesis">
+        토글 방식의 모드 오류율이 실사용에서 허용 범위인지는 P1에서 측정한다.
+        데스크톱 준모드와 달리 여기서는 구조적 방지책이 없으므로 이 지표가 특히 중요하다.
+      </verification>
+    </scenario>
+
+    <scenario id="S5" platform="mobile" name="텍스트 메모 입력">
+      <open>
+        (1) 도구 바 "메모" 버튼 탭 — 항상 보이는 주 경로.
+        (2) 셀 길게 누르기 400ms — 가속기. 햅틱 10ms.
+      </open>
+      <layout-transition revised="2026-07-26" rev="3">
+        헤더를 접는다(높이 0). 보드는 상단에 고정되고 필요한 만큼만 축소된다.
+        가용높이 = visualViewport.height - 헤더높이(편집 중 0) - 입력줄 56 - 여백 16.
+        배율 = min(1, 가용높이 / 보드폭). 대부분의 기기에서 1.0이며 축소가 일어나지 않는다.
+        헤더를 접지 않으면 배율이 0.90 이하로 떨어지므로 접기는 선택이 아니라 전제다.
+        선택 셀과 행/열/박스 강조는 유지. 입력 줄은 키보드 바로 위에 붙인다.
+      </layout-transition>
+      <target-label>입력 줄 왼쪽에 대상 표기 고정("3행5열" 또는 "4박스"). 사용자가 대상을 오인할 수 없게 한다.</target-label>
+      <close>저장(체크) 또는 키보드 닫힘 또는 보드 탭. 축소는 즉시 해제된다.</close>
+      <constraint-check ref="design-constraints">
+        "메모 때문에 퍼즐이 지속적으로 축소되어서는 안 된다" 요건은 충족한다. 축소는 편집 중에만 존재한다.
+      </constraint-check>
+    </scenario>
+
+    <scenario id="S6" platform="shared" name="저장된 메모 재확인">
+      <marker>
+        메모가 있는 셀의 우상단에 dog-ear(모서리가 접힌 삼각형, 한 변 7px). 색이 아니라 형태로 구분된다.
+        영역 메모는 해당 행/열/박스의 바깥 눈금에 같은 형태의 작은 표식.
+      </marker>
+      <desktop>
+        마커에 포인터를 올리거나 Tab 포커스 시 레일의 해당 카드가 강조된다.
+        M 키로 레일 전체 토글. 레일은 메모가 1건 이상일 때만 존재한다.
+      </desktop>
+      <mobile>
+        마커 탭 시 하단 시트가 읽기 모드로 열린다(키보드 없음). 시트 상단에서 아래로 스와이프하면 전체 메모 목록.
+      </mobile>
+      <no-clutter>본문 미리보기를 보드 위에 절대 렌더링하지 않는다. 보드에 나타나는 것은 형태 마커뿐이다.</no-clutter>
+    </scenario>
+
+    <scenario id="S7" platform="shared" name="오입력 복구">
+      <undo>
+        Ctrl+Z / 도구 바 실행취소. 단일 스택에 확정값, 후보, 메모 조작이 모두 기록된다.
+        1회 조작 = 1회 취소가 원칙이나, 200ms 이내 연속 후보 토글은 1건으로 병합한다.
+      </undo>
+      <redo>Ctrl+Shift+Z 또는 Ctrl+Y.</redo>
+      <stack-depth>200건. 초과 시 오래된 것부터 폐기.</stack-depth>
+      <undo-feedback>취소된 대상 셀로 선택이 이동하고 aria-live로 "실행 취소: 3행5열 7 삭제"를 알린다.</undo-feedback>
+      <destructive-ops>
+        "새 게임", "전체 지우기", "메모 전체 삭제"는 실행 취소 불가하므로 확인 대화상자를 띄운다.
+        그 외 어떤 조작에도 확인을 요구하지 않는다.
+      </destructive-ops>
+    </scenario>
+
+    <conflict-handling>
+      <rule id="CF1" default="on">
+        동일 행/열/박스에 같은 숫자가 이미 있으면 입력은 허용하되, 충돌하는 모든 셀에
+        밑줄 + 붉은 계열 색을 동시에 적용한다. 색 단독 신호 금지.
+        <why-default-on added="2026-07-26">
+          종이도 중복을 알려주지 않는다는 반론이 가능하다. 그러나 종이에서 중복은 사용자가
+          한 번 훑기만 하면 확인되는 <emphasis>이미 보이는 사실</emphasis>이지 추론의 대상이 아니다.
+          CF1은 답을 알려주는 것이 아니라 눈으로 세는 노동만 없앤다. CF4와 같은 성격이며,
+          정답을 아는 쪽에서 판정하는 CF2와는 다르다. 그래도 끄고 싶은 사용자를 위해 설정에 둔다.
+        </why-default-on>
+      </rule>
+      <rule id="CF2" default="off" name="정답 대조">
+        정답과 즉시 대조하는 표시는 기본 비활성. 종이 경험을 훼손하고 퍼즐을 스무고개로 만든다.
+        기존 "확인" 버튼은 유지한다.
+      </rule>
+      <rule id="CF3">
+        후보에 확정 숫자가 이미 있는 값을 넣으려 하면 그대로 허용한다. 사용자의 추론 과정을 검열하지 않는다.
+      </rule>
+      <rule id="CF4" name="자동 후보 제거" default="on">
+        확정값 입력 시 동일 행/열/박스의 같은 값 후보를 자동 제거한다. 실행 취소 1회로 원복된다.
+        설정에서 끌 수 있다.
+      </rule>
+    </conflict-handling>
+
+    <feature-decisions ref="functional-scope/evaluate-before-including">
+      <include feature="자동 후보 계산" default="off">전체 자동 채움은 게임을 대신 푸는 행위. 옵션으로만.</include>
+      <include feature="자동 후보 제거" default="on">종이의 지루한 노동만 제거. CF4.</include>
+      <include feature="모든 메모 일괄 보기">여백 레일이 그 기능 자체. 별도 화면 불필요.</include>
+      <exclude feature="오답 즉시 표시">CF2. 기본 off로만 존재.</exclude>
+      <exclude feature="색상 기반 마킹">접근성 비용 대비 효용 낮음. 텍스트 메모로 대체 가능.</exclude>
+      <exclude feature="메모 문법 자동 해석">학습 비용 높고 오해석 시 신뢰 붕괴.</exclude>
+      <exclude feature="셀 참조 구문">위와 동일. 영역 메모가 같은 목적을 UI로 해결.</exclude>
+      <exclude feature="제스처 전용 조작">설계 제약 위반.</exclude>
+      <exclude feature="음성 메모">저장 용량, 재확인 비용, 접근성 캡션 부담.</exclude>
+      <exclude feature="AI 풀이 힌트">이번 범위 밖.</exclude>
+    </feature-decisions>
+  </section>
+
+  <!-- ============================================================ 9 -->
+  <section order="9" id="responsive-specification">
+    <title>반응형 설계</title>
+
+    <adaptation-rule critical="true" revised="2026-07-26">
+      <principle>어댑터는 배타가 아니라 <emphasis>가산</emphasis>이다.</principle>
+      <rule id="AD1">
+        KeyboardAdapter는 언제나 활성이다. 어떤 기기에서도 끄지 않는다.
+        물리 키보드가 연결되면 별도 전환 없이 그냥 동작한다.
+      </rule>
+      <rule id="AD2" revised="2026-07-26" rev="3">
+        TouchAdapter(숫자 바·도구 바)의 표시 여부는 입력 이력이 아니라
+        <emphasis>매체 특성</emphasis>으로만 결정한다.
+        <condition>표시 조건은 CSS 미디어 쿼리 <emphasis>(pointer: coarse)</emphasis> 하나뿐이다. 뷰포트 폭 조건은 없다.</condition>
+        <rationale>
+          pointer는 주 입력 장치의 정밀도를 말한다. coarse면 손가락이 주 입력이므로 숫자 바가 필요하고,
+          fine이면 마우스나 트랙패드가 주 입력이므로 키보드가 함께 있다고 보아도 된다.
+          터치 스크린 노트북은 마우스가 주 입력이라 pointer: fine으로 잡히므로 자동으로 제외된다.
+        </rationale>
+        <why-no-width-condition severity="high">
+          직전 판에는 "뷰포트 폭 1024px 미만" 조건이 붙어 있었다. 이 조건은 AD 규칙 전체가 없애려던
+          실패 모드를 그대로 되살린다. iPad Pro 가로는 폭 1366px에 pointer: coarse이고 키보드가 없을 수 있는데,
+          폭 조건 때문에 숫자 바가 숨어 <emphasis>숫자를 입력할 수단이 사라진다</emphasis>.
+          조건문의 결합 순서도 모호해 해석이 갈렸다. 폭 조건을 삭제해 둘 다 해소한다.
+        </why-no-width-condition>
+        <layout-note>
+          큰 화면에서 숫자 바를 어디에 둘지는 별개 문제다. 폭 1024px 이상이면서 pointer: coarse인 경우
+          바를 하단 전체 폭이 아니라 보드 아래 중앙 정렬로 배치해 손가락 이동 거리를 줄인다.
+        </layout-note>
+      </rule>
+      <rule id="AD3">
+        태블릿·2-in-1에서 사용자가 바를 수동으로 접을 수 있다. 접은 상태는 설정에 저장된다.
+        자동으로 접지는 않는다.
+      </rule>
+      <why-not-last-input severity="high">
+        직전 설계는 "마지막 사용 입력 수단으로 전환"이었다. 이 규칙은 실패 모드를 만든다.
+        폰에서 keydown이 한 번이라도 발생하면(블루투스 키보드, 일부 IME, 일부 스크린 리더)
+        숫자 바가 접히고, 그 뒤 사용자가 다시 터치만 하면 <emphasis>숫자를 입력할 수단이 사라진다</emphasis>.
+        가산 규칙에는 이 상태가 존재하지 않는다.
+      </why-not-last-input>
+    </adaptation-rule>
+
+    <breakpoint name="desktop" min="1024px">
+      <board>min(70vh, 640px) 정사각. 셀 최소 48px.</board>
+      <input>키보드. 하단 바 없음.</input>
+      <notes>우측 여백 레일 280px. 메모 0건이면 미표시. 여백 폭이 320px 미만이면 레일 대신 오버레이 패널로 대체.</notes>
+      <constraint>보드가 세로로 잘리지 않도록 레일 높이는 보드 높이를 넘지 않는다.</constraint>
+    </breakpoint>
+
+    <breakpoint name="tablet" min="600px" max="1023px">
+      <portrait>보드 min(92vw, 62vh). 하단 숫자 바 노출. 메모는 하단 시트.</portrait>
+      <landscape>보드 min(62vh, 92vw). 숫자 바를 하단 대신 우측 세로 배치(가로 공간 활용, 세로 공간 보존).</landscape>
+      <keyboard-attached revised="2026-07-26">
+        물리 키보드는 언제나 동작한다(AD1). 숫자 바는 자동으로 접히지 않으며, 사용자가 원하면 직접 접는다(AD3).
+      </keyboard-attached>
+    </breakpoint>
+
+    <breakpoint name="mobile" max="599px">
+      <portrait>
+        보드 = 100vw - 16px 정사각. 헤더 48 + 숫자 바 60 + 도구 바 56 + 안전영역.
+        기준 뷰포트 390x768(390x844 화면에서 브라우저 UI 제외).
+        보드 374 + UI 164 = 538, 잔여 여백 약 230px. 보드 축소 없음.
+      </portrait>
+      <landscape>
+        세로 공간이 극단적으로 부족하다. 보드 = min(88vh, 88vw)로 좌측, 숫자 바는 우측 세로 3x3 배열.
+        헤더는 아이콘만 남기고 접는다.
+      </landscape>
+      <keyboard-open revised="2026-07-26" rev="3">
+        섹션 7 ST4 와이어프레임 참조. 헤더 접기 + 상단 고정 + 동적 배율(고정 0.62배 폐기).
+        높이 기준은 <emphasis>window.visualViewport.height</emphasis>이며 dvh가 아니다. 아래 viewport-note 참조.
+        resize와 scroll 이벤트를 모두 듣고, 값이 실제로 바뀐 경우에만 rAF 한 번으로 반영한다(깜빡임 회피).
+      </keyboard-open>
+      <viewport-note critical="true" confidence="verified" added="2026-07-26">
+        <finding>
+          가상 키보드가 열려도 dvh 단위는 이를 반영하지 않는다. dvh가 대응하는 것은 주소창처럼
+          늘었다 줄었다 하는 브라우저 UI이지 키보드가 아니다.
+          iOS Safari는 키보드가 뜰 때 layout viewport를 그대로 두고 visual viewport만 줄인다.
+        </finding>
+        <finding>
+          layout viewport까지 줄이려면 meta viewport에 interactive-widget=resizes-content가 필요한데
+          Chrome 108+, Firefox 132+만 지원하고 WebKit은 미지원이다. 즉 iOS에서는 쓸 수 없다.
+        </finding>
+        <decision>
+          키보드 관련 레이아웃은 VisualViewport API가 <emphasis>주</emphasis>, dvh는 주소창 대응용 <emphasis>보조</emphasis>다.
+          직전 설계는 이 둘의 역할이 반대로 적혀 있었다.
+        </decision>
+        <hedge>
+          자료마다 dvh가 키보드에 반응한다는 서술과 반응하지 않는다는 서술이 엇갈린다.
+          CSSWG 논의와 명세 해설 쪽을 신뢰해 위와 같이 정하되, P1 프로토타입에서
+          iOS Safari, Android Chrome, Firefox Android 3종 실측을 필수 항목으로 둔다.
+        </hedge>
+        <fallback>VisualViewport 미지원 환경에서는 dvh로 퇴화한다. 기능은 유지되고 정밀도만 떨어진다.</fallback>
+      </viewport-note>
+      <address-bar>동적 주소창 대응은 dvh/svh 단위로 처리. 100vh 사용 금지.</address-bar>
+      <safe-area>하단 도구 바에 env(safe-area-inset-bottom) 패딩 적용.</safe-area>
+      <no-soft-keyboard-for-digits critical="true">
+        셀은 input 요소가 아니라 div[role=gridcell]이므로 탭해도 소프트 키보드가 뜨지 않는다.
+        소프트 키보드는 텍스트 메모에서만 등장한다. 현재 구현 대비 명확한 개선점.
+      </no-soft-keyboard-for-digits>
+    </breakpoint>
+  </section>
+
+  <!-- ============================================================ 10 -->
+  <section order="10" id="visual-design">
+    <title>시각 설계 원칙</title>
+
+    <grid-lines>
+      <line type="외곽" width="3px" color="#1a1a1a"/>
+      <line type="박스 경계" width="2px" color="#1a1a1a"/>
+      <line type="셀 경계" width="1px" color="#c8c8c8"/>
+      <rationale>3단계 굵기가 있어야 박스 구조가 글자 없이도 읽힌다.</rationale>
+    </grid-lines>
+
+    <number-hierarchy>
+      <tier name="고정 숫자(given)" size="0.52em-of-cell" weight="600" color="#1a1a1a" background="#f0f0f0"/>
+      <tier name="사용자 확정값" size="0.52em-of-cell" weight="400" color="#1d4ed8" background="transparent"/>
+      <tier name="후보" size="0.24em-of-cell" weight="400" color="#6b7280" min-px="10"/>
+      <non-color-distinction>
+        given과 사용자 값은 <emphasis>굵기와 배경</emphasis>으로도 구분된다. 색이 안 보여도 판별 가능.
+      </non-color-distinction>
+    </number-hierarchy>
+
+    <candidates>
+      <layout>셀 내부 3x3 고정 격자. 숫자 n은 항상 같은 자리에 온다.</layout>
+      <rationale>위치가 고정되어야 격자 전체를 훑을 때 읽지 않고 형태로 판단할 수 있다.</rationale>
+      <min-size revised="2026-07-26">
+        <problem>
+          직전 규칙은 "최소 10px, 미달이면 셀을 키운다"였다. 모바일 세로에서 셀은 화면 폭을 9로 나눈 값에
+          고정돼 있어 키울 수 없다. 360px 기기에서 셀 38.2px x 0.24 = 9.2px로 자체 기준을 어기는데
+          해결책이 실행 불가능했다.
+        </problem>
+        <rule revised="2026-07-26" rev="3">
+          후보 글자 크기 = max(9px, 셀 크기 x 0.24). 분기 없는 단일 식이다.
+          360px 기기에서 38.2 x 0.24 = 9.2px로 하한을 이미 만족한다.
+          CSS로는 font-size: max(9px, 0.24em) (셀 폰트 기준) 한 줄.
+        </rule>
+        <why-single-formula>
+          직전 판은 "셀 42px 이상 0.24, 미만 0.26"이라는 분기를 뒀는데, 42px에서 10.08px이고
+          41.9px에서 10.9px이 되어 <emphasis>셀이 작아질수록 글자가 커지는</emphasis> 역전이 생겼다.
+          게다가 단일 식만으로 하한이 이미 충족되므로 분기 자체가 불필요했다.
+        </why-single-formula>
+        <floor>
+          절대 하한 9px. 이보다 작아지는 경우는 뷰포트 폭 320px 미만뿐이며, 그때는 후보를
+          숨기지 않고 9px로 고정한 뒤 셀 안쪽 여백을 0으로 줄인다.
+        </floor>
+        <verification>
+          9px 후보 숫자의 실제 판독성은 검증되지 않았다. P1 프로토타입에서 320px, 360px, 390px
+          3종 실측 대상.
+        </verification>
+      </min-size>
+    </candidates>
+
+    <selection>
+      <selected-cell>2px 실선 테두리 + 배경 #dbeafe</selected-cell>
+      <selected-cell-candidate-mode>2px 점선 테두리 (모드가 형태로 표현됨)</selected-cell-candidate-mode>
+      <peer-highlight>같은 행/열/박스 배경 #f1f5f9 (8% 수준)</peer-highlight>
+      <same-digit optional="true">같은 숫자 셀에 밑줄 1px</same-digit>
+      <focus-ring>브라우저 기본 포커스 표시를 제거하지 않는다. outline 2px + offset -2px 유지.</focus-ring>
+    </selection>
+
+    <memo-marker>
+      <shape>셀 우상단 dog-ear. 직각삼각형 한 변 7px, 색 #64748b.</shape>
+      <why-shape-not-dot>
+        점은 색 대비가 낮으면 소실되고 색맹 사용자에게 다른 마커와 혼동된다.
+        접힌 모서리는 형태 자체가 신호다.
+      </why-shape-not-dot>
+      <region-marker>보드 바깥 눈금(행 좌측, 열 상단, 박스는 박스 좌상단 바깥)에 동일 형태 5px.</region-marker>
+      <no-preview>본문 텍스트는 보드 위에 절대 렌더링하지 않는다.</no-preview>
+    </memo-marker>
+
+    <conflict-display>
+      충돌 셀: 숫자에 2px 밑줄 + 색 #dc2626. 배경은 바꾸지 않는다(선택 강조와 충돌 방지).
+    </conflict-display>
+
+    <motion>
+      <duration max="180ms"/>
+      <reduced-motion>prefers-reduced-motion: reduce 시 전 전환 0ms. 상태 변화는 즉시 반영.</reduced-motion>
+      <no-decoration>축하 애니메이션, 파티클, 사운드 없음.</no-decoration>
+    </motion>
+
+    <dark-mode decided="2026-07-26" in-scope="true">
+      1차 범위에 포함한다(OQ4 해소). prefers-color-scheme 대응.
+      대비비는 본문 4.5:1, 후보 숫자 3:1 이상 유지.
+      모든 색을 CSS 사용자 정의 속성으로 선언하고 미디어 쿼리 하나로 값만 바꾼다.
+      이 구조면 추가 비용이 선언 1벌과 QA 1회뿐이라 뒤로 미룰 이유가 없다.
+    </dark-mode>
+  </section>
+
+  <!-- ============================================================ 11 -->
+  <section order="11" id="accessibility">
+    <title>접근성 및 키보드 조작</title>
+
+    <a11y:keymap>
+      <key combo="방향키" action="선택 이동" scope="board"/>
+      <key combo="Ctrl+방향키" action="박스 단위 이동" scope="board"/>
+      <key combo="Home / End" action="현재 행의 처음 / 끝" scope="board"/>
+      <key combo="Ctrl+Home / Ctrl+End" action="보드 첫 셀 / 마지막 셀" scope="board" added="2026-07-26"/>
+      <key combo="1-9" action="확정값 입력·토글" scope="board"/>
+      <key combo="Shift+1-9" action="후보 토글(준모드)" scope="board"/>
+      <key combo="0 / Backspace / Delete" action="값 삭제, 값 없으면 후보 전량 삭제" scope="board"/>
+      <key combo="Space" action="후보 고정 모드 토글(보조 경로)" scope="board"/>
+      <key combo="N" action="선택 셀 텍스트 메모" scope="board"/>
+      <key combo="Shift+N" action="영역 메모(행/열/박스 선택)" scope="board"/>
+      <key combo="M" action="메모 레일 열기·닫기" scope="global"/>
+      <key combo="Enter" action="저장" scope="editor"/>
+      <key combo="Shift+Enter" action="줄바꿈" scope="editor"/>
+      <key combo="Esc" action="편집 취소 / 선택 해제" scope="editor,board"/>
+      <key combo="Ctrl+Z" action="실행 취소" scope="board"/>
+      <key combo="Ctrl+Shift+Z / Ctrl+Y" action="다시 실행" scope="board"/>
+      <key combo="Shift+S" action="링크 만들기 다이얼로그" scope="global" added="2026-07-26"/>
+      <key combo="? / F1" action="단축키 도움말" scope="global"/>
+      <key combo="Tab" action="보드 → 레일 → 컨트롤 순환(보드 내부는 1개 탭 스톱)" scope="global"/>
+    </a11y:keymap>
+
+    <conflict-analysis>
+      <item>Space: 브라우저 스크롤·버튼 활성화와 충돌. 보드에 포커스가 있을 때만 preventDefault.</item>
+      <item>Ctrl+Z: 편집기 포커스 중에는 가로채지 않고 브라우저 기본 텍스트 실행취소에 맡긴다.</item>
+      <item>숫자키: 편집기 포커스 중에는 보드로 전달되지 않는다. 이것이 가장 중요한 분리 규칙이다.</item>
+      <item>/ 키: Firefox 빠른 찾기와 충돌하므로 단축키로 쓰지 않는다.</item>
+      <item added="2026-07-26">
+        Shift+숫자: event.key가 배열에 따라 "!" 등으로 바뀐다. event.code를 1순위로 판정한다.
+        AZERTY 계열의 근본 충돌과 완화책은 섹션 8 S2 key-detection 참조.
+      </item>
+      <item added="2026-07-26">
+        Shift+S: 브라우저 기본 단축키와 겹치지 않는다. 편집기 포커스 중에는 전달되지 않는다(대문자 S 입력).
+      </item>
+      <item added="2026-07-26">
+        Ctrl+Home / Ctrl+End: 브라우저의 문서 처음·끝 스크롤과 겹치므로 보드 포커스 시에만 preventDefault.
+      </item>
+    </conflict-analysis>
+
+    <a11y:semantics>
+      <structure>
+        <![CDATA[
+ div[role=grid][aria-label="스도쿠 9x9 퍼즐"]
+   div[role=row][aria-rowindex=1]
+     div[role=gridcell][aria-rowindex=1][aria-colindex=1][tabindex=0|-1]
+        ]]>
+      </structure>
+      <roving-tabindex>선택 셀만 tabindex=0. 나머지 -1. 보드 전체가 탭 스톱 1개.</roving-tabindex>
+      <cell-label-pattern revised="2026-07-26" rev="3">
+        "3행 5열, 값 7, 고정" /
+        "3행 5열, 비어 있음, 후보 2 4 9, 메모 있음" /
+        "3행 5열, 값 7, 5열과 충돌" /
+        후보 모드일 때는 접두사를 붙인다 : "후보 입력 중, 3행 5열, 비어 있음, 후보 2 4"
+      </cell-label-pattern>
+      <live-region revised="2026-07-26" rev="3">
+        role=status(polite) 1개. 알림 대상: <emphasis>고정 토글</emphasis> 모드 전환, 실행 취소·다시 실행,
+        메모 저장·삭제, 고정 셀 입력 거부, 퍼즐 완성, 링크 복사 성공, 세션 복원·보관.
+        입력 1건마다 떠드는 것은 금지(스크린 리더 사용자가 셀 레이블에서 이미 듣는다).
+        <excluded>
+          Shift 준모드 진입·해제는 live 알림 대상이 아니다. 셀 레이블 접두사로 전달한다.
+          섹션 8 S2 assistive-tech-rule 참조.
+        </excluded>
+      </live-region>
+      <editor>
+        편집 카드는 role=dialog[aria-modal=false] + aria-label="메모 편집, 3행 5열".
+        여는 순간 포커스 이동, 닫는 순간 원래 셀로 복귀.
+      </editor>
+    </a11y:semantics>
+
+    <a11y:touch>
+      <cell>360px 폭에서 약 38px, 390px에서 약 41px. WCAG 2.2 SC 2.5.8(24x24) 충족, SC 2.5.5(44x44) 미달.</cell>
+      <mitigation>
+        9칸 격자에서 44px는 396px 이상 폭을 요구해 물리적으로 불가능하다.
+        따라서 정확도 요구가 큰 조작은 셀 탭에서 제거하고 하단 바 버튼(48x48 이상)으로 옮겼다.
+        셀 오탭은 실행 취소 1회로 복구된다.
+      </mitigation>
+      <bar-buttons>숫자 버튼 최소 40x48, 도구 버튼 최소 48x48, 간격 최소 4px.</bar-buttons>
+      <text-size>본문 최소 16px(iOS 자동 확대 방지). 후보 숫자 최소 10px.</text-size>
+    </a11y:touch>
+
+    <a11y:color-independence>
+      확정/후보/고정/충돌/메모존재 5종 상태 전부가 색 외 단서를 갖는다.
+      굵기, 크기, 배경, 밑줄, 형태 마커, 테두리 선종. 색은 보조 신호일 뿐이다.
+    </a11y:color-independence>
+  </section>
+
+  <!-- ============================================================ 12 -->
+  <section order="12" id="implementation-model">
+    <title>구현을 위한 상태 모델</title>
+
+    <arch:current-state>
+      <file path="game/views.py">요청마다 generate_puzzle 호출. 정답을 템플릿에 함께 내려보냄.</file>
+      <file path="game/static/game/js/game.js">셀마다 input 요소 81개. 상태는 DOM에만 존재. 후보·메모·실행취소 없음.</file>
+      <file path="game/models.py">비어 있음.</file>
+      <gap>상태 저장소 없음, 퍼즐 동일성 개념 없음, 접근성 구조 없음.</gap>
+    </arch:current-state>
+
+    <arch:bootstrap critical="true">
+      현재는 새로고침마다 새 퍼즐이 생성되어 메모가 즉시 고아가 된다.
+      부트스트랩 순서를 다음으로 바꾼다.
+      <![CDATA[
+ 1. 페이지 로드
+ 2. location.hash 검사 (섹션 15)
+ 3-a. 유효한 URL 상태 있으면 : 디코드 -> localStorage 세션과 충돌 판정(섹션 15 url:conflict)
+                              -> 채택 후 hash 제거(replaceState로 clean URL)
+ 3-b. 없으면                 : localStorage 활성 세션 조회
+ 4-a. 세션 있으면 : 저장된 puzzle/values/candidates/notes로 복원. 서버가 내려준 퍼즐은 버린다.
+ 4-b. 없으면      : 서버가 내려준 퍼즐로 새 세션 생성 후 저장
+ 5. "새 게임" 버튼을 눌렀을 때만 /api/new-puzzle/ 호출 + 이전 세션 폐기(확인 대화상자)
+      ]]>
+      URL 디코드는 CompressionStream 사용으로 비동기다. 부트스트랩 2-3단계는 await 대상이며,
+      그동안 보드는 스켈레톤으로 그리고 입력을 막는다(최대 200ms 예상).
+      서버 변경은 필수가 아니다. 뷰가 계속 퍼즐을 내려보내도 클라이언트가 무시하면 된다.
+      다만 무의미한 생성 비용이 매 요청 발생하므로, 후속 단계에서 index를 셸만 렌더링하도록 바꾸는 편을 권장한다.
+    </arch:bootstrap>
+
+    <arch:state-shape>
+      <![CDATA[
+ GameSession {
+   schemaVersion : number            // 마이그레이션용
+   puzzleId      : string            // givens 문자열의 해시. 세션 동일성 판정 키
+   dim           : 9                 // spec.py가 12/16도 지원하나 UI는 9만 대응
+   givens        : Uint8Array(81)    // 0 = 빈칸
+   solution      : Uint8Array(81)    // 확인 버튼용. 자체 세션에만 존재. URL에는 넣지 않는다(섹션 15)
+                                     // 공유 링크로 들어온 세션은 solution=null. 확인은 제약 검사로 대체
+   values        : Uint8Array(81)    // 사용자 확정값
+   candidates    : Uint16Array(81)   // 비트마스크. 값 n은 1 shl (n-1)
+   cellNotes     : Record<cellIndex, string>
+   regionNotes   : Record<regionKey, string>   // regionKey = "r0".."r8" | "c0".."c8" | "b0".."b8"
+   createdAt     : number
+   updatedAt     : number
+ }
+
+ UiState (비영속) {
+   selection    : number | null      // 셀 인덱스 0..80
+   activeDigit  : number | null      // 모바일 Digit First
+   candidateHeld : boolean           // Shift 준모드. 데스크톱 전용
+   candidateSticky : boolean         // Space 토글 / 모바일 연필 토글. 두 경로가 같은 플래그를 쓴다
+   editor       : null | { target: {kind:"cell"|"region", key:string}, draft:string }
+   dialog       : null | { kind:"conflict"|"confirm"|"help"|"share", payload:object }
+   railOpen     : boolean
+   boardScale   : number             // 1.0 또는 편집 중 계산값
+ }
+ // inputAdapter 필드는 삭제되었다. 어댑터가 가산이라 "현재 어댑터"라는 상태가 존재하지 않는다(AD1~AD3).
+
+ Settings (영속, localStorage sudoku:v1:settings) {
+   schemaVersion   : number
+   autoRemoveCandidates : boolean    // CF4. 기본 true
+   showConflicts        : boolean    // CF1. 기본 true
+   shiftQuasimode       : boolean    // 기본 true. AZERTY 사용자가 끌 수 있다
+   numberBarCollapsed   : boolean    // AD3. 기본 false
+   hintStripSeenCount   : number     // ST0 힌트 스트립 3회 노출 정책
+ }
+
+ HistoryEntry {
+   kind   : "value" | "candidates" | "cellNote" | "regionNote"
+   key    : number | string
+   before : number | string
+   after  : number | string
+   groupId: number | null            // 자동 후보 제거를 한 건으로 묶는 식별자
+   at     : number
+ }
+      ]]>
+      <note>
+        candidates를 비트마스크로 두면 후보 토글이 XOR 1회이고 localStorage 직렬화도 짧다.
+        Uint8Array/Uint16Array는 JSON 직렬화 시 배열 또는 base64 문자열로 변환한다.
+      </note>
+    </arch:state-shape>
+
+    <arch:persistence>
+      <key-pattern revised="2026-07-26">
+        sudoku:v1:session  활성 세션 1개
+        sudoku:v1:archive  직전 세션 1개. 공유 링크 채택 시 CR1이 여기로 밀어 넣고 "되돌리기"가 여기서 꺼낸다
+        sudoku:v1:settings 설정(자동 후보 제거, CF1, 숫자 바 접힘, Shift 준모드 사용 여부)
+      </key-pattern>
+      <archive-policy>
+        아카이브는 1칸이다. 두 번째 링크를 채택하면 이전 아카이브는 덮어쓴다.
+        다중 저장 게임은 별도 기능이며 이번 범위 밖이다(OQ7 해소).
+      </archive-policy>
+      <write-policy>변경 후 300ms 디바운스 저장. 실행 취소 이력은 저장하지 않는다(용량과 복잡도 대비 효용 낮음).</write-policy>
+      <quota>세션 1건은 수 KB. 초과 위험 없음. 저장 실패(사생활 보호 모드 등) 시 1회 경고 후 메모리 전용으로 계속 동작.</quota>
+      <migration>schemaVersion 불일치 시 세션 폐기 후 새 게임. 사용자에게 알린다.</migration>
+    </arch:persistence>
+
+    <arch:components>
+      <component name="SudokuStore">
+        상태 소유, 조작 API(setValue, toggleCandidate, setNote, undo, redo), 변경 구독. DOM 무지.
+      </component>
+      <component name="BoardView">
+        role=grid 렌더링, roving tabindex, 셀 레이블 갱신. 입력을 해석하지 않는다.
+      </component>
+      <component name="KeyboardAdapter">
+        keydown을 Store 조작으로 번역. 준모드 상태 관리. 편집기 포커스 시 자기 자신을 비활성화.
+      </component>
+      <component name="TouchAdapter">
+        하단 바 렌더링, Digit First/Cell First 판정, 길게 누르기 가속기.
+      </component>
+      <component name="NotesView">
+        데스크톱 레일 / 모바일 시트. 편집기 포함. 대상 강조를 BoardView에 요청.
+      </component>
+      <component name="Persistence">localStorage 직렬화·복원·마이그레이션.</component>
+      <component name="UrlCodec">
+        상태 to 바이너리 to deflate to base64url 인코딩과 역방향 디코딩, 입력 검증.
+        DOM과 Store를 모르며 순수 함수 2개(encode/decode)로 노출한다. 단위 테스트 대상 1순위. 섹션 15.
+      </component>
+      <component name="ShareView">
+        링크 만들기 다이얼로그. 포함 범위 선택, 길이 표시, 복사, 메모 포함 시 경고.
+      </component>
+      <component name="SettingsStore" added="2026-07-26" rev="3">
+        Settings 객체 소유, 읽기·쓰기·기본값·마이그레이션. Store와 분리한다.
+        설정은 퍼즐 세션을 넘어 지속되므로 수명이 다르다.
+      </component>
+      <component name="DialogHost" added="2026-07-26" rev="3">
+        z=3 계층 전체를 소유한다. 세션 충돌 대화상자(CR1, CR2), 파괴적 조작 확인,
+        단축키 도움말(? / F1)을 모두 여기서 연다.
+        포커스 이동·트랩·복귀, Esc 닫기, aria-modal 처리를 한 곳에서 책임진다.
+        ShareView와 NotesView의 편집 카드는 자체 포커스 규칙이 있어 여기 포함하지 않는다.
+      </component>
+      <component name="HintStrip" added="2026-07-26" rev="3">
+        ST0의 데스크톱 힌트 스트립. 노출 횟수를 SettingsStore에서 읽고 갱신한다.
+        발견성 정책이 P2 결과에 따라 바뀔 수 있으므로 독립시켜 교체 비용을 낮춘다.
+      </component>
+      <ownership-note added="2026-07-26" rev="3">
+        직전 판에서는 세션 충돌 대화상자, 단축키 도움말, 힌트 스트립의 동작만 명세되고
+        소유 컴포넌트가 없었다. 설정 4종도 상태 모델에 자리가 없었다. 위 3개 컴포넌트와
+        Settings 구조로 공백을 메운다.
+      </ownership-note>
+      <component name="Announcer">aria-live 문구 생성.</component>
+      <rule>
+        도메인 로직(Store)은 1벌. 플랫폼 분기는 KeyboardAdapter/TouchAdapter 두 어댑터에만 존재한다.
+        이것이 대안 E의 구현 복잡도 위험을 억제하는 유일한 장치다.
+      </rule>
+    </arch:components>
+
+    <arch:security>
+      <item>정답이 클라이언트에 그대로 내려간다(현행). 이번 설계로 악화되지 않지만 해소되지도 않는다.</item>
+      <item>메모는 사용자 입력 문자열이다. 렌더링 시 textContent만 사용하고 innerHTML을 쓰지 않는다.</item>
+      <item>localStorage에 개인정보를 저장하지 않는다.</item>
+    </arch:security>
+
+    <arch:compatibility>
+      <item>Django 템플릿·정적 파일 구조 그대로. 빌드 도구 도입 없음(U2).</item>
+      <item>기존 /api/new-puzzle/ 계약 유지.</item>
+      <item>셀 요소가 input에서 div로 바뀌므로 style.css의 .cell 규칙은 전면 개정 필요.</item>
+      <item>dvh 단위, VisualViewport, prefers-reduced-motion 모두 2021년 이후 주요 브라우저 지원.</item>
+    </arch:compatibility>
+  </section>
+
+  <!-- ============================================================ 13 -->
+  <section order="13" id="prototype-plan">
+    <title>프로토타입 및 검증 계획</title>
+
+    <plan:prototype id="P0" priority="1" name="데스크톱 준모드 입력">
+      <scope>보드 렌더링(div grid), 방향키 이동, 숫자 확정, Shift 준모드 후보, 실행 취소. 메모 없음.</scope>
+      <why-first>
+        전체 설계에서 가장 검증되지 않은 가정이 "준모드가 토글 모드보다 낫다"이다.
+        이것이 틀리면 키맵 전체가 바뀐다.
+      </why-first>
+      <hypothesis confidence="hypothesis">
+        Shift 준모드는 Space 토글 대비 모드 오류율을 절반 이하로 낮춘다.
+      </hypothesis>
+    </plan:prototype>
+
+    <plan:prototype id="P1" priority="2" name="모바일 하단 바 Digit First">
+      <scope>세로 화면, 숫자 바, 활성 숫자, 연필 버튼, 셀 탭 입력.</scope>
+      <hypothesis confidence="hypothesis">
+        Digit First는 Cell First 대비 동일 퍼즐 완주 탭 수를 20% 이상 줄인다.
+      </hypothesis>
+    </plan:prototype>
+
+    <plan:prototype id="P2" priority="3" name="메모 레일과 시트">
+      <scope>셀·영역 텍스트 메모, dog-ear 마커, 데스크톱 레일, 모바일 키보드 위 시트.</scope>
+      <hypothesis confidence="hypothesis">
+        안내 없이 3분 내 메모 기능을 스스로 발견하는 비율이 모바일 80% 이상, 데스크톱 50% 이상.
+        데스크톱이 낮으면 힌트 스트립 노출 정책을 강화한다.
+      </hypothesis>
+    </plan:prototype>
+
+    <plan:prototype id="P3" priority="2" name="UrlCodec 왕복" added="2026-07-26">
+      <scope>섹션 15의 인코더·디코더 순수 함수 2개와 검증 로직. UI 없음.</scope>
+      <why-early>
+        DOM 의존이 없어 단독 테스트가 가능하고, 링크 길이 예산이 실제로 성립하는지가
+        메모 기능 설계 전체의 전제이기 때문이다. P0과 병행 가능.
+      </why-early>
+      <hypothesis confidence="hypothesis">
+        메모 10건 x 한글 30자 상태의 링크가 1,000자 이하다.
+      </hypothesis>
+    </plan:prototype>
+
+    <plan:usability-tasks>
+      <task platform="desktop" id="TD1">마우스를 쓰지 않고 퍼즐 절반을 채운다.</task>
+      <task platform="desktop" id="TD2">특정 셀에 "5 아니면 7" 메모를 남기고 다른 셀 3개를 채운 뒤 그 메모를 다시 읽는다.</task>
+      <task platform="desktop" id="TD3">잘못 넣은 숫자 2개를 복구한다.</task>
+      <task platform="mobile" id="TM1">한 손으로 숫자 10개를 넣는다.</task>
+      <task platform="mobile" id="TM2">4박스에 영역 메모를 남긴다.</task>
+      <task platform="mobile" id="TM3">메모 편집 중 선택 셀이 어디인지 말한다.</task>
+      <task platform="a11y" id="TA1">스크린 리더만으로 임의 셀로 이동해 숫자를 넣고 후보를 2개 남긴다.</task>
+      <task platform="shared" id="TS1">진행 중인 퍼즐을 다른 기기에서 이어 푼다(링크 만들기 → 전송 → 열기).</task>
+      <task platform="shared" id="TS2">메모를 뺀 채로 친구에게 같은 문제를 낸다.</task>
+    </plan:usability-tasks>
+
+    <plan:metrics>
+      <metric name="모드 오류율" target="5% 미만" how="후보 의도 입력이 확정값으로 들어간 비율(직후 실행 취소로 추정)"/>
+      <metric name="입력 1건 소요" target="데스크톱 1.2초 미만 / 모바일 1.8초 미만" how="셀 선택부터 값 확정까지"/>
+      <metric name="메모 발견 시간" target="모바일 60초 미만" how="세션 시작부터 첫 메모 열기까지"/>
+      <metric name="보드 가시성" target="편집 중 100%(데스크톱) / 60% 이상(모바일)" how="스크린샷 측정"/>
+      <metric name="완주 이탈률" target="기존 대비 악화 없음" how="세션 로그"/>
+      <metric name="a11y" target="axe-core 위반 0건" how="자동 검사 + 스크린 리더 수동 통과"/>
+    </plan:metrics>
+
+    <plan:kill-criteria>
+      <item>P0에서 준모드 오류율이 토글보다 높으면 Shift 준모드를 포기하고 고정 토글 + 강한 상태 표시로 전환.</item>
+      <item>P1에서 Digit First 탭 수 이득이 5% 미만이면 Cell First를 기본으로 되돌린다.</item>
+      <item>P2에서 데스크톱 메모 발견율이 30% 미만이면 레일을 기본 노출로 승격한다.</item>
+    </plan:kill-criteria>
+  </section>
+
+  <!-- ============================================================ 14 -->
+  <section order="14" id="final-differences">
+    <title>초기 구상 대비 변경사항</title>
+
+    <diff-table>
+      <row>
+        <item>모바일 상시 UI</item>
+        <initial>숨김. 제스처로 호출</initial>
+        <final>하단 숫자 바 + 도구 바 상시 노출</final>
+        <reason>세로 화면에서 보드 아래는 죽은 공간. 숨겨도 보드가 커지지 않고 발견성만 잃는다.</reason>
+      </row>
+      <row>
+        <item>모바일 입력 순서</item>
+        <initial>셀 선택 후 입력</initial>
+        <final>Digit First 기본, Cell First 병행</final>
+        <reason>탭 수와 시선 왕복 절반. 서비스 사례에서 확인된 패턴(R1).</reason>
+      </row>
+      <row>
+        <item>후보 입력 전환</item>
+        <initial>Space 토글 모드</initial>
+        <final>Shift 준모드 기본, Space 고정 토글은 보조</final>
+        <reason>모드 착각을 구조적으로 제거. 근육으로 유지되는 모드는 잊을 수 없다(R2).</reason>
+      </row>
+      <row>
+        <item>텍스트 메모 입력 위치</item>
+        <initial>선택 셀 주변 임시 UI</initial>
+        <final>여백 영역(데스크톱 우측 레일 / 모바일 키보드 위 한 줄)</final>
+        <reason>셀 주변 팝오버가 추론에 필요한 이웃 셀을 가리고 가장자리에서 배치가 무너진다.</reason>
+      </row>
+      <row>
+        <item>메모 존재 표시</item>
+        <initial>모서리 표시 또는 숨김</initial>
+        <final>형태 기반 dog-ear + 여백 레일 목록 + 스크린 리더 레이블</final>
+        <reason>색 단독 신호 금지 요건. 완전 숨김은 메모를 죽은 데이터로 만든다.</reason>
+      </row>
+      <row>
+        <item>모바일 메모 진입</item>
+        <initial>길게 누르기</initial>
+        <final>항상 보이는 메모 버튼이 주 경로, 길게 누르기는 가속기</final>
+        <reason>설계 제약 "숨은 제스처 단독 의존 금지" + 발견성 위험(R6).</reason>
+      </row>
+      <row>
+        <item>메모 대상 범위</item>
+        <initial>셀·행·열·박스·전체</initial>
+        <final>셀·행·열·박스 (전체 노트 제외)</final>
+        <reason>전체 노트는 소속이 없어 마커와 탐색 경로를 정의할 수 없다. 사용자 결정 U3.</reason>
+      </row>
+      <row>
+        <item>원칙 P2</item>
+        <initial>항상 노출되는 UI 요소 최소화</initial>
+        <final>보드 면적 불가침 + 시선 비용 최소화</final>
+        <reason>요소 개수는 몰입의 대리 지표가 아니다. 진짜 비용은 면적과 시선이다.</reason>
+      </row>
+      <row>
+        <item>퍼즐 수명</item>
+        <initial>(미고려)</initial>
+        <final>puzzleId 기반 세션 복원. 새 퍼즐은 명시적 요청 시에만</final>
+        <reason>새로고침마다 새 퍼즐이면 메모 기능이 성립하지 않는다(game/views.py:7).</reason>
+      </row>
+      <row>
+        <item>셀 DOM</item>
+        <initial>(미고려, 현행 input 81개)</initial>
+        <final>div[role=gridcell] + roving tabindex</final>
+        <reason>Tab 81회 문제 해소, 모바일 숫자 입력 시 소프트 키보드 억제(R3).</reason>
+      </row>
+      <row added="2026-07-26">
+        <item>상태 저장 매체</item>
+        <initial>(미고려)</initial>
+        <final>localStorage 정본 + URL fragment 스냅샷 (섹션 15)</final>
+        <reason>
+          사용자 결정 U5. 둘은 대체재가 아니라 역할이 다르다. URL을 정본으로 삼으면
+          주소창이 매 입력마다 갱신되어 몰입 원칙과 충돌하고 Safari history 제한에 걸린다.
+        </reason>
+      </row>
+      <row added="2026-07-26">
+        <item>정답 보관</item>
+        <initial>서버가 페이지에 동봉, 클라이언트 보유</initial>
+        <final>자체 세션만 보유. 공유 링크에는 제외</final>
+        <reason>문제를 내는 링크에 정답이 딸려가면 안 된다. "확인"은 제약 검사로 대체.</reason>
+      </row>
+    </diff-table>
+  </section>
+
+  <!-- ============================================================ 15 -->
+  <section order="15" id="url-state-encoding" added="2026-07-26" ref-decision="U5"
+           xmlns:url="urn:sudoku:url">
+    <title>URL 상태 저장 및 공유 링크</title>
+
+    <url:purpose-split critical="true">
+      <statement>
+        URL은 localStorage를 대체하지 않는다. 역할이 다르다.
+      </statement>
+      <role medium="localStorage" purpose="작업 상태 지속">
+        길이 제한 없음, 자동 저장, 같은 브라우저에서만 유효. 진행 중 상태의 정본.
+      </role>
+      <role medium="URL fragment" purpose="스냅샷 교환">
+        기기 이동, 링크 전송, 북마크, 브라우저 초기화 대비 백업. 특정 시점의 사본.
+      </role>
+      <why>
+        URL을 정본으로 삼으면 입력할 때마다 주소창이 갱신되어 몰입 원칙(P1, P2')과 정면 충돌하고
+        Safari의 history 호출 제한에도 걸린다(url:address-bar-policy 참조).
+      </why>
+    </url:purpose-split>
+
+    <!-- ============================================== 저장 위치 결정 -->
+    <url:location-decision>
+      <option id="L1" name="query string (?s=...)" verdict="기각">
+        <problem>
+          매 요청마다 서버로 전송된다. Apache LimitRequestLine 기본 8190바이트, nginx
+          large_client_header_buffers 기본 8k에 걸릴 수 있고, 사용자의 메모 전문이 Django
+          접근 로그에 그대로 남는다.
+        </problem>
+      </option>
+      <option id="L2" name="fragment (#s=...)" verdict="채택" recommended="true">
+        <benefit>서버로 전송되지 않는다. 서버 헤더 길이 제한 무관, 접근 로그에 메모가 남지 않는다.</benefit>
+        <benefit>Django 코드 변경이 전혀 필요 없다. 라우팅에 영향 없음.</benefit>
+        <benefit>해시 변경은 페이지를 다시 로드하지 않는다.</benefit>
+        <cost>서버가 내용을 볼 수 없다. 본 프로젝트는 서버 영속화가 없으므로(U1) 손실 아님.</cost>
+      </option>
+      <option id="L3" name="path segment (/p/&lt;code&gt;/)" verdict="기각">
+        <problem>URL 라우팅 추가 필요. 길이 제한은 L1과 동일. 얻는 것은 미관뿐.</problem>
+      </option>
+    </url:location-decision>
+
+    <!-- ============================================== 길이 예산 -->
+    <url:length-budget confidence="verified">
+      <limits>
+        <limit scope="Chrome 주소창">약 32,779자</limit>
+        <limit scope="Firefox">약 65,536자</limit>
+        <limit scope="Safari">약 80,000자</limit>
+        <limit scope="서버·프록시·CDN">보통 8,000~16,000바이트. fragment는 전송되지 않으므로 무관</limit>
+        <limit scope="실무 권장 하한">2,083자. 구형 호환과 메신저·SEO 관행의 최소공배수</limit>
+        <limit scope="QR 코드 byte 모드">2,953자</limit>
+      </limits>
+      <policy>
+        <tier max="2000" action="정상">모든 환경에서 안전. 기본 목표.</tier>
+        <tier max="8000" action="경고">
+          "링크가 깁니다. 일부 메신저에서 잘릴 수 있습니다" 안내 + 메모 제외 링크 대안 제시.
+        </tier>
+        <tier max="unbounded" action="거부">
+          8,000자 초과 시 메모 포함 링크 생성 거부. 퍼즐+진행만 담은 짧은 링크로 대체 제안.
+        </tier>
+      </policy>
+      <decode-guard>
+        디코드 전에 fragment 길이를 검사해 8,000자를 넘으면 즉시 거부한다. 압축 폭탄 방어.
+      </decode-guard>
+    </url:length-budget>
+
+    <!-- ============================================== 인코딩 -->
+    <url:encoding>
+      <pipeline>상태 → 바이너리 팩 → deflate-raw → base64url → fragment</pipeline>
+
+      <step n="1" name="바이너리 팩" revised="2026-07-26">
+        <![CDATA[
+ v1 레이아웃 (모든 다중바이트 필드는 리틀엔디언, 가변길이 정수는 LEB128 부호없는 형식)
+
+ byte 0        version = 0x01
+ byte 1        flags
+                 bit0  values 포함
+                 bit1  candidates 포함
+                 bit2  notes 포함
+                 bit3  savedAt 포함
+                 bit4~6  예약(0으로 기록, 디코더는 무시)
+                 bit7  페이로드 압축됨
+ byte 2        dim = 9. 이후 모든 필드 길이가 이 값에서 계산된다
+ [4 bytes]     savedAt    : Unix 시각을 분 단위로. flags.bit3일 때만. 2^32분 = 약 8100년
+ [41 bytes]    givens     : 81개 니블(4비트, 값 0..9). 81은 홀수라 마지막 니블은 패딩 0
+ [41 bytes]    values     : 동일 형식. flags.bit0일 때만
+ [가변]        candidates : flags.bit1일 때만
+                 존재 비트맵 81비트(11바이트) + 존재하는 셀마다 9비트 마스크를 셀 순서대로 연속 패킹
+ [가변]        notes      : flags.bit2일 때만
+                 LEB128    noteCount
+                 각 노트 : kind(1바이트 0=cell 1=row 2=col 3=box)
+                           key(1바이트 0..80 또는 0..8)
+                           LEB128 byteLen
+                           UTF-8 바이트열
+        ]]>
+        <field-note name="dim" added="2026-07-26">
+          UI는 9x9만 지원하지만(OQ3) 솔버는 12x12, 16x16을 이미 지원한다.
+          1바이트를 지금 넣어두면 나중에 포맷을 깨지 않아도 된다. RK7이 말하는 영구 호환 부담에 대한 가장 싼 보험이다.
+          디코더는 dim이 9가 아니면 "지원하지 않는 크기"로 거부한다.
+        </field-note>
+        <field-note name="savedAt" added="2026-07-26" revised="2026-07-26" rev="3">
+          CR2가 "두 상태의 최종 수정 시각을 나란히 보여준다"고 규정하는데 직전 레이아웃에는 이 필드가 없었다.
+          규칙이 존재하지 않는 데이터를 요구하고 있었다. 4바이트로 해소한다.
+          <inclusion-rule critical="true">
+            savedAt은 <emphasis>SC2와 SC3에서만</emphasis> 기록한다.
+            SC1(퍼즐만)에는 넣지 않는다. 문제만 내는 링크에 출제자가 언제 풀었는지가 들어갈 이유가 없고,
+            CR2는 진행 상태가 있을 때만 발동하므로 SC1에서는 쓰이지도 않는다.
+          </inclusion-rule>
+          <side-effect severity="low">
+            같은 상태라도 시각이 다르면 다른 링크가 나온다. 같은 판을 두 번 공유하면 문자열이 달라지고,
+            "링크가 바뀌었는가"로 상태 변화를 판단할 수 없다.
+            AB2(주소창 자동 동기화)를 도입한다면 그때는 savedAt을 제외해야 한다.
+            상태가 그대로인데 1분마다 URL이 갱신되면 replaceState 호출만 낭비된다.
+          </side-effect>
+        </field-note>
+        <removed-format name="candidates 밀집 형식" removed="2026-07-26">
+          직전 설계는 표시 셀이 많을 때 81x9비트 밀집 형식으로 바꾸도록 했고 경계를 60개라고 적었다.
+          실제 손익분기는 72개다(11 + 1.125k = 92). 게다가 81셀 전부 표시라는 극단에서도 절감폭이
+          11바이트, base64 15자에 불과하다. 분기 하나와 flags 비트 하나를 없애는 편이 낫다.
+          희소 형식만 남긴다.
+        </removed-format>
+      </step>
+
+      <step n="2" name="압축">
+        <api>CompressionStream("deflate-raw") / DecompressionStream("deflate-raw")</api>
+        <availability confidence="verified">
+          Compression Streams API는 2023년 5월부터 주요 브라우저 전체에서 사용 가능(Baseline).
+          Chromium 80부터 지원 시작.
+        </availability>
+        <why-deflate-raw>
+          gzip은 헤더·트레일러로 18바이트를 더 쓴다. 수십~수백 바이트 페이로드에서 무시할 수 없는 비율.
+        </why-deflate-raw>
+        <size-check>
+          압축 결과가 원본보다 크면 압축을 버리고 원본을 쓰며 flags.bit7을 0으로 둔다.
+          니블 팩과 비트맵은 엔트로피가 높아 실제로 커질 수 있다. 이득은 거의 전부 메모 텍스트에서 나온다.
+        </size-check>
+        <fallback>
+          API 부재 시(구형 환경) 무압축으로 인코딩한다. 형식은 flags.bit7로 구분되므로 상호 호환된다.
+        </fallback>
+        <async-note>
+          Compression Streams는 비동기다. encode/decode는 Promise를 반환하며 부트스트랩이 이를 기다린다.
+        </async-note>
+      </step>
+
+      <step n="3" name="base64url">
+        <alphabet>A-Z a-z 0-9 - _ , 패딩(=) 제거</alphabet>
+        <why>
+          표준 base64의 +와 /는 복사·붙여넣기와 메신저 자동 링크화에서 문제를 일으킨다.
+          base64url 문자는 fragment에서 이스케이프 없이 안전하다.
+        </why>
+        <expansion>바이트 수 x 4/3</expansion>
+      </step>
+
+      <fragment-format>
+        <![CDATA[ https://example.com/#s=<base64url> ]]>
+        키를 붙이는 이유는 나중에 다른 파라미터(예: #s=... 뒤에 t=...)를 추가할 여지를 남기기 위해서다.
+      </fragment-format>
+    </url:encoding>
+
+    <!-- ============================================== 크기 실측 -->
+    <url:size-estimates confidence="reasoned" revised="2026-07-26">
+      <basis>헤더 3바이트(version, flags, dim) + savedAt 4바이트(포함 시)</basis>
+      <case name="퍼즐만 (친구에게 문제 내기)">
+        3 + 41 = 44바이트 → base64 59자 → 전체 URL 약 90자
+      </case>
+      <case name="퍼즐 + 진행 + 후보 20셀 + 시각">
+        3 + 4 + 41 + 41 + 34 = 123바이트 → 164자 → 전체 URL 약 195자
+      </case>
+      <case name="위 + 메모 10건 x 한글 30자">
+        원본 약 1,065바이트 → deflate 약 600바이트 → base64 약 800자 → 전체 약 830자. 안전 구간.
+      </case>
+      <case name="위 + 메모 30건 x 한글 50자">
+        원본 약 4,625바이트 → deflate 약 2,300바이트 → base64 약 3,070자. 경고 구간.
+      </case>
+      <conclusion>
+        일반적인 사용에서 2,000자 예산을 넘지 않는다. 메모를 20건 이상 장문으로 쓰는 사용자만
+        경고 구간에 들어가며, 그때도 퍼즐+진행 링크는 200자 이하로 항상 가능하다.
+      </conclusion>
+      <verification-needed>
+        한글 텍스트의 실제 deflate 압축률은 추정치다. 프로토타입에서 실측해 예산 표를 갱신한다.
+      </verification-needed>
+    </url:size-estimates>
+
+    <!-- ============================================== 정답 제외 -->
+    <url:solution-exclusion critical="true">
+      <rule>solution은 URL에 넣지 않는다.</rule>
+      <reason n="1">41바이트(base64 55자)를 아낀다.</reason>
+      <reason n="2">
+        친구에게 문제를 내는 링크에 정답이 동봉되는 것은 그 자체로 설계 결함이다.
+      </reason>
+      <consequence>
+        공유 링크로 들어온 세션은 solution이 없다. "확인" 버튼의 동작을 다시 정의해야 한다.
+      </consequence>
+      <check-redesign recommended="A">
+        <option id="A" name="제약 검사로 판정" server-change="none" recommended="true">
+          퍼즐은 유일해를 가지므로, 완성되고 모든 행·열·박스 제약을 만족하는 격자는 곧 정답이다.
+          game/sudoku/spec.py의 is_solved와 동일한 판정을 클라이언트에서 약 20줄로 구현한다.
+          미완성 상태에서는 "규칙 위반 없음"까지만 말할 수 있고 "정답 경로인지"는 말하지 않는다.
+          이는 CF2(오답 즉시 표시 기본 off)와 종이 감각 원칙에 오히려 부합한다.
+        </option>
+        <option id="B" name="서버 solve 엔드포인트 추가" server-change="required">
+          GET /api/solve/?g=(81자리 숫자) 를 추가해 기존 솔버로 정답을 돌려준다.
+          입력 검증은 길이 81, 문자 0-9, 제약 위반 없음으로 엄격히 한다.
+          비용은 new-puzzle보다 훨씬 싸므로 새로운 남용 위험은 없다.
+          정답 대조형 "확인"을 유지해야 할 때만 채택한다.
+        </option>
+        <decision>A를 기본으로 하고 B는 보류. 자체 생성 세션은 기존대로 solution을 보유한다.</decision>
+      </check-redesign>
+    </url:solution-exclusion>
+
+    <!-- ============================================== 주소창 정책 -->
+    <url:address-bar-policy>
+      <mode id="AB1" name="명시적 스냅샷" default="true">
+        평소 주소창을 건드리지 않는다. "링크 만들기"를 눌렀을 때만 인코딩해 다이얼로그에 보여주고 복사시킨다.
+        <pros>주소창이 깜빡이지 않아 몰입을 해치지 않는다. 오래된 링크를 실수로 북마크할 함정이 없다.</pros>
+      </mode>
+      <mode id="AB2" name="주소창 자동 동기화" default="false" opt-in="설정">
+        "북마크하면 저장된다"는 심성 모형을 원하는 사용자를 위한 선택 기능.
+        <constraint confidence="verified">
+          Safari는 30초당 100회를 넘는 history.replaceState 호출에 SecurityError를 던지고
+          이후 일정 시간 replaceState를 아예 막는다. 예외를 삼켜도 복구되지 않는다.
+        </constraint>
+        <implementation>
+          history.replaceState만 사용하고 1,000ms 트레일링 디바운스를 건다.
+          권장 하한(Safari 310ms)보다 넉넉해 제한에 걸리지 않는다.
+        </implementation>
+        <forbidden>
+          history.pushState 금지. 입력 한 번마다 히스토리가 쌓여 뒤로가기가 파괴된다.
+          location.hash 직접 대입도 같은 이유로 금지.
+        </forbidden>
+      </mode>
+      <link-consumed-rule>
+        공유 링크로 진입해 상태를 채택한 직후 fragment를 replaceState로 제거한다.
+        그대로 두면 사용자가 진행한 뒤에도 주소창에는 진입 시점 상태가 남아 오래된 링크를 공유하게 된다.
+      </link-consumed-rule>
+      <hashchange>
+        AB1에서는 hashchange를 듣지 않는다. AB2에서는 자기가 쓴 값과 다른 해시가 들어올 때만 재적용한다.
+      </hashchange>
+    </url:address-bar-policy>
+
+    <!-- ============================================== 공유 범위 -->
+    <url:share-scopes>
+      <scope id="SC1" name="퍼즐만" flags="none">
+        같은 문제를 남에게 낸다. 내 진행과 메모는 포함되지 않는다.
+        savedAt도 기록하지 않는다(위 inclusion-rule).
+      </scope>
+      <scope id="SC2" name="퍼즐 + 진행" flags="values,candidates" default="true">
+        기기 이동, 백업. 메모는 빠진다.
+      </scope>
+      <scope id="SC3" name="전체 (메모 포함)" flags="values,candidates,notes">
+        완전 이관. 다이얼로그에 경고를 함께 띄운다.
+      </scope>
+      <dialog-requirements>
+        선택한 범위에 따라 예상 링크 길이를 실시간 표시하고, 경고 구간에 들어가면 색이 아니라
+        문구와 아이콘으로 알린다.
+      </dialog-requirements>
+    </url:share-scopes>
+
+    <!-- ============================================== 충돌 해결 -->
+    <url:conflict>
+      <rule id="CR1" when="URL 퍼즐 != 저장된 세션 퍼즐">
+        URL을 채택한다. 기존 세션은 폐기하지 않고 "이전 게임" 슬롯 1칸으로 밀어둔 뒤
+        "진행 중이던 게임을 보관했습니다. 되돌리기" 토스트를 8초간 띄운다.
+      </rule>
+      <rule id="CR2" when="퍼즐 동일 + 진행 다름">
+        자동으로 고르지 않는다. 두 상태의 입력 칸 수와 최종 수정 시각을 나란히 보여주고 사용자가 고른다.
+        기본 포커스는 "내 진행 유지"에 둔다. 파괴적 선택을 기본값으로 삼지 않는다.
+        <data-dependency added="2026-07-26">
+          링크 쪽 시각은 payload의 savedAt 필드에서 읽는다. 링크에 savedAt이 없으면(flags.bit3=0)
+          시각 칸을 "알 수 없음"으로 표시하고 입력 칸 수만 비교시킨다. 시각 부재가 오류는 아니다.
+        </data-dependency>
+      </rule>
+      <rule id="CR3" when="퍼즐 동일 + 진행 동일">
+        조용히 병합한다. 알림 없음.
+      </rule>
+      <rule id="CR4" when="URL 디코드 실패">
+        무시하고 평소 부트스트랩을 계속한다. "링크의 정보를 읽을 수 없습니다" 1회 알림.
+        절대 빈 화면이나 예외로 끝내지 않는다.
+      </rule>
+    </url:conflict>
+
+    <!-- ============================================== 검증 -->
+    <url:validation trust-boundary="true">
+      <statement>
+        URL fragment는 완전한 비신뢰 입력이다. 사용자가 직접 편집할 수 있고 남이 만들어 보낼 수도 있다.
+        디코더는 시스템 경계로 취급해 모든 필드를 검사한다.
+      </statement>
+      <check order="1">fragment 길이 8,000자 이하</check>
+      <check order="2">base64url 문자 집합만 포함</check>
+      <check order="3">디코드 후 최소 44바이트, version === 1, dim === 9</check>
+      <check order="4">압축 해제 결과 상한 64KB (압축 폭탄 방어)</check>
+      <check order="5">givens 81칸 모두 0..9</check>
+      <check order="6">givens가 행·열·박스 제약을 위반하지 않음. 위반 시 거부</check>
+      <check order="7" severity="warn">givens 개수 17개 미만이면 유일해가 존재할 수 없다. 경고만 하고 진행</check>
+      <check order="8">values는 givens가 채워진 칸에서 0이어야 함. 아니면 해당 값 무시</check>
+      <check order="9">candidates 마스크는 9비트 범위 내</check>
+      <check order="10">노트 개수 100건 이하, 노트 1건당 512바이트 이하, key 범위 유효</check>
+      <check order="11">노트 문자열은 유효한 UTF-8. 제어문자(개행 제외) 제거</check>
+      <check order="12" added="2026-07-26">
+        LEB128 디코딩은 5바이트를 넘으면 중단한다. 무한 continuation 비트로 인한 정지 불능 방지.
+      </check>
+      <check order="13" added="2026-07-26">
+        선언된 길이가 남은 버퍼보다 크면 즉시 거부. 모든 필드 읽기 전에 경계를 확인한다.
+      </check>
+      <render-safety>
+        렌더링은 textContent만 사용한다. innerHTML 금지. 이는 URL 경로가 없어도 지키던 규칙이며
+        외부 링크가 들어오면서 실제 공격 표면이 된다.
+      </render-safety>
+      <failure-policy>
+        어떤 검사 실패도 예외를 밖으로 던지지 않는다. decode는 항상 결과 또는 실패 사유를 반환한다.
+      </failure-policy>
+    </url:validation>
+
+    <!-- ============================================== 프라이버시 -->
+    <url:privacy>
+      <item severity="high">
+        메모 포함 링크를 메신저에 붙여넣으면 메모 전문이 그 플랫폼에 남는다. fragment가 서버로 가지
+        않는다는 사실은 여기에 아무 도움이 되지 않는다. SC3 선택 시 명시적으로 경고한다.
+      </item>
+      <item severity="medium">
+        주소창의 URL은 브라우저 히스토리와 계정 동기화를 통해 클라우드에 올라간다. AB2를 켜면
+        메모 내용이 동기화 대상이 된다. 설정 화면에 이 사실을 적는다.
+      </item>
+      <item severity="low">
+        fragment는 Referer 헤더에 포함되지 않으므로 외부 링크 클릭 시 유출되지 않는다.
+      </item>
+    </url:privacy>
+
+    <!-- ============================================== UI -->
+    <url:ui-integration>
+      <entry-point platform="desktop">
+        헤더 우상단 [⋯] 메뉴 안 "링크 만들기". 단축키 Ctrl+Shift+C 는 브라우저 개발자도구와
+        충돌하므로 쓰지 않는다. 단축키를 둔다면 Shift+S.
+      </entry-point>
+      <entry-point platform="mobile">
+        [⋯] 메뉴 안 "링크 만들기". 생성 후 navigator.share 사용 가능하면 시스템 공유 시트로 넘긴다.
+      </entry-point>
+      <copy>navigator.clipboard.writeText. 실패 시 선택된 텍스트 필드로 대체.</copy>
+      <a11y>
+        다이얼로그는 role=dialog[aria-modal=true], 열릴 때 포커스 이동, Esc로 닫기, 닫으면 원래 위치 복귀.
+        복사 성공은 aria-live로 알린다.
+      </a11y>
+      <principle-conflict-check>
+        상시 노출 요소가 늘지 않는다. 진입점은 이미 존재하는 [⋯] 메뉴 안에만 있다.
+      </principle-conflict-check>
+    </url:ui-integration>
+
+    <!-- ============================================== 대안 검토 -->
+    <url:alternatives-rejected>
+      <rejected name="난수 시드만 URL에 저장">
+        <idea>generate_puzzle에 시드를 넘겨 같은 퍼즐을 재생성하면 41바이트가 4바이트가 된다.</idea>
+        <blocker confidence="verified">
+          현재 생성기는 결정적이지 않다. game/sudoku/generator.py의 dig_holes가
+          time.monotonic() 기반 deadline으로 조기 중단하므로, 같은 시드라도 기기 속도에 따라
+          다른 퍼즐이 나온다. 시드 기반 동일성은 성립하지 않는다.
+        </blocker>
+        <what-it-would-take>
+          결정적 생성 모드(시간 제한 대신 탐색 횟수 제한)를 추가하고 Python 버전 간
+          random 구현 안정성을 보장해야 한다. 이득 37바이트, 비용 생성기 재설계. 기각.
+        </what-it-would-take>
+      </rejected>
+      <rejected name="서버에 저장하고 짧은 코드 발급">
+        <idea>/s/AB12CD 같은 짧은 링크.</idea>
+        <blocker>사용자 결정 U1(서버 영속화 없음)에 정면으로 위배된다.</blocker>
+      </rejected>
+      <rejected name="JSON을 그대로 base64">
+        <idea>구현이 가장 쉽다.</idea>
+        <blocker>
+          같은 상태가 바이너리 대비 5~8배 길어진다. 압축을 해도 키 이름 반복 때문에 여전히 2배 이상.
+          메모가 없는 링크조차 500자를 넘긴다.
+        </blocker>
+      </rejected>
+      <rejected name="퍼즐만 URL, 메모는 localStorage">
+        <idea>URL을 짧게 유지.</idea>
+        <blocker>사용자 요구(U5)가 메모 유지·공유였다. 요구를 충족하지 못한다.</blocker>
+      </rejected>
+    </url:alternatives-rejected>
+
+    <!-- ============================================== 검증 계획 -->
+    <url:test-plan>
+      <unit>
+        encode(decode(x)) === x 왕복 테스트. 무작위 상태 1,000건 생성해 검사.
+      </unit>
+      <unit>경계값: 빈 보드, 꽉 찬 보드, 후보 0개, 후보 81셀 전부, 노트 0건, 노트 100건.</unit>
+      <unit>
+        손상 입력: 잘린 base64, 잘못된 version, dim != 9, 길이 불일치, 잘못된 UTF-8,
+        8,001자 fragment, 5바이트 초과 LEB128, 남은 버퍼를 넘는 선언 길이.
+      </unit>
+      <unit>savedAt 있는 payload와 없는 payload 양쪽 왕복.</unit>
+      <manual>
+        Chrome, Firefox, Safari, iOS Safari, Android Chrome에서 링크 왕복.
+        카카오톡·이메일에 붙여넣었을 때 잘림 여부 확인.
+      </manual>
+      <metric name="링크 길이" target="일반 사용 2,000자 이하" how="프로토타입 세션 로그"/>
+      <metric name="디코드 시간" target="100ms 이하" how="performance.now 측정"/>
+      <metric name="왕복 무결성" target="100%" how="자동 테스트"/>
+    </url:test-plan>
+
+    <url:prototype-slot>
+      섹션 13에 P3을 추가한다. 우선순위는 P2 다음.
+      범위는 UrlCodec 단위 구현과 왕복 테스트이며, UI 없이 콘솔에서 검증할 수 있다.
+      UrlCodec은 DOM 의존이 없어 P0보다 먼저 만들어도 무방하다.
+    </url:prototype-slot>
+  </section>
+
+  <!-- ======================================================= 위험/미해결 -->
+  <risks>
+    <risk id="RK1" severity="medium">
+      입력 어댑터 이원화로 유지보수 비용 증가. 완화는 Store 단일화(섹션 12 arch:components).
+    </risk>
+    <risk id="RK2" severity="medium" revised="2026-07-26">
+      고정 0.62배는 계산상 틀렸다(대부분 기기에서 축소 불필요). 동적 배율로 교체했다.
+      남은 위험은 두 가지다.
+      (1) 배율 계산의 입력인 visualViewport.height가 브라우저마다 키보드 상태를 다르게 보고할 수 있다.
+      (2) 배율이 1.0 미만으로 떨어지는 소형 기기에서 축소된 보드의 판독성은 여전히 미검증이다.
+      P1에서 iOS Safari, Android Chrome, Firefox Android 실측으로 두 항목을 함께 확인한다.
+    </risk>
+    <risk id="RK3" severity="low">
+      데스크톱 메모 발견성이 힌트 스트립에 의존한다. P2 결과에 따라 레일 기본 노출로 전환 가능.
+    </risk>
+    <risk id="RK4" severity="low">
+      localStorage 전용이므로 기기 변경·시크릿 모드에서 기록이 사라진다. 사용자 결정 U1의 수용된 결과.
+    </risk>
+    <risk id="RK5" severity="medium">
+      정답이 클라이언트에 노출된 채 남는다. 이번 범위 밖이나 경쟁/기록 기능을 넣는 순간 차단 요인이 된다.
+    </risk>
+    <risk id="RK6" severity="low">
+      바닐라 JS로 81셀 재렌더링 시 성능. 셀 단위 부분 갱신으로 대응 가능하나 코드가 장황해진다.
+    </risk>
+    <risk id="RK7" severity="medium" added="2026-07-26">
+      URL 포맷은 한번 배포되면 사용자가 보낸 링크가 외부에 남는다. v1을 깨는 변경은 불가능하다고 봐야 하며,
+      version 바이트로 구버전 디코더를 영구히 유지해야 한다. 포맷 확정 전 왕복 테스트가 필수다.
+    </risk>
+    <risk id="RK8" severity="medium" added="2026-07-26">
+      메모 포함 링크는 프라이버시 노출 경로다. 사용자가 무심코 SC3으로 공유할 위험이 있으며,
+      경고 문구만으로 충분한지 검증되지 않았다. 기본값을 SC2로 둔 이유.
+    </risk>
+    <risk id="RK10" severity="medium" added="2026-07-26">
+      AZERTY 계열 배열에서 Shift+숫자 준모드가 구조적으로 충돌한다(섹션 8 S2 key-detection).
+      어떤 수정자를 골라도 어떤 배열에서는 같은 문제가 생기므로 완전 해결이 불가능하다.
+      Space 고정 토글과 설정의 "Shift 준모드 끄기"가 유일한 완화책이며, 해당 지역 사용자에게는
+      주 경로가 보조 경로로 뒤바뀐다.
+    </risk>
+    <risk id="RK11" severity="medium" added="2026-07-26">
+      키보드 열림 시 레이아웃이 VisualViewport 보고값에 전적으로 의존한다.
+      브라우저별로 보고 시점과 값이 달라 첫 프레임에 잘못된 배율이 잠깐 보일 수 있다.
+      완화는 전환 애니메이션 180ms 안에 값이 안정화되도록 rAF 한 번 미루는 것. 실측 필요.
+    </risk>
+    <risk id="RK9" severity="low" added="2026-07-26">
+      공유 링크 세션은 solution이 없어 "확인" 동작이 자체 세션과 미묘하게 다르다(제약 검사만).
+      같은 버튼이 맥락에 따라 다르게 동작하는 것은 그 자체로 사용성 부채다.
+      완화는 버튼 레이블을 상태에 맞게 바꾸는 것("정답 확인" / "규칙 확인").
+    </risk>
+  </risks>
+
+  <open-questions>
+    <question id="OQ1">
+      난이도 선택 UI가 필요한가. generator.DIFFICULTIES에 easy/medium/hard가 이미 있으나
+      현재 뷰는 medium 고정이고 UI도 없다. 이번 설계 범위에 포함할지 결정 필요.
+    </question>
+    <question id="OQ2">
+      타이머·통계를 넣을 것인가. 넣으면 헤더에 상시 요소가 하나 늘고 "몰입" 원칙과 충돌한다.
+      현재 설계는 제외 전제.
+    </question>
+    <question id="OQ3">
+      12x12, 16x16 지원 여부. 솔버는 이미 지원하나(spec.py SPECS) 후보 3x3 배치와 숫자 바 설계가
+      전혀 달라진다. 현재 설계는 9x9 전용 전제.
+    </question>
+    <question id="OQ4" status="resolved" resolved="2026-07-26">
+      다크 모드 1차 범위 포함 여부 → <emphasis>포함</emphasis>으로 확정. 섹션 10 dark-mode 참조.
+      섹션 10이 이미 확정 사항처럼 적혀 있어 이 항목과 모순되던 것을 해소했다.
+    </question>
+    <question id="OQ5" added="2026-07-26">
+      주소창 자동 동기화(AB2)를 실제로 만들 것인가. 기본은 AB1이며 AB2는 설정 항목 1개와
+      디바운스 로직을 추가한다. "북마크가 곧 저장"이라는 심성 모형이 사용자에게 필요한지 확인 필요.
+    </question>
+    <question id="OQ6" added="2026-07-26">
+      정답 대조형 "확인"을 계속 유지할 것인가. 섹션 15에서 A안(제약 검사)을 택하면 공유 세션에서
+      정답 대조가 불가능하다. 유지하려면 GET /api/solve/ 추가라는 서버 변경이 필요하다.
+    </question>
+    <question id="OQ7" added="2026-07-26" status="resolved" resolved="2026-07-26">
+      "이전 게임" 슬롯(CR1) 개수 → <emphasis>1개</emphasis>로 확정.
+      localStorage 키 sudoku:v1:archive. 섹션 12 archive-policy 참조.
+    </question>
+  </open-questions>
+
+  <out-of-scope>
+    <item>서버 측 영속화, 계정, 랭킹</item>
+    <item>AI 힌트, 풀이 기법 설명</item>
+    <item>정답 클라이언트 노출 문제 해결</item>
+    <item>실제 코드 구현 (사용자 결정 U4)</item>
+  </out-of-scope>
+
+  <sources>
+    <source name="sudoku9x9 User Manual" url="https://www.sudoku9x9.com/manual/"/>
+    <source name="7sudoku - Entering numbers and pencil marks" url="https://www.7sudoku.com/instructions/entering-numbers"/>
+    <source name="W3C ARIA APG - Grid Pattern" url="https://www.w3.org/WAI/ARIA/apg/patterns/grid/"/>
+    <source name="MDN - VisualViewport" url="https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport"/>
+    <source name="web.dev - Compression Streams are now supported on all browsers"
+            url="https://web.dev/blog/compressionstreams" section="15"/>
+    <source name="MDN - CompressionStream"
+            url="https://developer.mozilla.org/en-US/docs/Web/API/CompressionStream" section="15"/>
+    <source name="SISTRIX - URL Length: how long can a URL be"
+            url="https://www.sistrix.com/ask-sistrix/technical-seo/site-structure/url-length-how-long-can-a-url-be" section="15"/>
+    <source name="Baeldung - Maximum Length of a URL in Different Browsers"
+            url="https://www.baeldung.com/cs/max-url-length" section="15"/>
+    <source name="history-throttled (Safari replaceState 제한 사례)"
+            url="https://github.com/joliss/history-throttled" section="15"/>
+    <source name="W3C CSSWG - interactive-widget=resizes-content 논의"
+            url="https://github.com/w3c/csswg-drafts/issues/10464" section="9" added="2026-07-26"/>
+    <source name="viewport-resize-behavior explainer"
+            url="https://github.com/bramus/viewport-resize-behavior/blob/main/explainer.md"
+            section="9" added="2026-07-26"/>
+    <source name="HTMHell - Control the Viewport Resize Behavior with interactive-widget"
+            url="https://www.htmhell.dev/adventcalendar/2024/4/" section="9" added="2026-07-26"/>
+  </sources>
+
+  <approval>
+    <checkbox checked="true" date="2026-07-26">System Design 승인</checkbox>
+    <checkbox checked="true" date="2026-07-26">재검토 14건 반영 (revision-log rev=2)</checkbox>
+    <checkbox checked="true" date="2026-07-26">2차 재검토 12건 반영 (revision-log rev=3)</checkbox>
+    <status>승인됨. rev 3이 Phase 2 이후의 불변 기준선이다.</status>
+    <next-phase>Phase 2 — Macro Blocking</next-phase>
+    <note>
+      사용자 결정 U4는 "설계 문서까지"였으나 이후 Macro Blocking 진행이 요청되었다.
+      Phase 4 코드 구현 착수는 여전히 별도 승인이 필요하다.
+    </note>
+    <remaining-open>OQ1 난이도 UI, OQ2 타이머, OQ3 12x12/16x16, OQ5 주소창 자동 동기화, OQ6 정답 대조 방식</remaining-open>
+  </approval>
+
+</system-design>

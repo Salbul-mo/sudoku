@@ -1,0 +1,1010 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mb:macro-blocking
+    xmlns:mb="urn:sudoku:macro-blocking:v1"
+    xmlns:blk="urn:sudoku:block:v1"
+    xmlns:dec="urn:sudoku:decision:v1"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xml:id="sudoku-macro-blocking-v1"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="2"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 2 Macro Blocking.
+    Phase 1 System Design rev 4(수정 반영본)를 불변 기준선으로 삼는다.
+    Phase 3 Micro Blocking 승인 전까지 code implementation을 시작하지 않는다.
+  -->
+
+  <mb:document-control xml:id="document-control">
+    <mb:title>Web Sudoku UI 재설계 — Macro Blocking</mb:title>
+    <mb:owner>claude-mhj</mb:owner>
+    <mb:baseline>
+      <mb:file>docs/codex-mhj_26_07_26_01_sudoku-ui-system-design.xml</mb:file>
+      <mb:version>4.0 (V4-01..V4-17 반영본)</mb:version>
+      <mb:approval>Phase 1 사용자 승인 완료</mb:approval>
+      <mb:immutable>
+        승인된 architecture, locked decisions U1..U5, scope decisions는 이 문서에서 변경하지 않는다.
+      </mb:immutable>
+    </mb:baseline>
+    <mb:deliverable>
+      <mb:file>docs/claude-mhj_26_07_26_01_sudoku-ui-macro-blocking.xml</mb:file>
+      <mb:scope>Macro Block 정의만 포함하며 application code는 변경하지 않는다.</mb:scope>
+    </mb:deliverable>
+    <mb:approval-state current="awaiting-user-approval">
+      <mb:next-on-approval>Phase 3 — Micro Blocking</mb:next-on-approval>
+      <mb:prohibited-before-approval>Phase 3 확정 및 Phase 4 code implementation</mb:prohibited-before-approval>
+    </mb:approval-state>
+  </mb:document-control>
+
+  <!-- ================================================== 잔존 이슈 해소 -->
+  <mb:carried-issues xml:id="carried-issues">
+    <mb:note>
+      rev 4 검토에서 남아 있던 M1·M2·M3와 low 4건은 Phase 1 문서에 직접 반영해 닫았고(V4-16, V4-17 및
+      low-severity cleanup), 이 문서는 그 결과를 구현 블록으로 배정한다. 아래 표는 각 이슈의 최종 귀착점이다.
+    </mb:note>
+    <mb:resolution id="M1" title="new-puzzle 실패 경로 미정의" severity="medium">
+      <mb:where>Phase 1 §12 arch:api-failure (V4-16)</mb:where>
+      <mb:decision>
+        AbortController 10초 timeout, network·timeout·5xx에 한해 1초 후 1회 재시도, 총 2회.
+        최종 실패는 inert board를 유지한 채 board 밖 error panel과 48px 재시도 button으로 종결한다.
+        navigator.onLine이 false면 호출을 건너뛰고 즉시 terminal state로 간다.
+      </mb:decision>
+      <mb:assigned-to>B-12</mb:assigned-to>
+      <mb:residual>
+        첫 방문이면서 offline인 사용자는 게임을 시작할 수 없다. embedded puzzle bank는 범위 밖이며 RK10으로 남긴다.
+      </mb:residual>
+    </mb:resolution>
+    <mb:resolution id="M2" title="CF2 default=off 잔재" severity="medium">
+      <mb:where>Phase 1 §8 ux:rule code="CF2"</mb:where>
+      <mb:decision>
+        setting이 아니라 non-goal로 재분류했다. client가 solution을 보유하지 않으므로 on 상태가 존재할 수 없고
+        Settings에 field를 두지 않는다.
+      </mb:decision>
+      <mb:assigned-to>B-03</mb:assigned-to>
+      <mb:residual>없음</mb:residual>
+    </mb:resolution>
+    <mb:resolution id="M3" title="contrast 요구만 있고 token 값 없음" severity="medium">
+      <mb:where>Phase 1 §10 ux:themes (V4-17)</mb:where>
+      <mb:decision>
+        light·dark 14개 token 값을 확정하고 WCAG 2.x relative luminance로 theme당 38쌍, 합계 76쌍을 계산했다.
+        전 쌍 통과이며 최악값은 light text 5.75:1, dark text 5.27:1, dark non-text 4.05:1이고 모두
+        --bg-cell-selected 위에서 발생한다.
+      </mb:decision>
+      <mb:assigned-to>B-08</mb:assigned-to>
+      <mb:residual>
+        계산은 산식 기반이며 실제 panel·주변광에서의 판독성은 별개다. 9px candidate 판독성은 기존 RK3과
+        kill criterion으로 계속 관리한다.
+      </mb:residual>
+    </mb:resolution>
+    <mb:resolution id="L1" title="48px cell floor 미정의 참조" severity="low">
+      <mb:decision>§10 ux:cell-target으로 정의했다. preferred 48px, enforced=false, narrow 실측 38~42px.</mb:decision>
+      <mb:assigned-to>B-08</mb:assigned-to>
+    </mb:resolution>
+    <mb:resolution id="L2" title="digit button 48px과 wireframe 60px 충돌" severity="low">
+      <mb:decision>row 60px = button 48px + 상하 padding 6px으로 분리 표기했다.</mb:decision>
+      <mb:assigned-to>B-09</mb:assigned-to>
+    </mb:resolution>
+    <mb:resolution id="L3" title="44px과 48px 하한 혼용" severity="low">
+      <mb:decision>§10 ux:control-floor로 48x48 단일화했다. expand handle도 동일 적용한다.</mb:decision>
+      <mb:assigned-to>B-09</mb:assigned-to>
+    </mb:resolution>
+    <mb:resolution id="L4" title="V4-11·V4-12 추적성 공백" severity="low">
+      <mb:decision>revision-log change-set과 §14 change-table에 대응 항목을 추가했다.</mb:decision>
+      <mb:assigned-to>문서 수정으로 종결</mb:assigned-to>
+    </mb:resolution>
+  </mb:carried-issues>
+
+  <!-- ================================================== Phase 2 결정 -->
+  <mb:phase2-decisions xml:id="phase2-decisions" status="proposed">
+    <dec:decision xml:id="P2-01" topic="module-format" needs-approval="true">
+      <dec:statement>
+        Shipped JavaScript는 native ES module로 작성하고 index.html이 &lt;script type="module"&gt;로 진입점 하나만 로드한다.
+      </dec:statement>
+      <dec:why>
+        U2는 build tool 도입을 금지하지만 module system 자체를 금지하지 않는다. ES module은 browser가 직접 해석하므로
+        bundler, transpiler, package.json dependency가 전혀 필요 없다. 단일 IIFE로 11개 component를 유지하는 쪽이
+        오히려 test와 소유권 경계를 무너뜨린다.
+      </dec:why>
+      <dec:cost>Django staticfiles가 상대 경로 import를 그대로 서빙하므로 서버 변경은 없다.</dec:cost>
+    </dec:decision>
+
+    <dec:decision xml:id="P2-02" topic="test-runner" needs-approval="true">
+      <dec:statement>
+        DOM-free module은 Node 내장 test runner(node:test)로 검증한다. 외부 dependency와 package.json을 추가하지 않는다.
+      </dec:statement>
+      <dec:why>
+        P3는 seeded random 1,000건 property test를 요구하는데 수동 browser 확인으로는 성립하지 않는다.
+        node:test는 Node 표준 라이브러리이므로 production dependency도 build tool도 아니다.
+      </dec:why>
+      <dec:verified>
+        이 환경에서 node v24.14.0, npm 11.9.0 확인. npm install은 필요하지 않다.
+      </dec:verified>
+      <dec:fallback>
+        Node 사용을 승인하지 않으면 browser에서 여는 test runner page로 대체한다. 이 경우 1,000건 property test는
+        CI 자동화가 불가능하고 수동 실행 기록에 의존한다.
+      </dec:fallback>
+    </dec:decision>
+
+    <dec:decision xml:id="P2-03" topic="testability-boundary">
+      <dec:statement>
+        module을 DOM-free layer(core, state, url)와 DOM-bound layer(ui, bootstrap)로 나눈다.
+        DOM-free layer는 document·window를 직접 참조하지 않는다.
+      </dec:statement>
+      <dec:why>
+        이 경계가 곧 자동 검증 가능 범위다. 도메인 규칙, 직렬화, URL codec처럼 결함 비용이 큰 부분을 전부
+        DOM-free로 밀어내면 headless로 검증할 수 있다. UI layer는 axe와 수동 matrix로 검증한다.
+      </dec:why>
+      <dec:consequence>
+        Persistence는 localStorage를 직접 부르지 않고 주입된 storage-like 객체를 사용한다.
+        UrlCodec은 CompressionStream을 주입 가능한 형태로 참조해 부재 환경을 test할 수 있게 한다.
+      </dec:consequence>
+    </dec:decision>
+
+    <dec:decision xml:id="P2-04" topic="file-layout">
+      <dec:statement>구현 파일 배치를 아래로 고정한다.</dec:statement>
+      <dec:layout><![CDATA[
+game/static/game/js/
+  main.js                    entry point
+  core/spec.js               dim 9 geometry, peer/unit index tables
+  core/rules.js              conflict, completion, candidate elimination
+  core/history.js            grouped undo/redo
+  core/store.js              SudokuStore, mutation API, subscription
+  state/serialize.js         GameSession <-> JSON, validation, migration
+  state/persistence.js       debounce, lifecycle flush, quota fallback
+  state/settings.js          SettingsStore
+  url/crc32.js               CRC32
+  url/leb128.js              minimal unsigned LEB128
+  url/canonical.js           canonical form, invariants, scope projection
+  url/codec.js               OuterEnvelopeV1, BodyV1, compression
+  ui/announcer.js            polite live region
+  ui/board-view.js           role=grid, roving tabindex, partial updates
+  ui/keyboard-adapter.js     keymap, quasimode, sticky
+  ui/touch-adapter.js        digit bar, tools, visibility policy
+  ui/notes-view.js           rail, sheet, target selector, notes list
+  ui/dialog-host.js          modal focus containment
+  ui/share-view.js           scope, length, privacy, copy/share
+  ui/viewport.js             VisualViewport geometry
+  bootstrap.js               sequence, conflict resolution, api failure
+
+game/static/game/css/
+  tokens.css                 color tokens, motion, typography scale
+  board.css                  grid lines, number tiers, state cues
+  layout.css                 breakpoints, adapters, safe area
+
+tests/js/                    node:test specs, not served as static
+tools/check-contrast.mjs     token contrast gate
+      ]]></dec:layout>
+      <dec:note>
+        tests/js와 tools는 STATICFILES 경로 밖이므로 browser로 배포되지 않는다.
+      </dec:note>
+    </dec:decision>
+
+    <dec:decision xml:id="P2-05" topic="legacy-code-disposition">
+      <dec:statement>
+        기존 game/static/game/js/game.js와 style.css는 삭제하지 않고 B-01에서 legacy/ 하위로 이동만 한다.
+        모든 block이 통과한 뒤 B-13에서 제거 여부를 별도 승인받는다.
+      </dec:statement>
+      <dec:why>
+        현재 game.js는 solution 대조 기반이라 새 설계와 공존할 수 없지만, 단계 중간에 비교 대상이 사라지면
+        회귀 판단 근거가 없어진다. 삭제는 되돌리기 어려운 조작이므로 별도 승인 대상으로 남긴다.
+      </dec:why>
+    </dec:decision>
+  </mb:phase2-decisions>
+
+  <!-- ================================================== 블록 개요 -->
+  <mb:block-map xml:id="block-map">
+    <mb:lane name="foundation">B-01, B-02</mb:lane>
+    <mb:lane name="domain">B-03, B-04</mb:lane>
+    <mb:lane name="codec" parallel-with="domain">B-05</mb:lane>
+    <mb:lane name="presentation">B-06, B-07, B-08</mb:lane>
+    <mb:lane name="adapters">B-09, B-10, B-11</mb:lane>
+    <mb:lane name="integration">B-12, B-13</mb:lane>
+    <mb:dependency-graph><![CDATA[
+B-01 ──┬─ B-03 ─┬─ B-04 ──────────────┐
+       │        ├─ B-05 ──────────┬───┤
+       │        └─ B-06 ─┬─ B-07  │   │
+B-02 ──┘                 ├─ B-08 ─┼─ B-09 ─┐
+                         │        ├─ B-10 ─┤
+                         │        └─ B-11 ─┤
+                                           ├─ B-12 ─ B-13
+                                           ┘
+    ]]></mb:dependency-graph>
+    <mb:prototype-mapping>
+      <mb:map prototype="P0" blocks="B-03, B-06, B-07"/>
+      <mb:map prototype="P1" blocks="B-08, B-09"/>
+      <mb:map prototype="P2" blocks="B-10"/>
+      <mb:map prototype="P3" blocks="B-05"/>
+      <mb:map prototype="P4" blocks="B-02, B-04, B-12"/>
+    </mb:prototype-mapping>
+  </mb:block-map>
+
+  <!-- ================================================== B-01 -->
+  <blk:block id="B-01" name="Module scaffolding and test harness">
+    <blk:rationale>
+      이후 모든 block의 완료 판정 수단이다. U2가 build tool을 금지하므로 module 경계와 test 실행 방법을
+      먼저 고정하지 않으면 나머지 block의 validation을 정의할 수 없다.
+    </blk:rationale>
+    <blk:objective>
+      tests/js에서 node:test 명령 하나로 spec을 실행할 수 있고, browser가 main.js를 module로 로드해
+      빈 skeleton을 그린다. 두 경로 모두 실제 실행으로 확인된다.
+    </blk:objective>
+    <blk:scope>
+      P2-04의 디렉터리 생성, main.js 진입점, index.html의 script type=module 전환,
+      tests/js 실행 규약, tools/check-contrast.mjs 뼈대, legacy 파일 이동(P2-05).
+    </blk:scope>
+    <blk:exclusions>도메인 로직, 렌더링, style token 값, CI 설정</blk:exclusions>
+    <blk:dependencies>없음</blk:dependencies>
+    <blk:input type="repository state">현재 game.js 단일 IIFE와 style.css</blk:input>
+    <blk:output type="file tree">P2-04 배치의 빈 module과 통과하는 smoke spec</blk:output>
+    <blk:side-effects>
+      파일 생성 및 이동. static asset 경로 변경으로 index.html이 참조하는 script가 바뀐다. DB, network 영향 없음.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="staticfiles가 상대 import를 404로 반환">
+        module specifier를 /static/ 기준 절대 경로 또는 정확한 상대 경로로 교정한다. B-01 완료 조건에 포함한다.
+      </blk:failure>
+      <blk:failure cause="node:test가 ESM import를 해석하지 못함">
+        .mjs 확장자를 사용해 module 판정을 명시한다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B01-01">node --test tests/js 실행이 0 exit로 통과한다.</blk:item>
+      <blk:item id="V-B01-02">runserver 후 index를 열어 console error 0, main.js가 module로 로드됨을 확인한다.</blk:item>
+      <blk:item id="V-B01-03">python manage.py check가 통과한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+create directories per P2-04
+move game.js, style.css -> legacy/
+write main.js: import nothing yet, render inert skeleton container
+edit index.html: add viewport meta, replace script tag with type="module"
+write tests/js/smoke.test.mjs: import a trivial core module, assert
+run: node --test tests/js
+run: python manage.py check
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-02 -->
+  <blk:block id="B-02" name="Server shell bootstrap">
+    <blk:rationale>
+      V4-07은 index가 puzzle을 생성하지 않는 것을 전제로 한다. 이 변경은 Python 쪽에 국한되고 JS와 독립이므로
+      별도 block으로 분리해 병렬 진행하고 회귀 위험을 격리한다.
+    </blk:rationale>
+    <blk:objective>
+      GET /이 puzzle generation 없이 shell HTML을 반환하고, GET /api/new-puzzle/의 response shape는 그대로다.
+      Django test로 두 사실이 모두 검증된다.
+    </blk:objective>
+    <blk:scope>game/views.py의 index, game/templates/game/index.html, game/tests의 view test 추가</blk:scope>
+    <blk:exclusions>
+      new_puzzle view의 response shape 변경, solution 제거, /api/solve/ 추가, generator·solver 수정
+    </blk:exclusions>
+    <blk:dependencies>없음. B-01과 병렬 가능하나 index.html 편집이 겹치므로 B-01 이후 적용을 권장한다.</blk:dependencies>
+    <blk:input type="HttpRequest">GET /</blk:input>
+    <blk:output type="HttpResponse">puzzle·solution context 없는 shell HTML 200</blk:output>
+    <blk:side-effects>
+      요청당 generate_puzzle 호출이 사라진다. dim=9 기준 최대 5초의 digging 비용이 index 경로에서 제거된다.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="template이 제거된 context 변수를 참조">
+        json_script 두 줄을 함께 제거한다. template 렌더 실패는 500이므로 test로 즉시 드러난다.
+      </blk:failure>
+      <blk:failure cause="기존 legacy game.js가 puzzle-data element를 찾지 못함">
+        B-01에서 legacy로 이동했으므로 index는 더 이상 참조하지 않는다. 이동 전 적용하면 깨진다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B02-01">index response에 puzzle-data·solution-data script가 없음을 assert하는 test가 통과한다.</blk:item>
+      <blk:item id="V-B02-02">index 처리 중 generator.generate_puzzle이 호출되지 않음을 assert한다.</blk:item>
+      <blk:item id="V-B02-03">new_puzzle response가 puzzle과 solution key를 그대로 포함함을 assert한다(계약 유지 회귀).</blk:item>
+      <blk:item id="V-B02-04">기존 game/tests 전체가 통과한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+def index(request):
+    return render(request, "game/index.html")          # no context
+
+template: drop {{ puzzle|json_script }} and {{ solution|json_script }}
+template: ensure <meta name="viewport" content="width=device-width, initial-scale=1">
+
+tests:
+  assert "puzzle-data" not in response.content
+  patch generator.generate_puzzle -> assert not called during index
+  assert set(json.loads(new_puzzle_response)) == {"puzzle", "solution"}
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-03 -->
+  <blk:block id="B-03" name="Domain core: SudokuStore, rules, history">
+    <blk:rationale>
+      단일 domain state와 단일 history는 설계의 중심 불변식이다(RK1 완화 근거). 두 input adapter가 공유하는
+      대상이므로 adapter보다 먼저 완결되어야 하고, DOM-free이므로 자동 검증이 가능하다.
+    </blk:rationale>
+    <blk:objective>
+      values, candidates, cellNotes, regionNotes에 대한 mutation API와 grouped undo/redo가 동작하고,
+      conflict 판정과 완성 판정이 solution 없이 제약만으로 이루어진다.
+    </blk:objective>
+    <blk:scope>
+      core/spec.js, core/rules.js, core/history.js, core/store.js.
+      domain rules CF1, CF3, CF4와 CF2의 non-goal 처리(M2), given cell mutation 거부, 구독 통지.
+    </blk:scope>
+    <blk:exclusions>
+      DOM, localStorage, URL, 렌더링. solution 보유 및 대조 기능 일체.
+    </blk:exclusions>
+    <blk:dependencies>B-01</blk:dependencies>
+    <blk:input type="GameSession fields">givens Uint8Array(81), 초기 values·candidates·notes</blk:input>
+    <blk:output type="Store instance">mutation API, 조회 API, change subscription</blk:output>
+    <blk:side-effects>없음. 순수 in-memory. 구독자 callback 호출만 발생한다.</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="given cell mutation 시도">
+        상태를 바꾸지 않고 rejected 결과를 반환한다. 알림은 UI layer가 담당한다.
+      </blk:failure>
+      <blk:failure cause="범위 밖 index 또는 digit">
+        TypeError·RangeError를 던진다. 내부 호출자는 이미 검증된 값만 전달한다.
+      </blk:failure>
+      <blk:failure cause="history 깊이 초과">
+        가장 오래된 group부터 폐기하고 200 group을 유지한다. redo stack은 새 mutation에서 비운다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B03-01">value set이 peers의 동일 candidate를 제거하고 undo 1회로 둘 다 되돌아간다(CF4 + grouping).</blk:item>
+      <blk:item id="V-B03-02">given cell mutation이 거부되고 state가 불변임을 확인한다.</blk:item>
+      <blk:item id="V-B03-03">conflict 판정이 row·column·box 중복만 보고하고 solution을 참조하지 않는다.</blk:item>
+      <blk:item id="V-B03-04">완성 판정이 모든 unit의 1..9 정확히 1회를 요구한다.</blk:item>
+      <blk:item id="V-B03-05">200 group 초과 시 가장 오래된 group만 폐기되고 undo/redo 순서가 유지된다.</blk:item>
+      <blk:item id="V-B03-06">store 어디에도 solution field가 없음을 정적으로 확인한다(M2 회귀 방지).</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+spec.js:    peersOf(index) -> 20 peer indices, unitsOf(index) -> row, col, box
+rules.js:   conflicts(values, givens) -> Set<index>
+            isSolved(values, givens) -> bool   // every unit contains 1..9 once
+            eliminationTargets(index, digit) -> peer indices holding that candidate
+history.js: push(entry), beginGroup(), endGroup(), undo(), redo()
+store.js:
+  setValue(index, digit):
+      if givens[index] != 0: return {ok:false, reason:"given"}
+      group = beginGroup()
+      record value change
+      if settings.autoRemoveCandidates:
+          for peer in eliminationTargets(index, digit): record candidate change
+      clear own candidates
+      endGroup(); notify()
+  toggleCandidate(index, digit): reject if given or filled; XOR bit; single-entry group
+  setNote(kind, key, text): empty text deletes; single-entry group
+  undo()/redo(): replay group entries in reverse/forward order, notify once
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-04 -->
+  <blk:block id="B-04" name="Persistence and settings">
+    <blk:rationale>
+      V4-08과 V4-13이 요구하는 durability·validation·migration은 store와 별개의 실패 양식을 가진다.
+      quota, private mode, 손상된 저장값은 domain 로직과 독립적으로 검증해야 한다.
+    </blk:rationale>
+    <blk:objective>
+      mutation이 300ms trailing debounce로 저장되고, pagehide와 hidden visibilitychange에서 pending write가
+      동기 flush되며, 손상·미래 schemaVersion 값이 적용되지 않고 사용자에게 실패가 보고된다.
+    </blk:objective>
+    <blk:scope>
+      state/serialize.js, state/persistence.js, state/settings.js.
+      key sudoku:v1:session, sudoku:v1:archive, sudoku:v1:settings. one-slot archive 정책.
+    </blk:scope>
+    <blk:exclusions>URL codec, 충돌 해소 UI, server persistence</blk:exclusions>
+    <blk:dependencies>B-01, B-03</blk:dependencies>
+    <blk:input type="GameSession | Settings">store snapshot 및 저장된 JSON 문자열</blk:input>
+    <blk:output type="RestoreResult">{ok:true, session} 또는 {ok:false, code, message}</blk:output>
+    <blk:side-effects>
+      주입된 storage에 대한 read·write·remove. pagehide·visibilitychange listener 등록.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="QuotaExceededError 또는 SecurityError">
+        1회 알림 후 in-memory mode로 계속한다. 저장 성공을 거짓으로 표시하지 않는다.
+      </blk:failure>
+      <blk:failure cause="JSON 손상, 배열 길이 불일치, 범위 밖 값">
+        복원을 포기하고 실패를 알린 뒤 new-puzzle flow로 넘긴다. 부분 복원을 하지 않는다.
+      </blk:failure>
+      <blk:failure cause="미래 schemaVersion">
+        적용하지 않는다. 알려진 이전 version만 순차 migrate한다.
+      </blk:failure>
+      <blk:failure cause="pagehide 중 동기 flush가 quota로 실패">
+        예외를 삼키되 다음 세션의 복원 실패 경로로 자연 귀결시킨다. unload를 막지 않는다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B04-01">debounce window 내 연속 mutation이 1회 write로 합쳐진다(fake timer).</blk:item>
+      <blk:item id="V-B04-02">pending write가 있는 상태에서 pagehide를 발생시키면 timer 취소 후 즉시 write된다.</blk:item>
+      <blk:item id="V-B04-03">
+        길이 80 배열, 값 10, 잘못된 note key, 미래 schemaVersion 각각에 대해 restore가 거부되고 typed code를 반환한다.
+      </blk:item>
+      <blk:item id="V-B04-04">throw하는 storage stub에서 in-memory mode로 전환되고 후속 mutation이 손실 없이 동작한다.</blk:item>
+      <blk:item id="V-B04-05">History와 UiState가 직렬화 대상에 포함되지 않음을 확인한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+serialize(session) -> {schemaVersion, puzzleId, dim, givens:[81], values:[81],
+                       candidates:[81], cellNotes, regionNotes, createdAt, updatedAt}
+deserialize(raw):
+    parse JSON; on error -> {ok:false, code:"corrupt"}
+    if schemaVersion > CURRENT -> {ok:false, code:"future-version"}
+    if schemaVersion < CURRENT -> migrate step by step, fail closed
+    validate: array lengths, integer ranges, note key pattern, text type
+    build typed arrays; return {ok:true, session}
+
+persistence:
+    onChange(): updatedAt = now; schedule(300ms trailing)
+    flushNow(): cancel timer; write synchronously
+    register pagehide -> flushNow
+    register visibilitychange -> if hidden: flushNow
+    write(): try storage.setItem catch -> announce once, mode = "memory"
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-05 -->
+  <blk:block id="B-05" name="URL codec: envelope, canonical body, integrity">
+    <blk:rationale>
+      RK4가 지적한 대로 URL format은 배포 후 영구 호환 부담이 된다. P3가 priority-1 병렬 lane인 이유이며,
+      DOM과 무관하므로 UI 진행과 독립적으로 완결·검증할 수 있다.
+    </blk:rationale>
+    <blk:objective>
+      OuterEnvelopeV1과 BodyV1을 왕복 인코딩하고, CRC32 불일치·미지원 codec·손상 payload를 typed failure로
+      거부하며, 동일 canonical state가 항상 동일 byte sequence를 만든다.
+    </blk:objective>
+    <blk:scope>
+      url/crc32.js, url/leb128.js, url/canonical.js, url/codec.js.
+      SC1·SC2·SC3 scope projection, deflate-raw 조건부 압축, 11단계 decode pipeline, 64KiB 출력 한도.
+    </blk:scope>
+    <blk:exclusions>Share dialog UI, 충돌 해소 정책 실행, address bar 조작</blk:exclusions>
+    <blk:dependencies>B-01, B-03(canonical state 정의)</blk:dependencies>
+    <blk:input type="CanonicalState + Scope">givens, values, candidates, notes, savedAt과 SC1|SC2|SC3</blk:input>
+    <blk:output type="string | DecodeResult">base64url fragment payload 또는 {ok, state|code, message}</blk:output>
+    <blk:side-effects>없음. CompressionStream·DecompressionStream 호출만 발생한다.</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="CompressionStream 부재 또는 deflate-raw 미지원 TypeError">
+        raw link만 생성한다. codec=1 link를 만나면 unsupported-codec으로 실패한다.
+      </blk:failure>
+      <blk:failure cause="CRC 불일치, truncated body, trailing bytes">crc-mismatch 또는 malformed-body</blk:failure>
+      <blk:failure cause="decompression 출력이 64KiB 초과">reader를 즉시 cancel하고 decompression-limit</blk:failure>
+      <blk:failure cause="givens가 row·column·box 모순">invalid-puzzle</blk:failure>
+      <blk:failure cause="noteCount 108 초과, non-minimal LEB128, non-zero padding">malformed-body</blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B05-01">
+        seeded random canonical state 1,000건에 대해 decode(encode(state, scope)) == normalize(state, scope).
+        note 수 0~108, candidate cell 수 0~81 경계를 포함한다.
+      </blk:item>
+      <blk:item id="V-B05-02">동일 state·scope·savedAt이 항상 동일 byte sequence를 만든다(결정성).</blk:item>
+      <blk:item id="V-B05-03">note 108건이 왕복 성공하고 109건 payload는 malformed-body로 거부된다(H1 회귀).</blk:item>
+      <blk:item id="V-B05-04">mask stream 말단 padding bit를 1로 조작한 payload가 거부된다(H2 회귀).</blk:item>
+      <blk:item id="V-B05-05">CompressionStream을 제거한 stub에서 raw link만 생성되고 codec=1 입력은 unsupported-codec을 반환한다.</blk:item>
+      <blk:item id="V-B05-06">SC1 66자, SC2+20 candidate cells 171자라는 산식이 실제 출력 길이와 일치한다.</blk:item>
+      <blk:item id="V-B05-07">8,000자 payload decode가 100ms 미만에 끝난다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+encode(state, scope):
+    body = buildBody(project(state, scope))        // canonical order, zero padding
+    crc  = crc32(body)
+    packed = deflateRaw(body)
+    use packed only if packed.length < body.length
+    out = [0x01, codec] ++ payload ++ le32(crc)
+    return base64urlNoPad(out)
+
+decode(fragment):
+    length and alphabet check                      // step 1
+    bytes = base64urlDecode                        // step 2
+    version and codec check
+    body = codec == 0 ? slice : inflateRawLimited(slice, 65536)   // step 3
+    if crc32(body) != trailer -> crc-mismatch      // step 4
+    parse with bounds check at every field         // steps 5..8
+    verify canonical invariants                    // step 9
+    verify givens consistency                      // step 10
+    require exact end of buffer                    // step 11
+    return {ok:true, state}
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-06 -->
+  <blk:block id="B-06" name="BoardView and grid accessibility">
+    <blk:rationale>
+      R3가 요구하는 role=grid + roving tabindex는 현재의 81 input 구조와 근본적으로 다르다.
+      렌더링과 접근성 semantics를 한 block으로 묶어야 accessible name과 DOM 갱신이 어긋나지 않는다.
+    </blk:rationale>
+    <blk:objective>
+      81개 gridcell이 하나의 tab stop과 arrow key 이동을 가지며, store 변경이 해당 cell만 갱신하고,
+      accessible name이 행·열·값·후보·충돌·메모 유무를 한 문장으로 전달한다.
+    </blk:objective>
+    <blk:scope>
+      Phase 1 component BoardView와 Announcer를 담당한다.
+      ui/board-view.js, ui/announcer.js. cell 렌더, partial update, roving tabindex, live region 정책.
+    </blk:scope>
+    <blk:exclusions>key 해석(B-07), touch 입력(B-09), style token 값(B-08), notes UI(B-10)</blk:exclusions>
+    <blk:dependencies>B-01, B-03</blk:dependencies>
+    <blk:input type="Store subscription">changed cell indices와 selection</blk:input>
+    <blk:output type="DOM">role=grid 하위 81 gridcell과 polite live region</blk:output>
+    <blk:side-effects>DOM 생성·갱신, focus 이동, live region textContent 갱신</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="전체 재렌더로 focus 소실">
+        변경된 index만 갱신하고 focus를 가진 element를 교체하지 않는다.
+      </blk:failure>
+      <blk:failure cause="digit 입력마다 live announcement가 쏟아짐">
+        각 digit 입력은 알리지 않는다. 알림 대상은 설계 §11 목록으로 한정한다.
+      </blk:failure>
+      <blk:failure cause="notes 텍스트를 innerHTML로 렌더">
+        textContent만 사용한다. 이는 보안 규칙이며 review 항목이다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B06-01">page tab sequence에 grid element가 정확히 1개만 존재한다.</blk:item>
+      <blk:item id="V-B06-02">arrow, Ctrl+arrow, Home/End, Ctrl+Home/End 이동이 명세대로 동작한다.</blk:item>
+      <blk:item id="V-B06-03">value 1개 변경 시 갱신되는 DOM node가 해당 cell과 peer highlight로 한정된다.</blk:item>
+      <blk:item id="V-B06-04">accessible name에 행·열·given 여부·candidates·conflict·메모 유무가 포함된다.</blk:item>
+      <blk:item id="V-B06-05">axe 자동 검사에서 critical violation 0.</blk:item>
+      <blk:item id="V-B06-06">note 텍스트에 마크업을 넣어도 문자 그대로 렌더된다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+mount(root, store):
+    build role=grid > role=row x9 > role=gridcell x9
+    cell[i].tabIndex = (i == selection) ? 0 : -1
+    store.subscribe(({changed, selection}) => {
+        for i in changed: updateCell(i)
+        if selection changed: move roving tabindex and focus
+    })
+updateCell(i):
+    set textContent for value or candidate spans
+    set data-state attributes for given, conflict, memo, peer, same-digit
+    set aria-label from labelFor(i)
+announce(message): liveRegion.textContent = message      // polite only
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-07 -->
+  <blk:block id="B-07" name="KeyboardAdapter">
+    <blk:rationale>
+      KeyboardAdapter는 viewport와 무관하게 항상 활성이라는 V4-02의 귀결을 담는다.
+      AZERTY 충돌(RK6)이라는 고유 위험이 있어 별도 검증 단위가 필요하다.
+    </blk:rationale>
+    <blk:objective>
+      §11 keymap 전체가 동작하고, Shift quasimode와 Space sticky toggle이 동등한 candidate 입력 경로를 제공하며,
+      editor descendant가 focus를 가진 동안 board shortcut을 해석하지 않는다.
+    </blk:objective>
+    <blk:scope>ui/keyboard-adapter.js. event.code 우선 판정, quasimode, sticky, shiftQuasimode setting 반영.</blk:scope>
+    <blk:exclusions>touch 입력, notes editor 내부 편집 동작, dialog 내부 key 처리</blk:exclusions>
+    <blk:dependencies>B-03, B-06</blk:dependencies>
+    <blk:input type="KeyboardEvent">keydown, keyup</blk:input>
+    <blk:output type="Store mutation | navigation">store 호출 또는 selection 이동</blk:output>
+    <blk:side-effects>store mutation, selection 변경, 일부 event의 preventDefault</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="AZERTY에서 Shift가 digit 입력에 필요">
+        Space sticky와 shiftQuasimode=false 설정을 동등 primary path로 제공한다.
+      </blk:failure>
+      <blk:failure cause="editor·dialog focus 중 board shortcut 오작동">
+        focus가 board 밖이면 adapter가 자신을 비활성화한다.
+      </blk:failure>
+      <blk:failure cause="Space가 button 활성화와 충돌">
+        Space sticky toggle은 focus가 gridcell일 때만 해석한다.
+      </blk:failure>
+      <blk:failure cause="Shift-held 상태의 반복 live announcement">
+        quasimode는 알리지 않는다. sticky만 on/off를 1회 알린다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B07-01">Digit1..9와 Numpad1..9가 event.code로 판정되고 key fallback이 동작한다.</blk:item>
+      <blk:item id="V-B07-02">Shift+digit이 candidate를, digit이 value를 기록한다.</blk:item>
+      <blk:item id="V-B07-03">shiftQuasimode=false에서 Shift+digit이 value로 처리된다.</blk:item>
+      <blk:item id="V-B07-04">focus가 textarea일 때 board shortcut이 해석되지 않는다.</blk:item>
+      <blk:item id="V-B07-05">focus가 button일 때 Space가 sticky를 토글하지 않는다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+onKeyDown(e):
+    if not boardHasFocus(): return
+    digit = digitFromCode(e.code) ?? digitFromKey(e.key)
+    if digit:
+        candidate = (e.shiftKey and settings.shiftQuasimode) or store.candidateSticky
+        candidate ? store.toggleCandidate(sel, digit) : store.setValue(sel, digit)
+        e.preventDefault(); return
+    switch e.key: arrows, Home, End, Backspace, Delete, "n", "m", "?", undo/redo combos
+    if e.code == "Space" and focusedRole == "gridcell": toggleSticky(); announce once
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-08 -->
+  <blk:block id="B-08" name="Visual system, color tokens, responsive layout">
+    <blk:rationale>
+      M3 해소의 귀착점이다. token 값과 contrast 검증을 코드로 고정하지 않으면 이후 어떤 style 변경도
+      4.5:1 보장을 조용히 깨뜨릴 수 있다. breakpoint와 VisualViewport geometry도 시각 계층의 일부다.
+    </blk:rationale>
+    <blk:objective>
+      §10 token이 CSS custom property로 존재하고 자동 contrast 검사가 실패 0으로 통과하며,
+      3개 breakpoint와 keyboard-open geometry가 명세 산식대로 동작한다.
+    </blk:objective>
+    <blk:scope>
+      css/tokens.css, css/board.css, css/layout.css, ui/viewport.js, tools/check-contrast.mjs.
+      grid line 3px/2px/1px, number tier, candidate max(9px, 24cqi), state cue, reduced motion,
+      ux:control-floor 48px, ux:cell-target 48px preferred(L1, L3).
+    </blk:scope>
+    <blk:exclusions>touch control 구성(B-09), notes 배치(B-10), dialog style(B-11)</blk:exclusions>
+    <blk:dependencies>B-06</blk:dependencies>
+    <blk:input type="CSS custom properties + VisualViewport">token 정의와 viewport geometry event</blk:input>
+    <blk:output type="computed layout">boardScale, 편집 surface 위치, theme별 색</blk:output>
+    <blk:side-effects>
+      style 적용, resize·scroll listener 등록, requestAnimationFrame 1회 합침.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="token 변경으로 contrast 미달">
+        tools/check-contrast.mjs가 실패를 반환한다. 이것이 M3 재발 방지 장치다.
+      </blk:failure>
+      <blk:failure cause="VisualViewport 미지원">
+        documentElement.clientHeight로 fallback하고 dvh를 보조로 사용한다.
+      </blk:failure>
+      <blk:failure cause="pinch zoom 중 좌표계 혼동">
+        scale을 읽어 layout 좌표와 visual 좌표를 분리한다.
+      </blk:failure>
+      <blk:failure cause="cqi 미지원 브라우저">
+        font-size 9px 선언을 먼저 두고 max(9px, 24cqi)를 뒤에 둬 자연 fallback시킨다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B08-01">3개 breakpoint에서 board·controls 배치가 명세와 일치함을 수동 확인한다.</blk:item>
+      <blk:item id="V-B08-02">
+        tools/check-contrast.mjs가 tokens.css를 파싱해 light·dark 76쌍을 재계산하고 실패 0으로 통과한다.
+        기대값은 light text 5.75:1, dark text 5.27:1, dark non-text 4.05:1이다.
+      </blk:item>
+      <blk:item id="V-B08-03">prefers-reduced-motion에서 transition duration이 0ms다.</blk:item>
+      <blk:item id="V-B08-04">320·360·390px에서 candidate가 9px 이상으로 렌더되고 판독 가능 여부를 기록한다(RK3).</blk:item>
+      <blk:item id="V-B08-05">software keyboard를 연 상태에서 편집 surface가 board를 가리지 않는다.</blk:item>
+      <blk:item id="V-B08-06">board 밖 모든 interactive control이 48x48 이상이다(L3).</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+tokens.css:
+    :root { --bg-cell: #FFFFFF; ... }                       // light values
+    @media (prefers-color-scheme: dark) { :root { ... } }    // dark values
+
+check-contrast.mjs:
+    parse custom properties from tokens.css for both themes
+    for each (fg, bg) pair in the required matrix: ratio(fg, bg)
+    exit non-zero when any text pair < 4.5 or non-text pair < 3.0
+
+viewport.js:
+    on resize/scroll -> coalesce into one rAF
+    visibleTop    = visualViewport?.offsetTop ?? 0
+    visibleHeight = visualViewport?.height ?? clientHeight
+    available     = max(0, visibleHeight - (56 + 16))
+    boardScale    = min(1, available / boardWidth)
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-09 -->
+  <blk:block id="B-09" name="TouchAdapter">
+    <blk:rationale>
+      V4-02의 additive 정책과 manual override, 그리고 잘못된 media query에서도 복구 가능해야 한다는 안전 요구를
+      한 곳에서 책임진다. sticky mode error는 kill criterion이 걸린 고유 위험이다.
+    </blk:rationale>
+    <blk:objective>
+      Digit First와 Cell First가 모두 동작하고, candidate sticky가 3중 신호로 표시되며,
+      touchControls auto·show·hide 해석과 48px expand handle 복구 경로가 동작한다.
+    </blk:objective>
+    <blk:scope>
+      ui/touch-adapter.js. digit bar, 도구 4종, adapter 가시성 정책, expand handle,
+      digit target width board/9 및 height 48px(L2), control floor 48px(L3).
+    </blk:scope>
+    <blk:exclusions>notes 편집 UI(B-10), keyboard 입력(B-07)</blk:exclusions>
+    <blk:dependencies>B-03, B-06, B-08</blk:dependencies>
+    <blk:input type="PointerEvent + Settings">tap, long press, touchControls 값, coarse pointer query</blk:input>
+    <blk:output type="Store mutation | UI state">value·candidate mutation, activeDigit, sticky 상태</blk:output>
+    <blk:side-effects>store mutation, DOM class 변경, 지원 시 navigator.vibrate 10ms</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="sticky 상태를 색으로만 표시">
+        pressed shape, dashed board outline, text badge를 함께 사용한다. 색 단독 신호 금지.
+      </blk:failure>
+      <blk:failure cause="media query 오판으로 controls가 사라짐">
+        hide 상태에서도 48x48 expand handle을 남긴다.
+      </blk:failure>
+      <blk:failure cause="숫자 입력이 software keyboard를 열음">
+        board와 digit bar에 입력 가능한 form control을 쓰지 않는다. 이는 핵심 불변식이다.
+      </blk:failure>
+      <blk:failure cause="vibrate 미지원">기능 저하 없이 무시한다.</blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B09-01">digit 활성 후 cell tap으로 set·toggle·replace가 동작하고 given tap은 무반응이다.</blk:item>
+      <blk:item id="V-B09-02">activeDigit 없이 cell을 먼저 골라도 입력이 완료된다(Cell First).</blk:item>
+      <blk:item id="V-B09-03">touchControls show·hide·auto 세 값이 media query와 독립적으로 해석된다.</blk:item>
+      <blk:item id="V-B09-04">hide 상태에서 expand handle로 controls를 복구할 수 있다.</blk:item>
+      <blk:item id="V-B09-05">모바일에서 어떤 조작으로도 software keyboard가 열리지 않는다.</blk:item>
+      <blk:item id="V-B09-06">digit target이 board width/9 폭과 48px 높이를 만족한다(L2).</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+resolveVisibility(setting, coarseQuery):
+    show -> visible; hide -> collapsed with handle; auto -> coarseQuery.matches
+
+onDigitTap(d):  activeDigit = (activeDigit == d) ? null : d
+onCellTap(i):
+    if givens[i] != 0: return
+    if candidateSticky and activeDigit: store.toggleCandidate(i, activeDigit)
+    else if activeDigit:                store.setValue(i, activeDigit)
+    else:                               store.select(i)
+onPencilTap(): candidateSticky = !candidateSticky; announce once
+onCellLongPress(i, 400ms): openNoteEditor("cell", i)      // accelerator only
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-10 -->
+  <blk:block id="B-10" name="NotesView: rail, sheet, target selector, markers">
+    <blk:rationale>
+      U3의 memo scope와 V4-03·V4-04·V4-05가 모두 여기서 만난다. non-modal focus 모델과 display-only marker는
+      rev 3에서 실제로 모순을 일으켰던 지점이므로 독립 검증이 필요하다.
+    </blk:rationale>
+    <blk:objective>
+      cell·row·column·box note를 desktop rail과 mobile sheet에서 생성·수정·삭제·재탐색할 수 있고,
+      editor가 focus를 가두지 않으며, marker가 어떤 입력도 받지 않는다.
+    </blk:objective>
+    <blk:scope>
+      ui/notes-view.js. rail 카드 목록, mobile 4-target selector, dog-ear·region tick 렌더,
+      Notes list, draft·dirty 처리, 저장·취소 계약.
+    </blk:scope>
+    <blk:exclusions>modal dialog 구현(B-11), URL notes 병합(B-12)</blk:exclusions>
+    <blk:dependencies>B-03, B-06, B-08</blk:dependencies>
+    <blk:input type="target + draft">{kind:"cell"|"row"|"column"|"box", key:number, text:string}</blk:input>
+    <blk:output type="Store note mutation">setNote 호출 및 rail·sheet 갱신</blk:output>
+    <blk:side-effects>DOM, focus 이동(initial·return), store mutation</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="비모달 editor에 focus trap 적용">
+        Tab이 자연 순서로 문서를 빠져나가야 한다. aria-modal을 쓰지 않는다.
+      </blk:failure>
+      <blk:failure cause="marker를 tap·focus 대상으로 사용">
+        pointer-events:none과 non-focusable을 강제한다. 대체 경로는 Memo button과 Notes list다.
+      </blk:failure>
+      <blk:failure cause="keyboard dismissal이 draft를 삼킴">
+        저장도 삭제도 하지 않는다. Save·Cancel만 상태를 바꾼다.
+      </blk:failure>
+      <blk:failure cause="selection 없이 Memo button을 누름">Notes list를 연다.</blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B10-01">editor 열림 상태에서 Tab이 문서의 다음 focusable로 빠져나간다.</blk:item>
+      <blk:item id="V-B10-02">Save·Cancel 후 focus가 originating gridcell로 복귀한다.</blk:item>
+      <blk:item id="V-B10-03">marker가 tab 순서에 없고 pointer event를 받지 않는다.</blk:item>
+      <blk:item id="V-B10-04">mobile에서 4개 target 모두로 note를 만들고 다시 찾을 수 있다(TM2 100% 목표).</blk:item>
+      <blk:item id="V-B10-05">dirty draft에서 Escape가 확인 modal을 1회 연다.</blk:item>
+      <blk:item id="V-B10-06">note 텍스트가 textContent로만 렌더된다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+openEditor(target):
+    draft = store.getNote(target) ?? ""
+    render editor outside the board rectangle
+    focus textarea            // initial focus only, no trap
+save():   store.setNote(target, draft.trim()); announce; returnFocus()
+cancel(): if dirty -> confirm modal via DialogHost; else returnFocus()
+renderMarkers():
+    for each cell with note: dog-ear span, pointer-events:none, aria-hidden
+    accessible name of the cell carries "메모 있음"
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-11 -->
+  <blk:block id="B-11" name="DialogHost and ShareView">
+    <blk:rationale>
+      실제 modal은 여기에만 존재한다. focus containment를 한 곳으로 모아야 B-10의 non-modal 계약이 오염되지 않는다.
+      Share는 SC3 유출(RK5)이라는 프라이버시 위험을 직접 다룬다.
+    </blk:rationale>
+    <blk:objective>
+      confirm·conflict·help·share dialog가 aria-modal, inert background, Escape, return focus를 갖추고,
+      Share dialog가 scope 선택·길이 경고·거부 규칙·복사 경로를 제공한다.
+    </blk:objective>
+    <blk:scope>
+      ui/dialog-host.js, ui/share-view.js. SC1·SC2·SC3 선택, 2,000자 경고, 8,000자 초과 notes 링크 거부,
+      clipboard 및 navigator.share, 프라이버시 문구.
+    </blk:scope>
+    <blk:exclusions>codec 구현(B-05), 충돌 해소 정책(B-12)</blk:exclusions>
+    <blk:dependencies>B-05, B-08</blk:dependencies>
+    <blk:input type="dialog request">{kind, payload} 및 share scope 선택</blk:input>
+    <blk:output type="user decision | link string">확인 결과 또는 base64url 링크</blk:output>
+    <blk:side-effects>DOM, focus containment, clipboard write, navigator.share 호출</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="clipboard API 거부 또는 미지원">
+        선택 가능한 readonly input을 fallback으로 제공한다.
+      </blk:failure>
+      <blk:failure cause="navigator.share를 user activation 밖에서 호출">
+        activation 안에서만 호출한다.
+      </blk:failure>
+      <blk:failure cause="SC3 링크가 8,000자 초과">
+        생성을 거부하고 notes 제외 링크를 제안한다.
+      </blk:failure>
+      <blk:failure cause="background가 여전히 조작 가능">inert 처리 실패는 접근성 결함으로 취급한다.</blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B11-01">modal 열림 중 Tab이 dialog 밖으로 나가지 않고 Escape로 닫히며 focus가 복귀한다.</blk:item>
+      <blk:item id="V-B11-02">background element가 inert이며 screen reader 탐색에서 제외된다.</blk:item>
+      <blk:item id="V-B11-03">2,000자 초과에서 경고가, 8,000자 초과 notes 링크에서 거부와 대안 제안이 나타난다.</blk:item>
+      <blk:item id="V-B11-04">SC3 선택 시 프라이버시 경고가 표시되고 기본 scope는 SC2다.</blk:item>
+      <blk:item id="V-B11-05">clipboard 실패 시 fallback input으로 링크를 선택·복사할 수 있다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+open(kind, payload):
+    previousFocus = document.activeElement
+    render role=dialog aria-modal=true
+    set inert on background containers
+    focus first control; contain Tab within dialog
+close(result):
+    remove inert; previousFocus.focus(); resolve(result)
+
+share(scope):
+    link = origin + path + "#s=" + codec.encode(state, scope)
+    if scope == SC3 and link.length > 8000: reject, offer SC2
+    if link.length > 2000: warn but allow
+    copy via clipboard, else expose selectable input
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-12 -->
+  <blk:block id="B-12" name="Bootstrap orchestration, conflict resolution, API failure">
+    <blk:rationale>
+      개별 block이 모두 옳아도 순서가 틀리면 restore가 지연되거나 상태가 유실된다.
+      M1이 만든 network 실패 경로도 여기서만 발생하므로 통합 지점을 하나로 둔다.
+    </blk:rationale>
+    <blk:objective>
+      §12의 9단계 sequence가 순서대로 실행되고, CR1~CR5가 한 번만 평가되며,
+      new-puzzle 실패가 blank page 없이 재시도 가능한 terminal state로 끝난다.
+    </blk:objective>
+    <blk:scope>
+      bootstrap.js. fragment 파싱·검증, local session 조회, 충돌 해소, session 채택, adapter 활성화,
+      history.replaceState로 fragment 제거, V4-16의 timeout·retry·error panel·offline 처리.
+    </blk:scope>
+    <blk:exclusions>codec 내부(B-05), 저장 형식(B-04), 개별 UI 구현</blk:exclusions>
+    <blk:dependencies>B-02, B-04, B-05, B-06, B-11</blk:dependencies>
+    <blk:input type="location.hash + storage + network">fragment, sudoku:v1:session, GET /api/new-puzzle/</blk:input>
+    <blk:output type="active GameSession | error state">렌더된 session 또는 재시도 가능한 실패 화면</blk:output>
+    <blk:side-effects>
+      network 요청 최대 2회, localStorage read·write, archive slot 이동, history.replaceState 1회, focus 이동.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="URL decode 실패">
+        적용하지 않고 local session 또는 new puzzle로 계속한다. 사용자 확인 후 fragment를 제거한다.
+      </blk:failure>
+      <blk:failure cause="new-puzzle timeout 또는 5xx">
+        1초 후 1회 재시도하고, 실패하면 error panel과 재시도 button으로 종결한다(M1).
+      </blk:failure>
+      <blk:failure cause="navigator.onLine == false">
+        호출을 건너뛰고 즉시 terminal state로 간다. online event 수신 시 button을 강조하되 자동 재시도는 하지 않는다.
+      </blk:failure>
+      <blk:failure cause="local session 복원 실패">알린 뒤 new-puzzle flow로 간다.</blk:failure>
+      <blk:failure cause="CR2와 CR4가 연속으로 dialog를 요구">
+        core 선택을 먼저 종결한 뒤 notes 병합을 연다. 두 dialog를 동시에 열지 않는다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B12-01">session이 있으면 network 호출 없이 복원된다.</blk:item>
+      <blk:item id="V-B12-02">CR1~CR5 각각에 대해 기대 결과가 재현된다. CR1은 archive 이동과 8초 undo toast를 포함한다.</blk:item>
+      <blk:item id="V-B12-03">URL이 notes를 생략한 경우 local notes가 보존된다(삭제 명령 아님).</blk:item>
+      <blk:item id="V-B12-04">
+        offline·timeout·500 세 조건 각각에서 blank page가 발생하지 않고 재시도 button에 도달한다(M1 회귀).
+      </blk:item>
+      <blk:item id="V-B12-05">재시도 button으로 정상 복구되면 이후 흐름이 신규 session과 동일하다.</blk:item>
+      <blk:item id="V-B12-06">채택 후 fragment가 replaceState로 제거되고 pushState가 사용되지 않는다.</blk:item>
+      <blk:item id="V-B12-07">CR2와 CR4가 동시에 성립할 때 dialog가 순차로 열린다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+async function bootstrap():
+    renderInertSkeleton()
+    urlState = hash ? codec.decode(hash) : null
+    local    = persistence.restore()
+    adopted  = resolveConflict(urlState, local)          // CR1..CR5, evaluated once
+    if adopted: render(adopted)
+    else:       adopted = await createNewSession()
+    if adopted: enableAdapters(); if consumedFragment: history.replaceState(cleanUrl)
+
+async function createNewSession():
+    if navigator.onLine == false: return showRetryPanel("offline")
+    for attempt in 1..2:
+        try:
+            res = await fetch("/api/new-puzzle/", {signal: timeout(10_000)})
+            if res.status >= 500: throw RetryableError
+            if not res.ok: return showRetryPanel("server")     // 4xx, no retry
+            return sessionFromPuzzle(await res.json())         // solution not stored
+        catch RetryableError or AbortError:
+            if attempt == 1: await delay(1000); continue
+    return showRetryPanel("network")
+
+showRetryPanel(cause):
+    keep board inert; render panel outside the board
+    focus the 48px retry button; return null
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== B-13 -->
+  <blk:block id="B-13" name="Acceptance verification and legacy removal">
+    <blk:rationale>
+      개별 block validation은 국소적이다. kill criterion과 usability metric은 통합된 build에서만 판정할 수 있고,
+      legacy 삭제는 되돌리기 어려우므로 마지막에 별도 승인 대상으로 둔다.
+    </blk:rationale>
+    <blk:objective>
+      §13 metric과 kill criterion을 통합 build에서 측정해 기록하고, 그 결과를 근거로 legacy 파일 제거 여부를
+      사용자에게 확인받는다.
+    </blk:objective>
+    <blk:scope>
+      전 block 통합 실행, axe 검사, 320·360·390px 실측, pagehide 100회 시험, codec 성능 측정,
+      P2-05의 legacy 처리 결정.
+    </blk:scope>
+    <blk:exclusions>
+      usability study 참가자 모집과 실행. 이는 설계상 별도 활동이며 이 block은 측정 환경만 준비한다.
+    </blk:exclusions>
+    <blk:dependencies>B-01 ~ B-12 전부</blk:dependencies>
+    <blk:input type="integrated build">전 block이 통합된 실행 가능한 앱</blk:input>
+    <blk:output type="measurement record">metric 표와 kill criterion 판정, legacy 처리 제안</blk:output>
+    <blk:side-effects>
+      legacy 파일 삭제는 승인 후에만 수행한다. 승인 전에는 어떤 파일도 제거하지 않는다.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="kill criterion 충족">
+        해당 설계 항목을 Phase 1으로 되돌려 재승인받는다. 임의로 대안을 구현하지 않는다.
+      </blk:failure>
+      <blk:failure cause="9px candidate 판독 불가">
+        RK3 kill criterion에 따라 horizontal zoom 또는 alternate list를 Phase 1에서 재검토한다.
+      </blk:failure>
+      <blk:failure cause="axe critical violation 잔존">
+        해당 block으로 되돌려 수정한다. 통합 단계에서 임시 우회하지 않는다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B13-01">axe critical violation 0과 수동 screen reader 통과.</blk:item>
+      <blk:item id="V-B13-02">pagehide 100회 시험에서 최종 mutation 유실 0.</blk:item>
+      <blk:item id="V-B13-03">8,000자 payload decode 100ms 미만.</blk:item>
+      <blk:item id="V-B13-04">codec round-trip 100%.</blk:item>
+      <blk:item id="V-B13-05">contrast gate 실패 0(V-B08-02 재실행).</blk:item>
+      <blk:item id="V-B13-06">legacy 제거는 사용자 승인 후에만 수행하고, 미승인 시 그대로 둔다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+run node --test tests/js                  # all DOM-free specs
+run tools/check-contrast.mjs              # token gate
+run python manage.py test game            # server contract
+open integrated build; run axe; record violations
+measure: decode latency, pagehide durability, candidate legibility at 320/360/390
+compare each metric against section 13 targets; record PASS/FAIL/BLOCKED/NOT RUN
+propose legacy removal; wait for explicit approval
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ================================================== 위험 -->
+  <mb:risks xml:id="phase2-risks">
+    <mb:risk id="MR1" severity="medium" refs="B-06 B-07 B-09">
+      81 input 구조에서 role=grid 구조로 바뀌면서 기존 사용자 조작 감각이 전면 변경된다.
+      단계별로 legacy와 병존시키지 않으므로 B-06 완료 전까지 앱이 조작 불가 상태가 된다.
+      완화는 B-06을 P0 prototype 범위로 우선 완결하는 것이다.
+    </mb:risk>
+    <mb:risk id="MR2" severity="medium" refs="B-05">
+      URL format은 배포 후 영구 호환 부담이다(RK4). V-B05-01..07 전부 통과 전에는 링크 공유 기능을 노출하지 않는다.
+    </mb:risk>
+    <mb:risk id="MR3" severity="low" refs="B-01 B-02">
+      index.html을 B-01과 B-02가 모두 수정한다. 순서를 지키지 않으면 legacy script가 존재하지 않는 context를 참조한다.
+      B-01 이후 B-02 적용으로 순서를 고정한다.
+    </mb:risk>
+    <mb:risk id="MR4" severity="low" refs="B-13">
+      metric 중 usability 항목은 참가자 없이는 측정할 수 없다. 해당 항목은 NOT RUN으로 보고하고
+      기술 metric만으로 완료를 주장하지 않는다.
+    </mb:risk>
+  </mb:risks>
+
+  <mb:open-questions xml:id="open-questions">
+    <mb:question id="OQ-A" blocking="false">
+      Phase 4에서 생성할 source file에 AGENTS.md의 claude-mhj_YY_MM_DD_seq_ prefix 규칙을 적용할 것인가.
+      ES module import 경로에 날짜와 일련번호가 들어가면 가독성과 유지보수성이 크게 나빠진다.
+      권장은 문서·산출물에는 규칙을 유지하고 application source에는 예외를 두는 것이며, 결정은 사용자 몫이다.
+    </mb:question>
+    <mb:question id="OQ-B" blocking="false">
+      P2-02의 Node test runner 사용을 승인하는가. 승인하지 않으면 P3의 1,000건 property test는
+      수동 browser 실행으로 대체되며 자동 회귀 검증이 불가능해진다.
+    </mb:question>
+    <mb:question id="OQ-C" blocking="false">
+      B-13의 usability study를 실제로 수행할 것인가. 수행하지 않으면 desktop candidate mode error,
+      touch sticky mode error, mobile region note completion 세 metric은 NOT RUN으로 남는다.
+    </mb:question>
+  </mb:open-questions>
+
+  <mb:approval xml:id="approval" status="awaiting-user-approval">
+    <mb:current-phase>2. Macro Blocking</mb:current-phase>
+    <mb:validation-performed>
+      XML well-formedness, block id 유일성, 의존 관계 비순환성, Phase 1 요구사항 대 block 매핑 완전성
+    </mb:validation-performed>
+    <mb:checkbox checked="false">Macro Blocking 승인</mb:checkbox>
+    <mb:checkbox checked="false">P2-01 ES module 및 P2-02 Node test runner 승인</mb:checkbox>
+    <mb:checkbox checked="false">Phase 3 Micro Blocking 진행 승인</mb:checkbox>
+    <mb:next-phase blocked="true">Phase 3 — Micro Blocking</mb:next-phase>
+  </mb:approval>
+
+</mb:macro-blocking>

@@ -1,0 +1,138 @@
+/* §10 visual regime: three grid-line weights, three number tiers, and five
+   state cues -- every cue pairs its color with a non-color signal (shape,
+   underline, or badge text) so nothing here relies on color alone. */
+
+[role="grid"] {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    border: 3px solid var(--line); /* outer: 3px */
+}
+
+[role="row"] {
+    display: contents;
+}
+
+.cell {
+    container-type: inline-size;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-cell);
+    border: 1px solid var(--line); /* default cell border: 1px */
+    outline-offset: -2px;
+}
+
+/* Box boundaries: every 3rd column/row gets the heavier 2px line. */
+.cell:nth-child(3n) {
+    border-right-width: 2px;
+}
+
+.cell:nth-child(9n + 1) {
+    border-left-width: 2px;
+}
+
+[role="grid"] > [role="row"]:nth-child(3n) .cell {
+    border-bottom-width: 2px;
+}
+
+[role="grid"] > [role="row"]:nth-child(9n + 1) .cell {
+    border-top-width: 2px;
+}
+
+.cell-value {
+    font-size: 52cqi;
+    color: var(--fg-body);
+}
+
+.cell[data-given="1"] {
+    background: var(--bg-cell-given);
+}
+
+.cell[data-given="1"] .cell-value {
+    font-weight: 600;
+    color: var(--fg-given);
+}
+
+.cell:not([data-given="1"]) .cell-value {
+    font-weight: 400;
+    color: var(--fg-user);
+}
+
+.cell-candidates {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.candidate {
+    font-size: 9px;
+    font-size: max(9px, 24cqi); /* cqi unsupported falls back to the 9px floor above it */
+    color: var(--fg-candidate);
+    text-align: center;
+}
+
+/* Selected: 2px solid outline plus a background change (V4-05: never color alone). */
+.cell[data-index][tabindex="0"] {
+    outline: 2px solid var(--focus);
+    background: var(--bg-cell-selected);
+}
+
+/* Peer highlight (same row/column/box as selection). */
+.cell[data-peer="1"] {
+    background: var(--bg-cell-peer);
+}
+
+/* Sticky candidate mode: dashed outline plus a text badge, not color alone. */
+.cell[data-candidate-mode="1"] {
+    outline: 2px dashed var(--focus);
+}
+
+.cell[data-candidate-mode="1"]::before {
+    content: "후보";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    font-size: 8px;
+    color: var(--fg-candidate);
+}
+
+/* Conflict: underline plus color, never color alone. */
+.cell[data-conflict="1"] .cell-value {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    color: var(--fg-conflict);
+    background: var(--bg-cell-conflict);
+}
+
+/* Memo indicator: a dog-ear triangle, display-only (never a tap/focus target). */
+.cell[data-note="1"]::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 8px 8px 0;
+    border-color: transparent var(--fg-candidate) transparent transparent;
+    pointer-events: none;
+}
+
+.cell[data-note="1"] {
+    /* aria-hidden is set on the pseudo-element's real DOM sibling in board-view.js
+       where one exists; this file only supplies the non-interactive visual. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition-duration: 0ms !important;
+        animation-duration: 0ms !important;
+    }
+}
+
+.cell,
+.candidate {
+    transition-duration: 120ms; /* well under the 180ms ceiling; reduced-motion above zeroes it */
+}

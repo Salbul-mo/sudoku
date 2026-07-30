@@ -5,11 +5,7 @@ from . import generator
 
 
 def index(request):
-    puzzle, solution = generator.generate_puzzle()
-    return render(request, "game/index.html", {
-        "puzzle": puzzle,
-        "solution": solution,
-    })
+    return render(request, "game/index.html")
 
 
 def new_puzzle(request):

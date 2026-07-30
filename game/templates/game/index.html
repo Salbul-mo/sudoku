@@ -3,25 +3,16 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>스도쿠</title>
-    <link rel="stylesheet" href="{% static 'game/css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/tokens.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/layout.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/board.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/chrome.css' %}">
 </head>
 <body>
-    <main class="wrap">
-        <h1>스도쿠</h1>
+    <main id="app"></main>
 
-        <div id="board" class="board"></div>
-
-        <div id="message" class="message"></div>
-
-        <div class="controls">
-            <button id="check-btn">확인</button>
-            <button id="new-game-btn">새 게임</button>
-        </div>
-    </main>
-
-    {{ puzzle|json_script:"puzzle-data" }}
-    {{ solution|json_script:"solution-data" }}
-    <script src="{% static 'game/js/game.js' %}"></script>
+    <script type="module" src="{% static 'game/js/main.js' %}"></script>
 </body>
 </html>

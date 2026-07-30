@@ -1,0 +1,681 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dlx:macro-blocking
+    xmlns:dlx="urn:sudoku:dlx-improvement:v1"
+    xmlns:basis="urn:sudoku:design-basis:v1"
+    xmlns:msr="urn:sudoku:measurement:v1"
+    xmlns:blk="urn:sudoku:block:v1"
+    xmlns:dec="urn:sudoku:decision:v1"
+    xmlns:risk="urn:sudoku:risk:v1"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xml:id="dlx-improvement-macro-blocking-v1"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="2"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Dancing Links 개선 2차 라운드의 Macro Blocking.
+    사용자 결정에 따라 Phase 1 System Design을 별도 문서로 분리하지 않고
+    basis:design-basis 절에 통합했다. 그 절의 수치는 전부 이 저장소에서 실제로 측정한 값이다.
+  -->
+
+  <dlx:document-control xml:id="document-control">
+    <dlx:title>Dancing Links 2차 개선 — Macro Blocking</dlx:title>
+    <dlx:owner>claude-mhj</dlx:owner>
+    <dlx:baseline>
+      <dlx:file>docs/dlx-refactor-plan.md</dlx:file>
+      <dlx:describes>1차 개선(Phase 1~6) 설계와 결과. commit bb53700으로 반영 완료.</dlx:describes>
+      <dlx:code-baseline>game/sudoku/{spec,dlx,solver,generator}.py, game/tests/ 74 tests</dlx:code-baseline>
+      <dlx:status>완료된 작업이며 이 문서의 불변 출발점이다. 되돌리지 않는다.</dlx:status>
+    </dlx:baseline>
+    <dlx:deliverable>
+      <dlx:file>docs/claude-mhj_26_07_26_02_dlx-improvement-macro-blocking.xml</dlx:file>
+      <dlx:scope>2차 개선의 Macro Block 정의. 이 문서 작성 과정에서 application code는 변경하지 않았다.</dlx:scope>
+    </dlx:deliverable>
+    <dlx:phase-note>
+      Phase 1을 별도 문서로 분리하지 않은 근거는 아래 basis:design-basis가 실측 프로파일과 반증된 가설을 모두
+      담고 있어 System Design이 요구하는 현상 분석·설계 근거·위험 식별을 충족하기 때문이다.
+      승인은 이 문서 하나로 받는다.
+    </dlx:phase-note>
+    <dlx:approval-state current="awaiting-user-approval">
+      <dlx:next-on-approval>Phase 3 — Micro Blocking</dlx:next-on-approval>
+      <dlx:prohibited-before-approval>Phase 3 확정 및 Phase 4 code implementation</dlx:prohibited-before-approval>
+    </dlx:approval-state>
+  </dlx:document-control>
+
+  <!-- ============================================================ 설계 근거 -->
+  <basis:design-basis xml:id="design-basis">
+
+    <basis:environment confidence="verified">
+      <basis:item name="python">3.14.3 (venv/Scripts/python.exe)</basis:item>
+      <basis:item name="django">6.0.7</basis:item>
+      <basis:item name="platform">Windows 11</basis:item>
+      <basis:item name="baseline-tests">python manage.py test game → Ran 74 tests in 2.876s, OK</basis:item>
+      <basis:caveat>
+        아래 timing은 단일 머신 1회 측정이다. 절대값이 아니라 같은 실행 안의 비율과 A/B 차이만 근거로 쓴다.
+      </basis:caveat>
+    </basis:environment>
+
+    <!-- ==================================================== 진단 -->
+    <basis:diagnosis xml:id="diagnosis" confidence="verified">
+      <basis:headline>
+        1차 개선은 “판정마다 행렬을 다시 짓는” 비용(전체의 약 50%)을 제거했다.
+        그 자리를 이제 “판정마다 단서 층을 다시 까는” 비용이 차지했고, 비중은 더 커졌다.
+      </basis:headline>
+
+      <msr:profile method="cProfile" workload="generate_puzzle, difficulty=medium, seed=7">
+        <msr:run dim="9" puzzles="25" total-seconds="0.647">
+          <msr:row function="dlx.cover" ncalls="200197" tottime="0.217" share-of-total="33.5%"/>
+          <msr:row function="dlx.uncover" ncalls="200197" tottime="0.197" share-of-total="30.4%"/>
+          <msr:row function="dlx._apply_row" ncalls="39701" cumtime="0.309" share-of-total="47.8%"/>
+          <msr:row function="dlx.givens" ncalls="1836" cumtime="0.540" share-of-total="83.5%"/>
+          <msr:row function="dlx.search" ncalls="943" cumtime="0.082" share-of-total="12.7%"/>
+        </msr:run>
+        <msr:run dim="16" puzzles="3" total-seconds="1.584">
+          <msr:row function="dlx.cover" ncalls="294743" tottime="0.639" share-of-total="40.3%"/>
+          <msr:row function="dlx.uncover" ncalls="294743" tottime="0.586" share-of-total="37.0%"/>
+          <msr:row function="dlx._apply_row" ncalls="61746" cumtime="0.792" share-of-total="50.0%"/>
+          <msr:row function="dlx.givens" ncalls="816" cumtime="1.438" share-of-total="90.8%"/>
+          <msr:row function="dlx.search" ncalls="411" cumtime="0.118" share-of-total="7.4%"/>
+        </msr:run>
+        <msr:reading>
+          givens() cumtime은 단서 적용 loop와 finally의 해제 loop만 포함한다. with 본문의 search는 호출자
+          frame에서 실행되므로 중복 계상되지 않는다. 따라서 두 값은 배타적으로 읽을 수 있다.
+        </msr:reading>
+      </msr:profile>
+
+      <basis:finding id="F1" severity="high" confidence="verified">
+        <basis:claim>퍼즐 생성 시간의 83.5%(9x9), 90.8%(16x16)가 단서 층 적용·해제이고, 탐색 자체는 12.7%, 7.4%다.</basis:claim>
+        <basis:implication>
+          탐색 알고리즘을 더 다듬는 것은 최대 이득이 7~13%로 상한이 걸려 있다. 개선 여지는 탐색 밖에 있다.
+        </basis:implication>
+      </basis:finding>
+
+      <basis:finding id="F2" severity="high" confidence="verified">
+        <basis:claim>
+          givens() 진입 1회당 단서 행 21.6개를 적용한다(39,701 / 1,836, dim=9).
+          cover와 uncover 호출은 각각 200,197회로 정확히 대칭이며 합계가 전체 tottime의 64.0%다.
+        </basis:claim>
+        <basis:implication>단서 층 진입 횟수를 줄이거나 층 자체를 더 싸게 만드는 두 방향만이 유효하다.</basis:implication>
+      </basis:finding>
+
+      <basis:finding id="F3" severity="medium" confidence="verified">
+        <basis:claim>
+          dig 중 alternative_exists 호출당 실제 probe 값은 평균 0.74개(dim=9), 0.67개(dim=12)이고,
+          호출의 55.6%(dim=9), 59.3%(dim=12)는 probe가 0개다.
+        </basis:claim>
+        <basis:detail>
+          probe가 0개인 호출은 spec.peers_forbid만으로 종결되어 행렬을 전혀 건드리지 않는다. 이미 공짜다.
+        </basis:detail>
+        <basis:implication>
+          한 호출 안에서 단서 층을 공유해 얻을 이득은 구조적으로 없다. 개선은 호출 사이 또는 층 비용 자체에서 와야 한다.
+        </basis:implication>
+      </basis:finding>
+    </basis:diagnosis>
+
+    <!-- ==================================================== 반증된 가설 -->
+    <basis:falsified xml:id="falsified-hypotheses">
+      <basis:note>
+        아래 두 가설은 이 문서를 쓰는 과정에서 실제로 시험해 기각했다. 재시도를 막기 위해 근거와 함께 남긴다.
+      </basis:note>
+
+      <basis:hypothesis id="H-A" verdict="rejected-by-measurement">
+        <basis:statement>
+          alternative_exists가 후보값마다 단서 전체를 다시 깔고 있으므로, 호출당 1회만 깔고 후보 행 1개만
+          교체하면 빨라진다.
+        </basis:statement>
+        <basis:experiment>
+          동일 seed로 두 구현의 생성 결과를 byte 단위 비교한 뒤 timing을 측정했다.
+        </basis:experiment>
+        <msr:result>
+          <msr:row dim="9" puzzles="30" identical="true" before-ms="18.0" after-ms="27.6" speedup="0.65x"/>
+          <msr:row dim="12" puzzles="5" identical="true" before-ms="70.9" after-ms="91.1" speedup="0.78x"/>
+          <msr:row dim="16" puzzles="2" identical="true" before-ms="371.7" after-ms="601.2" speedup="0.62x"/>
+          <msr:gate name="uniqueness" scope="40 generated 9x9 puzzles" outcome="PASS"/>
+        </msr:result>
+        <basis:why-rejected>
+          F3 때문이다. 호출당 probe가 평균 0.74개라 공유할 대상이 없고, 오히려 probe가 0개인 55.6%의 호출에
+          단서 적용 비용을 새로 얹는다. 출력이 완전히 동일한데 35~62% 느려진 것이 그 증거다.
+        </basis:why-rejected>
+      </basis:hypothesis>
+
+      <basis:hypothesis id="H-B" verdict="rejected-by-proof">
+        <basis:statement>
+          dig 반복 사이에 단서 층을 증분 유지하면(한 칸만 넣고 빼면) 층 재구축을 없앨 수 있다.
+        </basis:statement>
+        <basis:why-rejected>
+          DLX의 cover/uncover는 엄격한 LIFO에서만 역연산이다. cover(c1)은 c1과 교차하는 후보 행을
+          <basis:emphasis>다른 모든 열에서</basis:emphasis> 분리한다. 이후 c2를 cover하고 c1을 먼저 uncover하면
+          그 행의 node가 아직 covered인 c2 안으로 다시 연결되어 행렬이 손상된다.
+          서로 다른 단서 행은 제약 열을 공유하지 않지만(공유하면 모순이라 _apply_row가 False를 반환한다),
+          제3의 후보 행을 통해 여전히 간섭하므로 교환법칙이 성립하지 않는다.
+        </basis:why-rejected>
+        <basis:corollary>
+          dig 순서의 역순으로 층을 쌓아 대상 단서를 항상 stack top에 두는 변형도, 제거가 거부된 단서가 top에
+          누적되면서 반복 j마다 m개를 pop·push해야 해 총 작업이 O(n·m)로 커진다. 현재 비용과 같은 규모다.
+        </basis:corollary>
+        <basis:residual-value>
+          이 결론은 B-02가 채택할 수 있는 설계 공간을 좁힌다. “증분 유지”는 후보에서 제외한다.
+        </basis:residual-value>
+      </basis:hypothesis>
+    </basis:falsified>
+
+    <!-- ==================================================== 남은 설계 공간 -->
+    <basis:design-space xml:id="design-space">
+      <basis:note>
+        F1~F3과 H-A·H-B 기각 이후 남는 방향은 셋이다. 어느 것도 아직 증명되지 않았으므로
+        B-02와 B-03은 “증명하거나 폐기한다”는 형태로 정의한다.
+      </basis:note>
+      <basis:direction id="D1" target="probe 횟수" assigned="B-02">
+        probe 1회는 단서 층 1회 진입과 같다. peers_forbid보다 강한 값싼 선별기(제약 전파, naked single)로
+        probe 자체를 줄이면 층 진입이 줄어든다. 1차 개선에서 “측정된 필요가 없어” 보류했던 항목이며
+        F1이 그 필요를 제공한다.
+      </basis:direction>
+      <basis:direction id="D2" target="층 1회 비용" assigned="B-03">
+        층을 cover로 쌓는 대신 퍼즐 상태를 반영한 축소 행렬을 probe마다 새로 만드는 편이 쌀 수 있다.
+        dim=9에서 층 1회는 약 21.6행 x 4열의 cover이고 축소 행렬 구축은 729행 x 4열 삽입이다.
+        어느 쪽이 싼지는 측정으로만 갈린다. 1차 개선이 반대 방향으로 이동했던 경로이므로 신중히 A/B한다.
+      </basis:direction>
+      <basis:direction id="D3" target="탐색 경로" assigned="B-04">
+        상한이 7~13%로 낮다. search() 호출마다 depth_limit 길이 list 3개를 새로 할당하는 부분 등
+        위험이 낮고 되돌리기 쉬운 것만 다룬다. MRV 자료구조 교체처럼 복잡도를 크게 올리는 것은 하지 않는다.
+      </basis:direction>
+    </basis:design-space>
+
+    <basis:non-goals xml:id="non-goals">
+      <basis:non-goal>정확성 계약 변경. Uniqueness 4값 의미, 예산의 보수적 처리, 오라클 대조를 유지한다.</basis:non-goal>
+      <basis:non-goal>기존 public API 시그니처 변경. game/generator.py facade와 views.py는 무수정이다.</basis:non-goal>
+      <basis:non-goal>MRV 자료구조 전면 교체, 병렬 탐색, C 확장, 외부 의존성 추가.</basis:non-goal>
+      <basis:non-goal>UI의 12x12·16x16 지원. UI 설계의 scope decision에서 dim=9만 수용하기로 확정되어 있다.</basis:non-goal>
+    </basis:non-goals>
+  </basis:design-basis>
+
+  <!-- ============================================================ 결정 -->
+  <dlx:decisions xml:id="decisions" status="proposed">
+    <dec:decision xml:id="D-01" topic="evidence-gate">
+      B-02와 B-03은 spike로 이득을 증명하지 못하면 구현하지 않고 폐기한다.
+      폐기도 정상 결과이며, 기각 근거를 문서에 남기는 것으로 완료 처리한다.
+    </dec:decision>
+    <dec:decision xml:id="D-02" topic="correctness-invariant">
+      모든 block은 “동일 seed에서 생성 결과가 byte 단위로 동일”을 1차 검증으로 쓴다.
+      동작이 의도적으로 달라지는 block은 그 사실과 범위를 명시하고 오라클 대조로 대체한다.
+    </dec:decision>
+    <dec:decision xml:id="D-03" topic="benchmark-authority">
+      성능 판정은 game/tests/benchmarks.py의 A/B를 기준으로 한다. 개별 spike 수치는 방향 판단에만 쓴다.
+    </dec:decision>
+    <dec:decision xml:id="D-04" topic="legacy-retention">
+      game/dlx.py는 A/B 기준선이므로 B-08의 최종 측정이 기록될 때까지 남긴다.
+      제거는 B-07에서 별도 승인을 받는다.
+    </dec:decision>
+    <dec:decision xml:id="D-05" topic="budget-revalidation">
+      탐색 속도가 바뀌면 default_budget의 근거표(median·p95·max)가 낡는다.
+      알고리즘 block이 끝난 뒤 반드시 재측정한다.
+    </dec:decision>
+  </dlx:decisions>
+
+  <!-- ============================================================ 블록 지도 -->
+  <dlx:block-map xml:id="block-map">
+    <dlx:lane name="foundation">B-01</dlx:lane>
+    <dlx:lane name="algorithm" gated-by="D-01">B-02, B-03, B-04</dlx:lane>
+    <dlx:lane name="calibration">B-05</dlx:lane>
+    <dlx:lane name="delivery">B-06</dlx:lane>
+    <dlx:lane name="closeout">B-08, B-07</dlx:lane>
+    <dlx:dependency-graph><![CDATA[
+B-01 ─┬─ B-02 ─┐
+      ├─ B-03 ─┤
+      ├─ B-04 ─┼─ B-05 ─┐
+      └─ B-06 ─────────┴─ B-08 ─ B-07
+    ]]></dlx:dependency-graph>
+  </dlx:block-map>
+
+  <!-- ============================================================ B-01 -->
+  <blk:block id="B-01" name="Reproducible measurement harness">
+    <blk:rationale>
+      D-01이 모든 알고리즘 block을 증거 게이트에 묶는다. 게이트를 집행할 계측이 저장소 안에 없으면
+      판정이 임시 script와 기억에 의존하게 된다. 지금의 진단도 저장소 밖 spike로 얻은 것이라 재현이 보장되지 않는다.
+    </blk:rationale>
+    <blk:objective>
+      명령 하나로 (a) 단계별 호출 수 계측, (b) cProfile 요약, (c) 크기별 A/B timing을 재현할 수 있고,
+      basis:diagnosis의 수치가 오차 범위 안에서 재현된다.
+    </blk:objective>
+    <blk:scope>
+      game/tests/benchmarks.py 확장: givens 진입 수, _apply_row 수, search 수, 반복 수, probe 분포 수집.
+      profile 요약 함수 추가. 결과를 표로 출력하는 진입점 정리.
+    </blk:scope>
+    <blk:exclusions>알고리즘 변경, 계측 코드를 production 경로에 상주시키는 것</blk:exclusions>
+    <blk:dependencies>없음</blk:dependencies>
+    <blk:input type="dims and trial counts">측정할 크기 목록과 시행 횟수</blk:input>
+    <blk:output type="measurement table">호출 수, 비중, timing을 담은 표와 원자료</blk:output>
+    <blk:side-effects>
+      측정 중 monkeypatch로 계측기를 붙였다 뗀다. 테스트 러너가 수집하지 않는 모듈에 둔다.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="계측 오버헤드가 측정을 왜곡">
+        호출 수 계측과 timing 측정을 분리 실행한다. timing run에는 계측기를 붙이지 않는다.
+      </blk:failure>
+      <blk:failure cause="monkeypatch가 원복되지 않아 다른 테스트를 오염">
+        try/finally로 원복하고, 원복 여부를 검사하는 test를 둔다.
+      </blk:failure>
+      <blk:failure cause="시행 수가 적어 분산이 결론을 삼킴">
+        각 수치에 시행 수와 seed를 함께 출력한다. 단일 실행 수치를 단독 근거로 쓰지 않는다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B01-01">benchmarks 진입점이 오류 없이 끝나고 표를 출력한다.</blk:item>
+      <blk:item id="V-B01-02">dim=9에서 givens cumtime 비중이 80%대로 재현된다(F1 재현).</blk:item>
+      <blk:item id="V-B01-03">호출당 평균 probe 수가 0.7 내외로 재현된다(F3 재현).</blk:item>
+      <blk:item id="V-B01-04">계측 후 solver·dlx 모듈 속성이 원래 함수로 복원되었음을 test로 확인한다.</blk:item>
+      <blk:item id="V-B01-05">기존 74 tests가 계속 통과한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+with instrumented(dlx.DancingLinks):        # counts only, no timing
+    run generate_puzzle x N per dim
+    emit call counts and probe histogram
+profile_run(dim, n):                         # cProfile, separate pass
+    emit top functions by tottime and the givens/search cumtime split
+ab_run(dim, n):                              # timing only, no instrumentation
+    emit ms/puzzle for legacy and current engines
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ B-02 -->
+  <blk:block id="B-02" name="Probe reduction by cheap pre-filtering" gate="D-01">
+    <blk:rationale>
+      D1 방향이다. probe 1회가 단서 층 1회 진입과 같으므로, probe를 줄이는 것이 F1이 지목한 비용을 직접
+      깎는 유일한 경로다. 1차 개선이 “측정된 필요 없음”으로 보류했던 제약 전파를 F1이 정당화한다.
+    </blk:rationale>
+    <blk:objective>
+      peers_forbid보다 강한 값싼 선별기를 도입해 dim=9 기준 probe 수를 유의하게 줄이고,
+      생성 결과의 동등성을 유지한 채 A/B에서 개선을 보인다. 개선이 없으면 폐기한다.
+    </blk:objective>
+    <blk:scope>
+      game/sudoku/solver.py의 alternative_exists 선별 단계. 후보값 w에 대해 행렬을 건드리기 전에
+      제한적 제약 전파(naked single 연쇄 또는 peer 후보 소진 검사)로 모순을 조기 판정한다.
+    </blk:scope>
+    <blk:exclusions>
+      탐색 엔진 내부의 전파, 완전한 논리 solver 구현, 난이도 평가 기능
+    </blk:exclusions>
+    <blk:dependencies>B-01</blk:dependencies>
+    <blk:input type="board, index, exclude, spec">dig 중인 보드와 검사 대상 칸</blk:input>
+    <blk:output type="bool | None">대안 존재 여부. 판정 불가 시 None. 기존 계약과 동일하다.</blk:output>
+    <blk:side-effects>없음. 선별기는 순수 함수이며 행렬을 변경하지 않는다.</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="선별기가 실제로 존재하는 대안을 잘못 배제">
+        유일해가 깨진다. 가장 위험한 실패다. 선별기는 <blk:emphasis>모순이 증명된 경우에만</blk:emphasis>
+        배제하고 불확실하면 반드시 probe로 넘긴다. 오라클 대조로 게이트한다.
+      </blk:failure>
+      <blk:failure cause="전파 비용이 절감분을 상쇄">
+        D-01에 따라 폐기한다. 전파 깊이를 1단계로 제한한 변형도 함께 측정한다.
+      </blk:failure>
+      <blk:failure cause="probe 수는 줄었으나 생성 결과가 달라짐">
+        선별기가 정확하면 결과는 동일해야 한다. 달라지면 결함으로 간주하고 원인을 찾는다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B02-01">동일 seed에서 생성 퍼즐이 기존 구현과 byte 단위로 동일하다(D-02).</blk:item>
+      <blk:item id="V-B02-02">오라클 기준 유일해 검사가 9x9 40판, 12x12 5판에서 전부 통과한다.</blk:item>
+      <blk:item id="V-B02-03">probe 수와 givens 진입 수가 B-01 계측에서 감소했음을 수치로 보인다.</blk:item>
+      <blk:item id="V-B02-04">A/B timing이 dim=9와 dim=16 모두에서 개선을 보인다. 아니면 폐기한다.</blk:item>
+      <blk:item id="V-B02-05">선별기가 배제한 값에 실제 해가 없음을 무작위 표본에서 classify로 교차 확인한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+def alternative_exists(board, index, exclude, spec, budget):
+    for value in 1..dim:
+        if value == exclude: continue
+        if spec.peers_forbid(board, index, value): continue
+        if contradiction_proven(board, index, value, spec):   # new, matrix-free
+            continue                                          # must be sound, not just fast
+        ... existing probe path (givens + search) ...
+
+contradiction_proven(board, index, value, spec):
+    tentatively place value at index
+    propagate naked singles up to a bounded depth
+    return True only when some cell is left with zero candidates
+    return False on exhaustion, ambiguity, or depth limit
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ B-03 -->
+  <blk:block id="B-03" name="Clue-layer strategy A/B: covering versus reduced rebuild" gate="D-01">
+    <blk:rationale>
+      D2 방향이다. H-B로 증분 유지가 막혔으므로 남은 선택지는 “층을 계속 cover로 쌓기”와
+      “probe마다 축소 행렬을 새로 짓기”의 비교뿐이다. 1차 개선이 후자에서 전자로 이동했으나,
+      그때의 비교 대상은 객체 기반·선형 삽입 builder였다. 현재 builder는 O(1) 삽입이므로 전제가 달라졌다.
+    </blk:rationale>
+    <blk:objective>
+      두 전략을 동일 workload에서 측정해 승자를 정하고 근거를 기록한다.
+      현행 유지가 이기면 그 결과를 문서화하고 코드는 그대로 둔다.
+    </blk:objective>
+    <blk:scope>
+      game/sudoku/dlx.py에 축소 행렬 구축 경로를 실험적으로 추가하고 solver의 probe 경로에서 선택 가능하게 한다.
+      비교 후 패자 경로는 제거한다.
+    </blk:scope>
+    <blk:exclusions>증분 층 유지(H-B로 기각됨), 행렬 캐시 정책 변경, 스레드 모델 변경</blk:exclusions>
+    <blk:dependencies>B-01</blk:dependencies>
+    <blk:input type="board + spec">단서가 박힌 보드와 크기 명세</blk:input>
+    <blk:output type="searchable matrix">탐색 가능한 행렬과 그 해제 계약</blk:output>
+    <blk:side-effects>
+      축소 행렬 경로는 매 probe마다 list를 새로 할당한다. 메모리 사용 패턴이 달라지므로 함께 측정한다.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="축소 행렬이 원 행렬과 다른 해 집합을 가짐">
+        구축 로직 결함이다. 두 경로의 count_solutions 결과를 무작위 보드에서 대조해 게이트한다.
+      </blk:failure>
+      <blk:failure cause="스레드로컬 캐시와 새 경로가 상호작용해 상태 오염">
+        축소 행렬은 캐시하지 않고 지역 객체로 둔다. is_pristine 검사를 양 경로에 적용한다.
+      </blk:failure>
+      <blk:failure cause="dim별로 승자가 다름">
+        크기별로 다른 전략을 쓰지 않는다. 분기 하나를 늘리는 비용이 이득보다 크면 단일 전략을 유지한다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B03-01">두 경로의 count_solutions가 무작위 보드 200개에서 완전히 일치한다.</blk:item>
+      <blk:item id="V-B03-02">양 경로 모두 탐색 종료 후 is_pristine이 참이다.</blk:item>
+      <blk:item id="V-B03-03">dim 9·12·16에서 A/B timing과 메모리 사용을 표로 기록한다.</blk:item>
+      <blk:item id="V-B03-04">승자 채택 후 동일 seed 생성 결과가 byte 단위로 동일하다.</blk:item>
+      <blk:item id="V-B03-05">패자 경로가 코드에서 제거되고 74 tests가 통과한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+strategy A (current):  with matrix.givens(board): search()
+strategy B (candidate): m = DancingLinks.reduced(spec, board)   # skip rows the clues exclude
+                        m.search()
+measure both over identical seeded workloads per dim
+adopt the winner; delete the loser; record the numbers in the plan document
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ B-04 -->
+  <blk:block id="B-04" name="Low-risk search-path optimizations">
+    <blk:rationale>
+      D3 방향이다. 이득 상한이 7~13%로 낮으므로 위험과 복잡도가 낮은 것만 고른다.
+      상한을 명시해 두면 이 block에 과투자하는 것을 막을 수 있다.
+    </blk:rationale>
+    <blk:objective>
+      search() 호출당 할당과 반복문 내부의 불필요한 작업을 줄이되, 상태 기계의 구조와 행렬 복원 보장을
+      전혀 바꾸지 않는다.
+    </blk:objective>
+    <blk:scope>
+      search()의 stack_col·stack_node·stack_start 재사용, 지역 바인딩 정리,
+      _unwind와 예산 초과 경로의 중복 제거.
+    </blk:scope>
+    <blk:exclusions>
+      MRV 자료구조 교체, 상태 기계 재작성, 예산 의미 변경, 무작위화 방식 변경
+    </blk:exclusions>
+    <blk:dependencies>B-01</blk:dependencies>
+    <blk:input type="matrix state + search parameters">limit, budget, randomize, rng, collect</blk:input>
+    <blk:output type="SearchOutcome">기존과 동일한 4-tuple</blk:output>
+    <blk:side-effects>
+      stack buffer를 인스턴스에 보관하면 재진입이 불가능해진다. 현재도 재진입 불가지만 그 제약이 암묵에서
+      명시로 바뀌므로 docstring과 test로 고정한다.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="buffer 재사용이 중첩 search에서 상태를 덮어씀">
+        재진입 금지를 명시하고, 중첩 호출을 감지하면 RuntimeError를 던진다. 조용히 잘못된 답을 내지 않는다.
+      </blk:failure>
+      <blk:failure cause="예산 초과 경로의 unwind 깊이 계산이 어긋남">
+        1차 개선에서 실제로 발생했던 결함이다. 예산 1~120 전 구간 훑기 test를 유지·확장한다.
+      </blk:failure>
+      <blk:failure cause="이득이 측정 잡음 이하">
+        변경을 되돌린다. 상한이 낮다는 것을 이미 알고 시작한다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B04-01">cover→uncover 후 링크 상태가 바이트 단위로 동일하다는 기존 불변식 test가 통과한다.</blk:item>
+      <blk:item id="V-B04-02">예산 1~120 전 구간에서 행렬이 정상 복원되고 무한 루프가 없다.</blk:item>
+      <blk:item id="V-B04-03">setrecursionlimit(60)에서 16x16 풀이가 계속 성공한다.</blk:item>
+      <blk:item id="V-B04-04">중첩 search 호출이 RuntimeError로 즉시 실패한다.</blk:item>
+      <blk:item id="V-B04-05">4스레드 동시 풀이 test가 계속 통과한다.</blk:item>
+      <blk:item id="V-B04-06">A/B에서 개선이 측정 잡음을 넘지 못하면 되돌린다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+__init__: preallocate stack_col, stack_node, stack_start of length cells+1
+search():
+    if self._searching: raise RuntimeError("DancingLinks.search is not re-entrant")
+    self._searching = True
+    try:   ... existing three-state loop, using the preallocated stacks ...
+    finally: self._searching = False
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ B-05 -->
+  <blk:block id="B-05" name="Budget and difficulty recalibration">
+    <blk:rationale>
+      D-05이다. default_budget의 근거표는 특정 엔진 속도에서 측정한 꼬리 분포다.
+      앞선 block이 반복 비용이나 탐색 형태를 바꾸면 그 표는 낡은 근거가 된다.
+      예산은 정답성이 아니라 난이도에만 영향을 주지만, 근거 없는 상수로 남겨서는 안 된다.
+    </blk:rationale>
+    <blk:objective>
+      크기별 반복 분포를 재측정해 median·p95·max와 여유 배수를 갱신하고,
+      난이도 프리셋이 실제로 만들어내는 단서 수 분포를 함께 기록한다.
+    </blk:objective>
+    <blk:scope>
+      dlx.default_budget의 근거표 docstring 갱신, 필요 시 _BUDGETS 값 조정,
+      generator.DIFFICULTIES와 DIG_TIME_LIMIT의 실측 재확인.
+    </blk:scope>
+    <blk:exclusions>
+      예산 초과의 보수적 처리 방식 변경, Uniqueness 열거값 변경, 난이도 평가 알고리즘 도입
+    </blk:exclusions>
+    <blk:dependencies>B-02, B-03, B-04</blk:dependencies>
+    <blk:input type="measurement runs">크기별 200회 유일해 판정의 반복 수 표본</blk:input>
+    <blk:output type="calibrated constants + documented basis">갱신된 표와 상수</blk:output>
+    <blk:side-effects>
+      예산을 낮추면 어려운 퍼즐이 더 자주 BUDGET_EXCEEDED로 되돌려져 단서가 늘어난다. 난이도가 이동한다.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="새 분포의 꼬리가 이전보다 두꺼워짐">
+        여유 배수를 유지하도록 예산을 올린다. 최악 1회 소요 시간을 함께 재계산해 표에 적는다.
+      </blk:failure>
+      <blk:failure cause="예산 조정이 난이도를 눈에 띄게 이동">
+        DIFFICULTIES 목표 단서 수를 함께 조정하거나 예산을 되돌린다. 조용히 난이도를 바꾸지 않는다.
+      </blk:failure>
+      <blk:failure cause="time_limit 도달이 잦아져 목표 단서 수 미달">
+        DIG_TIME_LIMIT을 실측에 맞춰 조정한다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B05-01">크기별 200회 판정의 median·p95·max를 재측정해 표로 남긴다.</blk:item>
+      <blk:item id="V-B05-02">예산 여유 배수가 각 크기에서 최소 20배 이상이다.</blk:item>
+      <blk:item id="V-B05-03">예산 1·10·100·기본값에서 유일해가 항상 유지된다는 기존 속성 test가 통과한다.</blk:item>
+      <blk:item id="V-B05-04">난이도별 결과 단서 수 분포를 기록하고 이전 값과 비교한다.</blk:item>
+      <blk:item id="V-B05-05">docstring의 표가 실제 측정값과 일치한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+for dim in (9, 12, 16):
+    samples = [check_uniqueness(hard_puzzle).iterations for _ in range(200)]
+    report median, p95, max, chosen budget, headroom, worst-case seconds
+    assert headroom >= 20
+update the docstring table and _BUDGETS together; never one without the other
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ B-06 -->
+  <blk:block id="B-06" name="Pre-generated puzzle cache for large dimensions">
+    <blk:rationale>
+      알고리즘 개선으로는 16x16 hard의 요청-응답 내 생성을 정당화하기 어렵다.
+      1차 문서가 지목한 대로 models.py가 비어 있어 Puzzle 모델을 넣기 좋은 상태이고,
+      이는 알고리즘과 독립적으로 진행할 수 있는 전달 경로 개선이다.
+    </blk:rationale>
+    <blk:objective>
+      관리 커맨드로 퍼즐을 미리 생성해 저장하고, API가 캐시에서 즉시 꺼내되
+      캐시가 비면 기존 동기 생성으로 자연 강등된다.
+    </blk:objective>
+    <blk:scope>
+      game/models.py의 Puzzle 모델, migration, 생성용 management command,
+      new_puzzle view의 캐시 우선 조회. response shape는 유지한다.
+    </blk:scope>
+    <blk:exclusions>
+      response shape 변경, 인증·계정, UI의 대형 크기 지원, 난이도 UI
+    </blk:exclusions>
+    <blk:dependencies>B-01</blk:dependencies>
+    <blk:input type="dim, difficulty, count">생성할 퍼즐의 크기·난이도·개수</blk:input>
+    <blk:output type="persisted rows + API response">저장된 Puzzle 행과 기존과 동일한 JSON</blk:output>
+    <blk:side-effects>
+      데이터베이스 스키마 추가와 migration. 이는 되돌리기 부담이 있는 변경이므로 별도 확인 대상이다.
+    </blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="캐시 고갈">동기 생성으로 강등한다. 오류를 반환하지 않는다.</blk:failure>
+      <blk:failure cause="동일 퍼즐 반복 제공">소비 표시 또는 무작위 선택으로 중복을 억제한다.</blk:failure>
+      <blk:failure cause="migration 적용 실패">
+        빈 models.py에 신규 테이블을 더하는 변경이라 기존 데이터가 없다. 그래도 적용 전 db.sqlite3를 백업한다.
+      </blk:failure>
+      <blk:failure cause="solution 저장으로 노출면이 넓어짐">
+        기존 API가 이미 solution을 내려보내므로 노출이 새로 생기지는 않는다. 다만 UI 설계의 RK9와 함께
+        추적되어야 하며 이 block에서 해결하지 않는다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B06-01">management command가 지정 개수의 퍼즐을 생성해 저장한다.</blk:item>
+      <blk:item id="V-B06-02">캐시가 있을 때 new_puzzle 응답 시간이 동기 생성보다 유의하게 짧다.</blk:item>
+      <blk:item id="V-B06-03">캐시가 비어도 응답이 정상이며 shape가 동일하다.</blk:item>
+      <blk:item id="V-B06-04">저장된 모든 퍼즐이 오라클 기준 유일해다.</blk:item>
+      <blk:item id="V-B06-05">migration이 적용·역적용 가능하다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+model Puzzle: dim, difficulty, givens(text), solution(text), created_at, consumed(bool)
+command generate_puzzles --dim 16 --difficulty hard --count 50
+view new_puzzle:
+    row = Puzzle.objects.filter(dim=dim, difficulty=d, consumed=False).first()
+    if row: mark consumed; return its payload
+    else:   fall back to generator.generate_puzzle()   # same response shape
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ B-07 -->
+  <blk:block id="B-07" name="Legacy engine retirement" requires-approval="true">
+    <blk:rationale>
+      game/dlx.py는 A/B 기준선으로만 존재한다. 최종 측정이 기록되기 전에 지우면 이번 라운드의 이득을
+      증명할 수단이 사라진다. 삭제는 되돌리기 어려우므로 마지막에 별도 승인으로 분리한다(D-04).
+    </blk:rationale>
+    <blk:objective>
+      최종 A/B가 문서에 기록된 뒤, 사용자 승인을 받아 legacy 엔진과 그 전용 benchmark 경로를 제거한다.
+      승인이 없으면 아무것도 지우지 않고 종료한다.
+    </blk:objective>
+    <blk:scope>game/dlx.py, benchmarks.py의 legacy 비교 경로, 관련 test</blk:scope>
+    <blk:exclusions>game/generator.py facade 제거. views.py가 의존하므로 유지한다.</blk:exclusions>
+    <blk:dependencies>B-08</blk:dependencies>
+    <blk:input type="approval decision">사용자의 명시적 삭제 승인</blk:input>
+    <blk:output type="reduced tree">legacy 제거 또는 무변경</blk:output>
+    <blk:side-effects>파일 삭제. git 이력에는 남지만 작업 트리에서는 사라진다.</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="승인 없음">아무것도 삭제하지 않고 block을 종료한다. 이것도 정상 종료다.</blk:failure>
+      <blk:failure cause="legacy를 참조하는 test가 남아 있음">
+        삭제 전 참조를 전수 조사한다. 참조가 남으면 삭제하지 않는다.
+      </blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B07-01">삭제 전 legacy 참조를 전수 조사해 목록을 제시한다.</blk:item>
+      <blk:item id="V-B07-02">최종 A/B 수치가 문서에 기록되어 있음을 확인한다.</blk:item>
+      <blk:item id="V-B07-03">삭제 후 전체 test가 통과한다.</blk:item>
+      <blk:item id="V-B07-04">승인이 없으면 작업 트리가 변경되지 않았음을 git status로 확인한다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+grep for imports of game.dlx across the repository
+present the reference list and the recorded A/B numbers
+ask for explicit approval
+if approved: remove file and legacy benchmark path; run full tests
+else: stop, change nothing
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ B-08 -->
+  <blk:block id="B-08" name="Acceptance and improvement report">
+    <blk:rationale>
+      D-01의 게이트를 최종 집행하는 지점이다. 각 block이 개별로 통과해도 합쳐 놓았을 때 이득이 남는지는
+      따로 확인해야 하고, 폐기된 가설도 기록으로 남겨야 다음 라운드가 같은 곳을 다시 판다.
+    </blk:rationale>
+    <blk:objective>
+      1차 개선 문서와 같은 형식으로 2차 결과표를 만들고, 채택·폐기된 항목을 근거와 함께 기록한다.
+      개선이 없는 항목은 개선이 없다고 적는다.
+    </blk:objective>
+    <blk:scope>
+      통합 A/B 측정, 전체 test 실행, 결과 문서 작성, 폐기 가설 기록(H-A·H-B 포함).
+    </blk:scope>
+    <blk:exclusions>새로운 최적화 시도, legacy 삭제(B-07에서 별도 승인)</blk:exclusions>
+    <blk:dependencies>B-02, B-03, B-04, B-05, B-06</blk:dependencies>
+    <blk:input type="integrated engine">모든 채택 block이 반영된 엔진</blk:input>
+    <blk:output type="report">결과표와 채택·폐기 기록</blk:output>
+    <blk:side-effects>문서 생성. 코드 변경 없음.</blk:side-effects>
+    <blk:failure-modes>
+      <blk:failure cause="통합 후 이득이 개별 합보다 작음">
+        상호작용을 조사해 원인을 적는다. 개별 수치를 합산해 보고하지 않는다.
+      </blk:failure>
+      <blk:failure cause="모든 알고리즘 block이 폐기됨">
+        그것이 결론이다. “현행 구현이 이 workload에서 이미 충분하다”를 근거와 함께 기록하고 종료한다.
+        실패가 아니라 측정된 답이다.
+      </blk:failure>
+      <blk:failure cause="회귀 발견">해당 block으로 되돌린다. 통합 단계에서 우회하지 않는다.</blk:failure>
+    </blk:failure-modes>
+    <blk:validation>
+      <blk:item id="V-B08-01">전체 test가 통과한다. 개수와 소요 시간을 기록한다.</blk:item>
+      <blk:item id="V-B08-02">dim 9·12·16의 생성 시간과 판정 시간을 1차 기준선과 나란히 표로 제시한다.</blk:item>
+      <blk:item id="V-B08-03">동일 seed 생성 결과가 의도한 범위에서만 달라졌음을 확인한다.</blk:item>
+      <blk:item id="V-B08-04">폐기된 가설이 근거와 함께 문서에 남는다.</blk:item>
+      <blk:item id="V-B08-05">각 항목이 PASS·FAIL·BLOCKED·NOT RUN으로 분류되어 있다.</blk:item>
+    </blk:validation>
+    <blk:pseudocode><![CDATA[
+run full test suite; record count and duration
+run ab_run for each dim; tabulate against the 1st-round baseline
+write the report: adopted, rejected, unchanged, with numbers for each
+classify every validation item; do not claim a full pass when items were NOT RUN
+    ]]></blk:pseudocode>
+  </blk:block>
+
+  <!-- ============================================================ 위험 -->
+  <risk:register xml:id="risk-register">
+    <risk:item code="DR1" severity="high" owner="B-02">
+      선별기가 존재하는 대안을 잘못 배제하면 생성 퍼즐의 유일해가 깨진다. 이번 라운드에서 정확성을 해칠 수 있는
+      유일한 지점이다. 완화는 “모순이 증명된 경우에만 배제”라는 단방향 규칙과 오라클 대조이며,
+      의심스러우면 항상 probe로 넘긴다.
+    </risk:item>
+    <risk:item code="DR2" severity="medium" owner="B-03">
+      축소 행렬 경로는 1차 개선이 떠나온 방향이다. 되돌아가는 것이 옳은지는 측정으로만 정해지며,
+      잘못 채택하면 성능이 후퇴한다. D-01 게이트와 dim 3종 A/B로 관리한다.
+    </risk:item>
+    <risk:item code="DR3" severity="medium" owner="B-04">
+      stack buffer 재사용은 재진입 불가 제약을 암묵에서 명시로 바꾼다. 향후 중첩 탐색이 필요해지면
+      이 결정이 걸림돌이 된다. RuntimeError로 조용한 오답을 막는 것으로 완화한다.
+    </risk:item>
+    <risk:item code="DR4" severity="medium" owner="B-06">
+      데이터베이스 스키마 추가는 이 저장소의 첫 migration이다. 되돌리기 부담이 있으므로 적용 전 백업하고,
+      역적용 가능성을 검증 항목에 넣는다.
+    </risk:item>
+    <risk:item code="DR5" severity="low" owner="B-05">
+      예산 재조정이 난이도를 조용히 이동시킬 수 있다. 단서 수 분포를 함께 기록해 이동을 가시화한다.
+    </risk:item>
+    <risk:item code="DR6" severity="low" owner="B-01">
+      timing 측정은 단일 머신 단일 실행이다. 절대값을 성능 주장으로 쓰지 않고 같은 실행 안의 A/B만 근거로 쓴다.
+    </risk:item>
+  </risk:register>
+
+  <dlx:open-questions xml:id="open-questions">
+    <dlx:question id="OQ-D1" blocking="false">
+      B-06의 Puzzle 모델 도입은 이 저장소의 첫 데이터베이스 스키마다. UI 설계의 locked decision U1은
+      “localStorage 전용, server-side persistence와 database model을 추가하지 않는다”이다.
+      B-06은 게임 상태가 아니라 생성 캐시를 저장하므로 U1의 취지와 충돌하지 않는다고 판단하지만,
+      문언상으로는 겹친다. B-06을 이번 범위에 유지할지 확인이 필요하다.
+    </dlx:question>
+    <dlx:question id="OQ-D2" blocking="false">
+      알고리즘 block이 전부 폐기될 가능성이 실재한다. 그 경우에도 B-01과 B-08만 수행해
+      “현행 구현이 충분함”을 측정으로 확정하는 것으로 이번 라운드를 종료할지 확인이 필요하다.
+    </dlx:question>
+    <dlx:question id="OQ-D3" blocking="false">
+      난이도를 단서 수가 아니라 풀이 기법 기준으로 평가하는 기능은 이번 범위에 넣지 않았다.
+      논리 solver가 필요해 성격이 다른 작업이기 때문이다. 별도 라운드로 다룰지 확인이 필요하다.
+    </dlx:question>
+  </dlx:open-questions>
+
+  <dlx:approval xml:id="approval" status="awaiting-user-approval">
+    <dlx:current-phase>2. Macro Blocking (Phase 1 설계 근거 통합)</dlx:current-phase>
+    <dlx:validation-performed>
+      XML well-formedness, block id 유일성, 검증 항목 id 형식과 유일성, 의존 그래프 비순환성,
+      인용 수치의 실측 재현
+    </dlx:validation-performed>
+    <dlx:checkbox checked="false">설계 근거(basis:design-basis) 승인</dlx:checkbox>
+    <dlx:checkbox checked="false">Macro Blocking 승인</dlx:checkbox>
+    <dlx:checkbox checked="false">Phase 3 Micro Blocking 진행 승인</dlx:checkbox>
+    <dlx:next-phase blocked="true">Phase 3 — Micro Blocking</dlx:next-phase>
+  </dlx:approval>
+
+</dlx:macro-blocking>

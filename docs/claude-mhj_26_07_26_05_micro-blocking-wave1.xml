@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mic:micro-blocking
+    xmlns:mic="urn:sudoku:micro-blocking:v1"
+    xmlns:mb="urn:sudoku:micro-block:v1"
+    xmlns:dev="urn:sudoku:deviation:v1"
+    xml:id="sudoku-micro-blocking-wave1"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="3"
+    wave="W1"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 3 Micro Blocking, Wave 1.
+    UI-B02 한 블록만 분해한다. 이 블록은 CT-02의 sync point S1이며 DX-B06의 선행 조건이다.
+  -->
+
+  <mic:document-control xml:id="document-control">
+    <mic:title>Micro Blocking — Wave 1 (server shell contract)</mic:title>
+    <mic:owner>claude-mhj</mic:owner>
+    <mic:baseline>
+      <mic:file>docs/claude-mhj_26_07_26_03_sudoku-master-macro-plan.xml</mic:file>
+      <mic:blocks-covered>UI-B02</mic:blocks-covered>
+    </mic:baseline>
+    <mic:deliverable>
+      <mic:file>docs/claude-mhj_26_07_26_05_micro-blocking-wave1.xml</mic:file>
+      <mic:scope>Micro Block 정의만 포함한다. application code는 변경하지 않았다.</mic:scope>
+    </mic:deliverable>
+    <mic:cross-track-significance>
+      이 wave의 산출물인 V-UI-B02-03(new_puzzle response shape 불변)이 DX-B06의 회귀 기준이 된다(CT-02).
+      즉 UI-B02는 UI track의 블록이지만 DLX track의 계약을 고정하는 지점이기도 하다.
+    </mic:cross-track-significance>
+    <mic:approval-state current="awaiting-user-approval">
+      <mic:next-on-approval>Wave 2 Micro Blocking 또는 Wave 0-1 구현</mic:next-on-approval>
+      <mic:prohibited-before-approval>모든 code implementation</mic:prohibited-before-approval>
+    </mic:approval-state>
+  </mic:document-control>
+
+  <mic:established-facts xml:id="established-facts" confidence="verified">
+    <mic:fact id="EF7" file="game/views.py">
+      index는 <mic:code>puzzle, solution = generator.generate_puzzle()</mic:code> 후 두 값을 context로 넘긴다.
+      new_puzzle은 동일 호출 결과를 JsonResponse({"puzzle":..., "solution":...})로 반환한다.
+    </mic:fact>
+    <mic:fact id="EF8" file="game/urls.py">
+      app_name="game"이며 name은 index와 new_puzzle이다. reverse("game:index")와 reverse("game:new_puzzle")로 접근한다.
+    </mic:fact>
+    <mic:fact id="EF9" file="game/generator.py">
+      views가 import하는 것은 facade인 game.generator다. game.sudoku.generator가 아니다.
+      따라서 호출 여부를 patch로 검사할 때 대상은 game.views.generator.generate_puzzle이다.
+    </mic:fact>
+    <mic:fact id="EF10" file="game/tests/">
+      기존 test_legacy_api.py가 두 엔드포인트의 동작을 이미 검사한다. UI-B02는 그 기대를 깨뜨리면 안 된다.
+    </mic:fact>
+  </mic:established-facts>
+
+  <mic:deviations xml:id="deviations">
+    <dev:deviation id="DV-03" from="UI-B02 target files" severity="low" needs-approval="false">
+      <dev:macro-text>UI-B02 scope는 "game/tests의 view test 추가"라고만 적었다.</dev:macro-text>
+      <dev:problem>
+        Wave 0의 M-UI-B01-05가 이미 game/tests/test_views.py를 만든다. 같은 파일을 두 wave가 생성하면 충돌한다.
+      </dev:problem>
+      <dev:resolution>
+        UI-B02는 test_views.py를 새로 만들지 않고 Wave 0이 만든 파일에 TestCase를 추가한다.
+        기존 test_legacy_api.py는 수정하지 않는다(EF10).
+      </dev:resolution>
+    </dev:deviation>
+  </mic:deviations>
+
+  <mic:parent-block id="UI-B02" name="Server shell bootstrap" micro-count="4">
+    <mic:objective-recap>
+      GET /가 puzzle generation 없이 shell HTML을 반환하고 GET /api/new-puzzle/의 response shape는 그대로다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B02-01 → 02 → 03 → 04</mic:order>
+    <mic:preconditions-global>
+      Wave 0 전체 완료. 특히 M-UI-B01-01(legacy 이동)과 M-UI-B01-03(template module 전환)이 끝나 있어야
+      한다. 순서를 어기면 MR-U4가 실현된다.
+    </mic:preconditions-global>
+
+    <mb:micro id="M-UI-B02-01" parent="UI-B02" name="index view reduced to a shell render">
+      <mb:rationale>
+        V4-07의 핵심이다. index가 퍼즐을 만들면 client가 URL snapshot이나 local session을 복원하기도 전에
+        서버가 최대 5초를 쓰고, 그 결과물은 대부분 버려진다. 생성 호출을 제거하는 것이 이 블록의 본체다.
+      </mb:rationale>
+      <mb:objective>
+        index가 context 없이 template만 렌더하고, 요청 처리 경로에서 generate_puzzle이 호출되지 않는다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/views.py" note="index 함수만. new_puzzle은 건드리지 않는다"/>
+      </mb:target-files>
+      <mb:preconditions>Wave 0 완료</mb:preconditions>
+      <mb:input-type>HttpRequest (GET /)</mb:input-type>
+      <mb:input-validation>
+        없음. 인자를 읽지 않는 view가 된다. query parameter를 해석하지 않는다.
+      </mb:input-validation>
+      <mb:output-type>HttpResponse, status 200, Content-Type text/html</mb:output-type>
+      <mb:output-validation>
+        본문에 puzzle-data와 solution-data script가 없다. 본문 길이가 이전보다 짧다.
+      </mb:output-validation>
+      <mb:exceptions>
+        TemplateDoesNotExist는 500이 된다. M-UI-B02-02와 순서가 어긋나면 template이 없는 context 변수를
+        참조해 렌더 오류가 날 수 있으므로 두 micro block을 연속 적용한다.
+      </mb:exceptions>
+      <mb:side-effects>
+        요청당 generate_puzzle 호출이 사라진다. dim=9 기준 최대 5초(DIG_TIME_LIMIT)의 비용이 제거된다.
+        generator import 자체는 new_puzzle이 계속 쓰므로 남긴다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+# game/views.py
+def index(request):
+    return render(request, "game/index.html")
+
+# new_puzzle is untouched:
+def new_puzzle(request):
+    puzzle, solution = generator.generate_puzzle()
+    return JsonResponse({"puzzle": puzzle, "solution": solution})
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B02-01" kind="integration">GET /가 200을 반환한다.</mb:test>
+        <mb:test id="T-UI-B02-02" kind="integration">
+          game.views.generator.generate_puzzle을 patch하고 GET / 후 call_count가 0이다(V-UI-B02-02, EF9).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>이전 3줄로 되돌린다. 단일 함수 편집이라 완전 가역이다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B02-02" parent="UI-B02" name="Template json_script removal">
+      <mb:rationale>
+        view가 context를 넘기지 않으면 json_script 필터는 빈 값을 직렬화해 조용히 null을 심는다.
+        legacy script는 Wave 0에서 이미 떨어져 나갔으므로 이 두 줄은 소비자 없는 잔재다.
+      </mb:rationale>
+      <mb:objective>
+        template에 puzzle-data와 solution-data script가 없고, 나머지 구조(viewport meta, app 컨테이너,
+        module script)는 Wave 0 상태 그대로다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/templates/game/index.html"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B02-01과 같은 변경 단위로 적용한다.</mb:preconditions>
+      <mb:input-type>Django template. context는 빈 dict다.</mb:input-type>
+      <mb:input-validation>
+        제거 대상은 EF5가 확인한 23행과 24행 두 줄뿐이다. Wave 0이 넣은 요소는 건드리지 않는다.
+      </mb:input-validation>
+      <mb:output-type>렌더된 HTML</mb:output-type>
+      <mb:output-validation>
+        응답에 id="puzzle-data"와 id="solution-data"가 0개, viewport meta 1개, type="module" script 1개다.
+      </mb:output-validation>
+      <mb:exceptions>없음. 삭제만 수행한다.</mb:exceptions>
+      <mb:side-effects>
+        이 시점부터 client는 서버로부터 어떤 퍼즐도 받지 않는다. bootstrap이 완성되는 UI-B12까지
+        화면은 빈 skeleton이다. MR-U1이 기술한 구간의 연장이다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+remove:
+    {{ puzzle|json_script:"puzzle-data" }}
+    {{ solution|json_script:"solution-data" }}
+keep:
+    <meta name="viewport" ...>            (from M-UI-B01-03)
+    <main id="app"></main>                (from M-UI-B01-03)
+    <script type="module" src="...main.js"></script>
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B02-03" kind="integration">
+          응답에 puzzle-data와 solution-data가 없다(V-UI-B02-01).
+        </mb:test>
+        <mb:test id="T-UI-B02-04" kind="integration">
+          Wave 0이 넣은 viewport meta와 module script가 여전히 각각 1개다(회귀).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>두 줄 복원. view도 함께 되돌려야 의미가 있다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B02-03" parent="UI-B02" name="Index shell test cases">
+      <mb:rationale>
+        V-UI-B02-01과 V-UI-B02-02를 자동 검증으로 고정한다. 특히 "생성이 호출되지 않는다"는
+        응답 본문만 봐서는 알 수 없어 patch 기반 검사가 필요하다.
+      </mb:rationale>
+      <mb:objective>
+        index의 shell 성질 두 가지가 test로 강제되고, 이후 누가 context를 되살리면 즉시 실패한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/tests/test_views.py" note="Wave 0이 만든 파일에 TestCase 추가(DV-03)"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B02-01, M-UI-B02-02 완료</mb:preconditions>
+      <mb:input-type>django.test.Client. reverse("game:index")로 URL을 얻는다(EF8).</mb:input-type>
+      <mb:input-validation>
+        하드코딩 경로 "/"를 쓰지 않는다. urls.py가 바뀌어도 test가 계속 유효해야 한다.
+      </mb:input-validation>
+      <mb:output-type>unittest 결과</mb:output-type>
+      <mb:output-validation>두 TestCase가 통과하고, 의도적으로 되돌리면 실패한다.</mb:output-validation>
+      <mb:exceptions>
+        patch 대상 경로를 잘못 적으면 AttributeError로 즉시 드러난다. EF9의 경로를 쓴다.
+      </mb:exceptions>
+      <mb:side-effects>수집되는 test 수가 늘어난다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+class IndexIsShellTests(TestCase):
+    def test_no_puzzle_payload_in_html(self):
+        html = self.client.get(reverse("game:index")).content.decode()
+        self.assertNotIn("puzzle-data", html)
+        self.assertNotIn("solution-data", html)
+
+    @patch("game.views.generator.generate_puzzle")          # EF9
+    def test_index_does_not_generate(self, gen):
+        self.client.get(reverse("game:index"))
+        gen.assert_not_called()
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B02-05" kind="integration">위 두 TestCase가 통과한다.</mb:test>
+        <mb:test id="T-UI-B02-06" kind="negative">
+          index를 이전 구현으로 되돌리면 두 test가 실패함을 1회 확인해 실효성을 입증한다.
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>TestCase 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B02-04" parent="UI-B02" name="new_puzzle contract regression test">
+      <mb:rationale>
+        CT-02가 지정한 교차 track 계약이다. DX-B06이 new_puzzle을 캐시 우선 조회로 바꿀 때
+        response shape를 지켰는지 판정할 기준이 여기서 만들어진다.
+        UI track의 필요가 아니라 DLX track을 위한 안전장치라는 점이 이 micro block의 존재 이유다.
+      </mb:rationale>
+      <mb:objective>
+        new_puzzle 응답이 정확히 puzzle과 solution 두 key를 갖고, 각각 길이 81의 정수 배열임을 test가 고정한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/tests/test_views.py"/>
+      </mb:target-files>
+      <mb:preconditions>없음. new_puzzle은 이 wave에서 수정하지 않는다.</mb:preconditions>
+      <mb:input-type>django.test.Client. reverse("game:new_puzzle").</mb:input-type>
+      <mb:input-validation>없음. 읽기 전용 계약 검사다.</mb:input-validation>
+      <mb:output-type><![CDATA[
+JSON object:
+  puzzle:   list[int], len 81, 각 원소 0..9
+  solution: list[int], len 81, 각 원소 1..9
+key 집합은 정확히 {"puzzle", "solution"}이며 추가 key도 실패로 본다.
+      ]]></mb:output-type>
+      <mb:output-validation>
+        key 집합 동등성을 assertEqual로 검사한다. 포함 검사(assertIn)로 완화하지 않는다.
+        완화하면 DX-B06이 key를 추가해도 통과해 계약이 무의미해진다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        이 test는 실제 퍼즐을 생성하므로 수 십 ms가 걸린다. 전체 suite 시간에 미치는 영향은 무시할 수준이다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+class NewPuzzleContractTests(TestCase):
+    def test_response_shape_is_frozen(self):
+        payload = self.client.get(reverse("game:new_puzzle")).json()
+        self.assertEqual(set(payload), {"puzzle", "solution"})      # exact, not subset
+        self.assertEqual(len(payload["puzzle"]), 81)
+        self.assertEqual(len(payload["solution"]), 81)
+        self.assertTrue(all(0 <= v <= 9 for v in payload["puzzle"]))
+        self.assertTrue(all(1 <= v <= 9 for v in payload["solution"]))
+# CT-02: DX-B06 must keep this green.
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B02-07" kind="contract">
+          위 TestCase가 통과한다(V-UI-B02-03). DX-B06의 V-DX-B06-06이 이 test를 재사용한다.
+        </mb:test>
+        <mb:test id="T-UI-B02-08" kind="regression">
+          기존 74개를 포함한 전체 suite가 통과한다(V-UI-B02-04, EF10).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>TestCase 제거. 다만 CT-02의 안전장치가 사라지므로 DX-B06 착수 전에는 되돌리지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B02">
+      V-UI-B02-01 → T-UI-B02-03 | V-UI-B02-02 → T-UI-B02-02 |
+      V-UI-B02-03 → T-UI-B02-07 | V-UI-B02-04 → T-UI-B02-08.
+      Macro 검증 4항목이 모두 micro test로 수용되었다.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <mic:risks xml:id="wave1-risks">
+    <mic:risk id="W1-R1" severity="medium" refs="M-UI-B02-01, M-UI-B02-02">
+      view와 template을 분리 적용하면 그 사이에 렌더 오류 또는 null 주입 상태가 생긴다.
+      두 micro block을 하나의 변경 단위로 적용하고 중간 상태로 커밋하지 않는다.
+    </mic:risk>
+    <mic:risk id="W1-R2" severity="low" refs="M-UI-B02-04">
+      T-UI-B02-07을 assertIn 같은 느슨한 검사로 작성하면 계약이 무의미해진다.
+      key 집합 동등성으로 작성해야 CT-02가 실제로 지켜진다.
+    </mic:risk>
+    <mic:risk id="W1-R3" severity="low" refs="UI-B02">
+      이 wave 이후 앱은 UI-B12가 끝날 때까지 빈 화면이다. 중간에 동작을 확인하려는 요구가 생기면
+      계획 밖 임시 코드를 넣고 싶어진다. 확인 수단은 test이며 화면이 아니다.
+    </mic:risk>
+  </mic:risks>
+
+  <mic:approval xml:id="approval" status="awaiting-user-approval">
+    <mic:current-phase>3. Micro Blocking — Wave 1</mic:current-phase>
+    <mic:validation-performed>
+      XML well-formedness, micro block과 test id 유일성,
+      Macro 검증 항목 수용 완전성(UI-B02 4/4), views.py와 urls.py 실제 코드 대조
+    </mic:validation-performed>
+    <mic:checkbox checked="false">Wave 1 Micro Blocking 승인</mic:checkbox>
+    <mic:next-phase blocked="true">Wave 2 Micro Blocking 또는 구현 착수</mic:next-phase>
+  </mic:approval>
+
+</mic:micro-blocking>

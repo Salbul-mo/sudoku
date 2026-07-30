@@ -1,0 +1,660 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mic:micro-blocking
+    xmlns:mic="urn:sudoku:micro-blocking:v1"
+    xmlns:mb="urn:sudoku:micro-block:v1"
+    xmlns:dev="urn:sudoku:deviation:v1"
+    xml:id="sudoku-micro-blocking-wave6-7"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="3"
+    wave="W6+W7"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 3 Micro Blocking, Wave 6과 7.
+    UI-B13, DX-B08은 두 track의 acceptance이고 DX-B07은 승인이 필요한 파괴적 정리다.
+    이 문서로 22개 macro block의 분해가 끝난다.
+  -->
+
+  <mic:document-control xml:id="document-control">
+    <mic:title>Micro Blocking — Wave 6 and 7 (acceptance, unified gate, closeout)</mic:title>
+    <mic:owner>claude-mhj</mic:owner>
+    <mic:baseline>
+      <mic:file>docs/claude-mhj_26_07_26_03_sudoku-master-macro-plan.xml</mic:file>
+      <mic:blocks-covered>UI-B13, DX-B08, DX-B07</mic:blocks-covered>
+    </mic:baseline>
+    <mic:deliverable>
+      <mic:file>docs/claude-mhj_26_07_26_11_micro-blocking-wave6-7.xml</mic:file>
+      <mic:scope>Micro Block 정의만 포함한다. application code는 변경하지 않았다.</mic:scope>
+    </mic:deliverable>
+    <mic:why-merged>
+      남은 세 블록은 모두 측정과 보고와 정리다. 새 기능을 만들지 않고 앞선 블록의 산출물을 판정한다.
+      W6와 W7을 나누면 같은 측정 결과를 두 문서가 나눠 갖게 되므로 하나로 묶는 편이 정확하다.
+      다만 DX-B07의 승인 게이트는 그대로 유지한다.
+    </mic:why-merged>
+    <mic:approval-state current="awaiting-user-approval">
+      <mic:next-on-approval>Phase 4 — 승인된 wave부터 순차 구현</mic:next-on-approval>
+      <mic:prohibited-before-approval>모든 code implementation</mic:prohibited-before-approval>
+    </mic:approval-state>
+  </mic:document-control>
+
+  <mic:reporting-rules xml:id="reporting-rules" critical="true">
+    <mic:rule id="RR1">
+      모든 항목을 PASS, FAIL, BLOCKED, NOT RUN 넷 중 하나로 분류한다. 다섯 번째 범주를 만들지 않는다.
+    </mic:rule>
+    <mic:rule id="RR2">
+      수행하지 않은 항목을 PASS로 적지 않는다. 게이트로 폐기된 블록의 검증 항목은 DEC-M-04에 따라
+      NOT RUN이며, 폐기가 정상 결과라는 사실이 그 항목을 통과로 만들지는 않는다.
+    </mic:rule>
+    <mic:rule id="RR3">
+      participant가 없어 측정 불가한 usability metric 3종은 NOT RUN이다.
+      기술 metric만으로 전체 완료를 주장하지 않는다(MR-U3).
+    </mic:rule>
+    <mic:rule id="RR4">
+      개별 블록 수치를 합산해 통합 이득으로 보고하지 않는다. 통합 측정을 따로 수행한다.
+    </mic:rule>
+  </mic:reporting-rules>
+
+  <!-- ============================================================ UI-B13 -->
+  <mic:parent-block id="UI-B13" name="UI acceptance verification and legacy disposition" micro-count="6">
+    <mic:objective-recap>
+      통합 build에서 metric과 kill criterion을 측정해 기록하고, 그 결과로 legacy 처리를 확인받는다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B13-01 → (02, 03, 04, 05 병렬) → 06</mic:order>
+
+    <mb:micro id="M-UI-B13-01" parent="UI-B13" name="Automated suite execution across three runners">
+      <mb:rationale>
+        CT-05가 정한 대로 러너가 셋이다. 하나만 돌리고 통과를 선언하면 나머지 두 영역의 회귀를 놓친다.
+      </mb:rationale>
+      <mb:objective>
+        세 러너를 모두 실행하고 각각의 결과를 분리해 기록한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="none" path="실행과 기록만 수행한다"/></mb:target-files>
+      <mb:preconditions>UI-B01부터 UI-B12, UI-B14까지 완료</mb:preconditions>
+      <mb:input-type>통합된 작업 트리</mb:input-type>
+      <mb:input-validation>
+        실행 전 git status로 미커밋 변경을 확인한다. 더러운 트리에서 측정하면 재현이 불가능하다.
+      </mb:input-validation>
+      <mb:output-type>세 러너의 결과와 소요 시간</mb:output-type>
+      <mb:output-validation><![CDATA[
+node --test tests/js        -> 통과 수, 실패 수, exit code
+node tools/check-contrast.mjs -> exit 0과 최악 대비 수치
+python manage.py test game  -> 테스트 수와 소요 시간
+하나라도 실패하면 그 사실을 먼저 적고 나머지를 계속 측정한다. 실패를 감추지 않는다.
+      ]]></mb:output-validation>
+      <mb:exceptions>없음. 실행 실패도 결과다.</mb:exceptions>
+      <mb:side-effects>test DB 생성과 삭제. 작업 트리는 변경하지 않는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+git status --short                       # must be clean, or record the diff
+node --test tests/js
+node tools/check-contrast.mjs
+python manage.py test game
+record each: command, exit code, counts, duration
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B13-01" kind="measurement">세 러너가 모두 실행되고 결과가 분리 기록된다.</mb:test>
+        <mb:test id="T-UI-B13-02" kind="measurement">
+          contrast gate가 실패 0으로 통과한다(V-UI-B13-05, V-UI-B08-02 재실행).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>측정 전용이라 되돌릴 것이 없다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B13-02" parent="UI-B13" name="Accessibility audit">
+      <mb:rationale>
+        G-A11Y는 목표이자 kill criterion이다. axe는 자동 검출만 하고 roving tabindex나
+        live region 정책 같은 것은 잡지 못하므로 수동 확인이 함께 필요하다.
+      </mb:rationale>
+      <mb:objective>
+        axe critical violation이 0이고 screen reader 수동 시나리오가 통과한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="none" path="측정과 기록"/></mb:target-files>
+      <mb:preconditions>M-UI-B13-01 완료</mb:preconditions>
+      <mb:input-type>실행 중인 통합 build</mb:input-type>
+      <mb:input-validation>
+        측정 시 사용한 브라우저와 screen reader 이름·버전을 함께 기록한다.
+        도구가 다르면 결과가 다르므로 조건 없는 수치는 근거가 되지 않는다.
+      </mb:input-validation>
+      <mb:output-type>violation 목록과 수동 시나리오 결과</mb:output-type>
+      <mb:output-validation><![CDATA[
+axe critical violation 0
+수동: grid가 tab stop 1개, arrow 이동, cell label이 상태를 전달,
+      note editor에서 Tab이 빠져나감, dialog에서 Tab이 갇힘,
+      각 digit 입력이 알려지지 않음, sticky 토글만 알려짐
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        critical violation이 남으면 해당 블록으로 되돌린다. 통합 단계에서 우회하지 않는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+run axe on the integrated page; list violations by impact
+walk the manual matrix above with a screen reader; record pass or fail per line
+if any critical violation remains: name the owning block and stop claiming acceptance
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B13-03" kind="measurement">
+          axe critical 0과 수동 통과가 기록된다(V-UI-B13-01).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>없음.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B13-03" parent="UI-B13" name="Lifecycle durability trial">
+      <mb:rationale>
+        V4-08이 닫으려던 유실 경계를 실제로 확인한다. 단위 test는 flushNow를 직접 부르지만
+        실제 pagehide 타이밍에서도 성립하는지는 별개 문제다.
+      </mb:rationale>
+      <mb:objective>
+        pagehide 100회 시험에서 최종 mutation 유실이 0이다.
+      </mb:objective>
+      <mb:target-files><mb:file action="none" path="측정"/></mb:target-files>
+      <mb:preconditions>UI-B04, UI-B12 완료</mb:preconditions>
+      <mb:input-type>debounce window 안에서 마지막 mutation을 한 뒤 즉시 pagehide를 유발하는 시나리오</mb:input-type>
+      <mb:input-validation>
+        각 시행의 마지막 mutation 값을 기록해 두어야 복원값과 대조할 수 있다.
+      </mb:input-validation>
+      <mb:output-type>100회 중 유실 횟수</mb:output-type>
+      <mb:output-validation>
+        유실 0이 목표다. 1회라도 유실되면 원인을 찾을 때까지 통과로 적지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>localStorage에 반복 쓰기. 시험 후 정리한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for i in 1..100:
+    mutate a distinct value; immediately dispatch pagehide
+    reload; read the restored session; compare with the expected value
+report lost / 100      # V-UI-B13-02 requires 0
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B13-04" kind="measurement">
+          100회 시험에서 최종 mutation 유실이 0이다(V-UI-B13-02).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>없음.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B13-04" parent="UI-B13" name="Codec round-trip and latency measurement">
+      <mb:rationale>
+        MR-U2의 해제 조건이다. 이 측정이 통과하기 전에는 공유 기능을 노출하지 않기로 했으므로
+        acceptance에서 다시 확인한다.
+      </mb:rationale>
+      <mb:objective>
+        round-trip 100%와 8,000자 decode 100ms 미만을 통합 build에서 재확인한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="none" path="측정"/></mb:target-files>
+      <mb:preconditions>UI-B05 완료</mb:preconditions>
+      <mb:input-type>property test의 1,000건과 최대 길이 payload</mb:input-type>
+      <mb:input-validation>
+        측정 환경(브라우저 또는 node)을 기록한다. CompressionStream 유무가 결과를 바꾼다.
+      </mb:input-validation>
+      <mb:output-type>round-trip 성공률과 decode 지연</mb:output-type>
+      <mb:output-validation>
+        round-trip 100%, 8,000자 decode 100ms 미만. 둘 중 하나라도 미달이면 MR-U2가 해제되지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+run tests/js/url-codec.property.test.mjs and record pass rate
+time decode() on a maximum-length fragment, median of 20 runs
+record the environment; state whether CompressionStream was available
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B13-05" kind="measurement">codec round-trip 100%다(V-UI-B13-04).</mb:test>
+        <mb:test id="T-UI-B13-06" kind="measurement">
+          8,000자 decode가 100ms 미만이다(V-UI-B13-03).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>없음.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B13-05" parent="UI-B13" name="Kill criteria evaluation and metric table">
+      <mb:rationale>
+        Phase 1의 kill criterion 5종은 여기서만 판정할 수 있다. 판정하지 않고 넘어가면
+        검증되지 않은 가설이 그대로 배포된다.
+      </mb:rationale>
+      <mb:objective>
+        §13 metric 표를 채우고 kill criterion 5종 각각의 발동 여부를 명시한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="docs/ui-acceptance-report.md" note="metric 표와 kill criterion 판정"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B13-01부터 04까지 완료</mb:preconditions>
+      <mb:input-type>앞선 micro block의 측정 결과와 320/360/390px 판독성 기록</mb:input-type>
+      <mb:input-validation>
+        usability metric 3종은 participant가 없으면 측정할 수 없다. 추정치를 적지 않고 NOT RUN으로 둔다(RR3).
+      </mb:input-validation>
+      <mb:output-type>metric 표와 kill criterion 판정</mb:output-type>
+      <mb:output-validation><![CDATA[
+metric 9종 각각 PASS / FAIL / BLOCKED / NOT RUN
+kill criterion 5종:
+  desktop quasimode error > sticky error       -> Shift default 제거 검토
+  Digit First tap reduction < 5%               -> Cell First default 재검토
+  touch sticky error >= 8%                     -> value/candidate 분리 검토
+  9px candidate 판독 불가                       -> zoom 또는 alternate list 검토 (RK3)
+  VisualViewport가 한 frame 이상 board를 가림   -> transition 제거와 settle gate
+발동한 criterion은 임의로 대안을 구현하지 않고 Phase 1 재승인으로 돌린다.
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        kill criterion 발동은 Phase 1으로의 되돌림을 뜻한다. 그 자체가 정상 절차다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+fill the metric table from M-UI-B13-01..04 plus the legibility record (M-UI-B08-06)
+for each kill criterion: state triggered / not triggered / cannot evaluate
+mark the three usability metrics NOT RUN unless a study was actually held
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B13-07" kind="measurement">
+          metric 9종이 모두 분류되고 kill criterion 5종이 판정된다.
+        </mb:test>
+        <mb:test id="T-UI-B13-08" kind="measurement">
+          320/360/390px 판독성 기록이 표에 반영된다(RK3).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>보고서 삭제. 다만 판정 근거가 사라지므로 권장하지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B13-06" parent="UI-B13" name="Legacy disposition proposal" requires-approval="true">
+      <mb:rationale>
+        DEC-UI-05가 legacy를 남긴 이유는 회귀 판단 근거를 유지하기 위해서다.
+        acceptance가 끝나야 그 근거가 필요 없어지고, 삭제는 되돌리기 어려우므로 별도 승인이다.
+      </mb:rationale>
+      <mb:objective>
+        legacy 파일의 현재 참조 상태를 제시하고 제거 여부를 사용자에게 확인받는다.
+        승인이 없으면 아무것도 지우지 않는다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="conditional" path="game/static/game/legacy/game.js" note="승인 시에만 삭제"/>
+        <mb:file action="conditional" path="game/static/game/legacy/style.css" note="승인 시에만 삭제"/>
+      </mb:target-files>
+      <mb:preconditions>M-UI-B13-05 완료. acceptance 결과가 기록되어 있어야 한다.</mb:preconditions>
+      <mb:input-type>사용자의 명시적 삭제 승인</mb:input-type>
+      <mb:input-validation>
+        승인은 명시적이어야 한다. 침묵이나 무응답을 승인으로 해석하지 않는다.
+      </mb:input-validation>
+      <mb:output-type>삭제된 트리 또는 무변화</mb:output-type>
+      <mb:output-validation>
+        미승인 시 git status가 legacy 관련 변경을 보이지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>파일 삭제. git 이력에는 남는다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+grep -r "legacy/" across templates and js       # expect zero references
+present the reference list and the acceptance results
+ask for explicit approval
+if approved: remove the two files; run all three runners again
+else: stop, change nothing
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B13-09" kind="manual">
+          legacy 참조가 0임을 전수 조사로 확인한다.
+        </mb:test>
+        <mb:test id="T-UI-B13-10" kind="manual">
+          미승인 시 작업 트리가 변경되지 않는다(V-UI-B13-06).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>git에서 복원한다. 이력에 남아 있으므로 완전 복구 가능하다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B13">
+      V-UI-B13-01 → T-UI-B13-03 | 02 → T-UI-B13-04 | 03 → T-UI-B13-06 |
+      04 → T-UI-B13-05 | 05 → T-UI-B13-02 | 06 → T-UI-B13-10. 6/6 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ DX-B08 -->
+  <mic:parent-block id="DX-B08" name="DLX acceptance and improvement report" micro-count="4">
+    <mic:objective-recap>
+      1차 개선 문서와 같은 형식으로 2차 결과표를 만들고 채택·폐기를 근거와 함께 기록한다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B08-01 → 02 → 03 → 04</mic:order>
+
+    <mb:micro id="M-DX-B08-01" parent="DX-B08" name="Full suite run and duration record">
+      <mb:rationale>
+        1차 개선의 기준선이 "74개, 2.6초"였다. 같은 형식으로 기록해야 비교가 성립한다.
+      </mb:rationale>
+      <mb:objective>전체 test를 실행하고 개수와 소요 시간을 기록한다.</mb:objective>
+      <mb:target-files><mb:file action="none" path="측정"/></mb:target-files>
+      <mb:preconditions>DX-B02부터 DX-B06까지의 채택 여부가 확정된 뒤</mb:preconditions>
+      <mb:input-type>python manage.py test game</mb:input-type>
+      <mb:input-validation>
+        DX-B06이 CT-01-B로 제외되었다면 그 test는 존재하지 않는다. 누락이 아니라 범위 제외임을 명시한다.
+      </mb:input-validation>
+      <mb:output-type>test 개수, 실패 수, 소요 시간</mb:output-type>
+      <mb:output-validation>
+        1차 기준선 74개와 나란히 제시한다. 증가분이 어느 블록에서 왔는지 적는다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+python manage.py test game
+record: total, failures, duration, delta vs the 74/2.6s baseline
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B08-01" kind="measurement">
+          전체 test가 통과하고 개수와 시간이 기록된다(V-DX-B08-01).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>없음.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B08-02" parent="DX-B08" name="Integrated A/B against the first-round baseline">
+      <mb:rationale>
+        RR4가 금지하는 것이 여기서 문제가 된다. 블록별 개선을 더해 통합 이득이라고 적으면
+        상호작용을 놓친다. 통합 상태에서 다시 재야 한다.
+      </mb:rationale>
+      <mb:objective>
+        dim 3종의 생성 시간과 판정 시간을 1차 기준선과 나란히 표로 제시한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="none" path="측정"/></mb:target-files>
+      <mb:preconditions>M-DX-B08-01 완료</mb:preconditions>
+      <mb:input-type>DX-B01의 ab_timing과 compare_uniqueness_checks</mb:input-type>
+      <mb:input-validation>
+        1차 문서의 수치는 다른 시점의 측정이다. 같은 머신에서 legacy 경로를 다시 돌려
+        동시 비교를 만드는 편이 정확하다. 그것이 legacy를 남겨 둔 이유다(DEC-DX-04).
+      </mb:input-validation>
+      <mb:output-type>dim별 before/after 표</mb:output-type>
+      <mb:output-validation><![CDATA[
+9x9, 12x12, 16x16의 생성 ms/puzzle과 유일해 판정 ms
+각 행에 trials와 seed를 함께 적는다 (MR-D4)
+통합 이득이 개별 합보다 작으면 그 사실과 추정 원인을 적는다
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>16x16 측정이 수 분 걸린다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+run benchmarks.main() on the integrated tree
+re-run the legacy comparison path in the same session for a same-machine A/B
+tabulate: dim, metric, first-round, this-round, delta, trials, seed
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B08-02" kind="measurement">
+          dim 3종의 before/after가 표로 제시된다(V-DX-B08-02).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>없음.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B08-03" parent="DX-B08" name="Adopted, rejected, unchanged record">
+      <mb:rationale>
+        H-A와 H-B를 기록해 둔 이유가 여기서 완성된다. 다음 라운드가 같은 곳을 다시 파지 않으려면
+        이번에 폐기한 것도 근거와 함께 남아야 한다.
+      </mb:rationale>
+      <mb:objective>
+        각 알고리즘 블록의 채택·폐기 여부와 근거 수치를 기록하고, 기각 가설 목록을 갱신한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="docs/dlx-second-round-report.md" note="1차 문서와 같은 형식"/>
+      </mb:target-files>
+      <mb:preconditions>M-DX-B08-02 완료</mb:preconditions>
+      <mb:input-type>DX-B02, B03, B04, B05, B06의 게이트 결과</mb:input-type>
+      <mb:input-validation>
+        "개선 없음"도 결과다. 빈칸으로 두거나 낙관적 표현으로 바꾸지 않는다.
+      </mb:input-validation>
+      <mb:output-type>채택·폐기·무변화 표와 기각 가설 목록</mb:output-type>
+      <mb:output-validation><![CDATA[
+블록별로 채택 / 폐기 / 범위 제외 중 하나와 근거 수치
+기각 가설에 H-A(측정으로 기각), H-B(증명으로 기각)와 이번 라운드의 기각분을 함께 싣는다
+모든 알고리즘 블록이 폐기되었다면 "현행 엔진 유지, 근거 기록됨"으로 적는다. 그것이 결론이다.
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for block in (DX-B02, DX-B03, DX-B04, DX-B05, DX-B06):
+    status = adopted | discarded | out-of-scope        # DEC-M-04
+    record the numbers that produced that decision
+append rejected hypotheses: H-A, H-B, plus anything discarded this round
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B08-03" kind="measurement">
+          폐기된 가설이 근거와 함께 문서에 남는다(V-DX-B08-04).
+        </mb:test>
+        <mb:test id="T-DX-B08-04" kind="measurement">
+          동일 seed 생성 결과가 의도한 범위에서만 달라졌음이 확인된다(V-DX-B08-03).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>보고서 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B08-04" parent="DX-B08" name="Validation item classification">
+      <mb:rationale>
+        RR1과 RR2의 집행 지점이다. DEC-M-04로 폐기된 블록의 항목을 PASS로 적는 것이
+        가장 흔한 보고 오류이며, 그것이 이 micro block이 따로 있는 이유다.
+      </mb:rationale>
+      <mb:objective>
+        DLX track의 모든 검증 항목을 넷 중 하나로 분류한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="docs/dlx-second-round-report.md"/></mb:target-files>
+      <mb:preconditions>M-DX-B08-03 완료</mb:preconditions>
+      <mb:input-type>DX track의 검증 항목 전체</mb:input-type>
+      <mb:input-validation>
+        분류되지 않은 항목이 남으면 보고가 완료되지 않은 것이다. 전수를 확인한다.
+      </mb:input-validation>
+      <mb:output-type>항목별 분류 표</mb:output-type>
+      <mb:output-validation><![CDATA[
+폐기된 블록의 항목 -> NOT RUN (PASS 아님, RR2)
+CT-01-B로 제외된 DX-B06의 6항목 -> NOT RUN이며 사유는 범위 제외
+BLOCKED은 환경·권한·자격 문제로 실행하지 못한 경우에만 쓴다
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for every V-DX-* item in the master plan:
+    classify PASS / FAIL / BLOCKED / NOT RUN with a one-line reason
+assert no item is left unclassified
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B08-05" kind="measurement">
+          모든 항목이 넷 중 하나로 분류된다(V-DX-B08-05).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>없음.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B08">
+      V-DX-B08-01 → T-DX-B08-01 | 02 → T-DX-B08-02 | 03 → T-DX-B08-04 |
+      04 → T-DX-B08-03 | 05 → T-DX-B08-05. 5/5 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================ UNIFIED GATE -->
+  <mic:unified-gate-execution xml:id="unified-gate-execution" at="S2">
+    <mic:rationale>
+      Macro Plan의 UNIFIED-GATE는 블록이 아니라 두 track의 합류 규칙이다.
+      UI-B13과 DX-B08의 산출물을 한 표로 합치는 절차를 여기 둔다.
+    </mic:rationale>
+    <mic:procedure>
+      <mic:step n="1">UI-B13의 metric 표와 DX-B08의 분류 표를 하나의 문서로 합친다.</mic:step>
+      <mic:step n="2">러너별 결과를 분리해 보고한다. 합산하지 않는다(CT-05).</mic:step>
+      <mic:step n="3">
+        어느 한 track만 통과한 상태를 전체 완료로 표시하지 않는다.
+        DLX track의 모든 알고리즘 블록이 폐기되어도 통합 게이트는 통과할 수 있으며,
+        그 경우 "현행 엔진 유지, 근거 기록됨"으로 적는다.
+      </mic:step>
+      <mic:step n="4">
+        NOT RUN 항목의 총수와 사유를 요약한다. 기술 metric만으로 완료를 주장하지 않는다(RR3).
+      </mic:step>
+    </mic:procedure>
+    <mic:output>docs/unified-acceptance-report.md</mic:output>
+  </mic:unified-gate-execution>
+
+  <!-- ============================================================ DX-B07 -->
+  <mic:parent-block id="DX-B07" name="Legacy engine retirement" micro-count="3" requires-approval="true">
+    <mic:objective-recap>
+      최종 A/B가 기록된 뒤 승인을 받아 legacy 엔진을 제거한다. 승인이 없으면 아무것도 지우지 않는다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B07-01 → 02 → 03</mic:order>
+    <mic:destructive-notice critical="true">
+      이 블록은 파일을 삭제한다. AGENTS.md와 CLAUDE.md가 요구하는 명시적 승인 대상이며,
+      승인 없이 어떤 micro block도 실행하지 않는다. 침묵은 승인이 아니다.
+    </mic:destructive-notice>
+
+    <mb:micro id="M-DX-B07-01" parent="DX-B07" name="Reference audit">
+      <mb:rationale>
+        legacy를 참조하는 코드가 남은 채 지우면 import 오류가 난다.
+        삭제 전 전수 조사가 유일한 방어다.
+      </mb:rationale>
+      <mb:objective>
+        game.dlx를 참조하는 모든 위치를 목록으로 제시한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="none" path="조사만 수행"/></mb:target-files>
+      <mb:preconditions>DX-B08 완료. 최종 A/B가 기록되어 있어야 한다.</mb:preconditions>
+      <mb:input-type>저장소 전체</mb:input-type>
+      <mb:input-validation>venv를 제외한다. 서드파티 코드는 대상이 아니다.</mb:input-validation>
+      <mb:output-type>참조 위치 목록</mb:output-type>
+      <mb:output-validation>
+        benchmarks.py의 legacy 비교 경로 외에 참조가 남아 있으면 삭제하지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+grep -rn "game.dlx\|from game import dlx\|import dlx" --exclude-dir=venv .
+list every hit with file and line
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B07-01" kind="manual">참조 목록이 제시된다(V-DX-B07-01).</mb:test>
+        <mb:test id="T-DX-B07-02" kind="manual">
+          최종 A/B 수치가 문서에 기록되어 있음을 확인한다(V-DX-B07-02).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>조사 전용이라 없다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B07-02" parent="DX-B07" name="Approval gate" requires-approval="true">
+      <mb:rationale>
+        삭제는 되돌리기 어렵고 이번 라운드의 증명 수단을 없앤다.
+        판단 근거를 제시하고 사용자의 명시적 결정을 받는 것이 이 micro block의 전부다.
+      </mb:rationale>
+      <mb:objective>
+        참조 목록과 A/B 수치를 제시하고 삭제 승인 여부를 받는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="none" path="결정 지점"/></mb:target-files>
+      <mb:preconditions>M-DX-B07-01 완료</mb:preconditions>
+      <mb:input-type>사용자의 명시적 승인 또는 거부</mb:input-type>
+      <mb:input-validation>
+        승인은 불명확해서는 안 된다. 무응답, 침묵, 다른 주제의 후속 질문은 승인이 아니다.
+      </mb:input-validation>
+      <mb:output-type>진행 또는 중단 결정</mb:output-type>
+      <mb:output-validation>
+        거부 또는 무응답이면 M-DX-B07-03을 실행하지 않고 블록을 정상 종료한다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+present: reference list, recorded A/B numbers, what will be deleted
+ask explicitly
+if not approved: stop here and record "legacy retained by decision"
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B07-03" kind="manual">
+          미승인 시 작업 트리가 변경되지 않는다(V-DX-B07-04).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>없음. 결정 지점이다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B07-03" parent="DX-B07" name="Removal and full regression" requires-approval="true">
+      <mb:rationale>
+        승인 이후에만 실행된다. 삭제 후 전체 test를 다시 돌려 남은 참조가 없음을 확인한다.
+      </mb:rationale>
+      <mb:objective>
+        legacy 엔진과 benchmark 비교 경로를 제거하고 전체 test가 통과한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="conditional" path="game/dlx.py" note="승인 시에만 삭제"/>
+        <mb:file action="conditional" path="game/tests/benchmarks.py" note="legacy 비교 절만 제거"/>
+      </mb:target-files>
+      <mb:preconditions>M-DX-B07-02에서 명시적 승인을 받은 경우에만</mb:preconditions>
+      <mb:input-type>승인된 삭제 목록</mb:input-type>
+      <mb:input-validation>
+        benchmarks.py는 파일 전체가 아니라 legacy 절만 제거한다. 나머지 측정은 계속 필요하다.
+      </mb:input-validation>
+      <mb:output-type>축소된 트리</mb:output-type>
+      <mb:output-validation>
+        전체 test 통과. game.dlx 참조 0. compare_uniqueness_checks가 legacy 없이도 동작하거나 제거된다.
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        1차 개선의 A/B를 재현할 수단이 사라진다. 수치는 문서에만 남는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+remove game/dlx.py
+remove _legacy_constraints, _legacy_matrix, and the legacy column from benchmarks
+python manage.py test game
+grep to confirm zero references remain
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B07-04" kind="regression">삭제 후 전체 test가 통과한다(V-DX-B07-03).</mb:test>
+        <mb:test id="T-DX-B07-05" kind="manual">game.dlx 참조가 0이다.</mb:test>
+      </mb:tests>
+      <mb:rollback>git에서 복원한다. 이력에 남아 있어 완전 복구 가능하다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B07">
+      V-DX-B07-01 → T-DX-B07-01 | 02 → T-DX-B07-02 | 03 → T-DX-B07-04 | 04 → T-DX-B07-03. 4/4 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <mic:risks xml:id="wave67-risks">
+    <mic:risk id="W67-R1" severity="high" refs="M-DX-B08-04, M-UI-B13-05">
+      게이트로 폐기된 항목을 PASS로 적는 것이 가장 흔한 보고 오류다. 폐기가 정상 결과라는 사실이
+      그 항목을 통과로 만들지 않는다. RR2가 이를 명시하고 M-DX-B08-04가 전수 분류로 강제한다.
+    </mic:risk>
+    <mic:risk id="W67-R2" severity="medium" refs="M-UI-B13-05">
+      kill criterion이 발동했을 때 그 자리에서 대안을 구현하고 싶은 유혹이 크다.
+      그것은 승인되지 않은 설계 변경이다. Phase 1 재승인으로 돌리는 것이 절차다.
+    </mic:risk>
+    <mic:risk id="W67-R3" severity="medium" refs="DX-B07">
+      legacy 삭제 후에는 1차 개선의 A/B를 재현할 수 없다. 수치가 문서에만 남으므로
+      DX-B08의 기록이 부실하면 회복 불가능한 정보 손실이 된다. 순서를 반드시 지킨다.
+    </mic:risk>
+    <mic:risk id="W67-R4" severity="low" refs="M-UI-B13-03">
+      pagehide 100회 시험은 브라우저와 플랫폼에 따라 타이밍이 다르다. 측정 환경을 기록하지 않으면
+      다른 환경의 결과와 비교할 수 없다.
+    </mic:risk>
+  </mic:risks>
+
+  <!-- ============================================ 분해 완료 요약 -->
+  <mic:decomposition-summary xml:id="decomposition-summary">
+    <mic:status>Phase 3 Micro Blocking 분해 완료</mic:status>
+    <mic:coverage macro-blocks="22" decomposed="22" documents="8"/>
+    <mic:wave-index>
+      <mic:entry wave="W0" doc="claude-mhj_26_07_26_04_micro-blocking-wave0.xml" blocks="UI-B01, DX-B01"/>
+      <mic:entry wave="W1" doc="claude-mhj_26_07_26_05_micro-blocking-wave1.xml" blocks="UI-B02"/>
+      <mic:entry wave="W2A" doc="claude-mhj_26_07_26_06_micro-blocking-wave2a.xml" blocks="UI-B03, UI-B04, UI-B05"/>
+      <mic:entry wave="W2B" doc="claude-mhj_26_07_26_07_micro-blocking-wave2b.xml" blocks="UI-B06, DX-B02, DX-B03, DX-B04"/>
+      <mic:entry wave="W3" doc="claude-mhj_26_07_26_08_micro-blocking-wave3.xml" blocks="UI-B07, UI-B08, DX-B05, DX-B06"/>
+      <mic:entry wave="W4" doc="claude-mhj_26_07_26_09_micro-blocking-wave4.xml" blocks="UI-B09, UI-B10, UI-B11"/>
+      <mic:entry wave="W5" doc="claude-mhj_26_07_26_10_micro-blocking-wave5.xml" blocks="UI-B12, UI-B14"/>
+      <mic:entry wave="W6+W7" doc="claude-mhj_26_07_26_11_micro-blocking-wave6-7.xml" blocks="UI-B13, DX-B08, DX-B07"/>
+    </mic:wave-index>
+    <mic:outstanding-decisions>
+      <mic:item id="OQ-M2" severity="blocking" topic="CT-01">
+        U1 한정 개정(CT-01-A) 또는 DX-B06 범위 제외(CT-01-B). DX-B06 착수 전 필요.
+      </mic:item>
+      <mic:item id="OQ-M1" severity="blocking-for-phase4" topic="파일 명명 규칙">
+        Phase 4 source file에 claude-mhj_ 접두사를 적용할지. 첫 파일 생성 전 필요하다.
+      </mic:item>
+      <mic:item id="DV-05" severity="normal">moveSelection을 UI-B06 소속 순수 함수로</mic:item>
+      <mic:item id="DV-06" severity="normal">UI-B10이 confirm 함수 계약에 의존</mic:item>
+      <mic:item id="DV-07" severity="normal">lifecycle 배선을 bootstrap으로</mic:item>
+      <mic:item id="OQ-W5-1" severity="normal">DEC-UI-04에 JS 모듈 4개 추가</mic:item>
+      <mic:item id="OQ-W5-3" severity="normal">shell action control 8종의 좁은 화면 배치</mic:item>
+    </mic:outstanding-decisions>
+  </mic:decomposition-summary>
+
+  <mic:approval xml:id="approval" status="awaiting-user-approval">
+    <mic:current-phase>3. Micro Blocking — Wave 6 and 7 (최종)</mic:current-phase>
+    <mic:validation-performed>
+      XML well-formedness, micro block과 test id 유일성,
+      Macro 검증 항목 수용 완전성(UI-B13 6/6, DX-B08 5/5, DX-B07 4/4),
+      22개 macro block 전체 분해 완료 확인
+    </mic:validation-performed>
+    <mic:checkbox checked="false">Wave 6 및 7 Micro Blocking 승인</mic:checkbox>
+    <mic:checkbox checked="false">Phase 3 전체 승인 (8개 문서, 22개 블록)</mic:checkbox>
+    <mic:checkbox checked="false">Phase 4 구현 착수 승인</mic:checkbox>
+    <mic:next-phase blocked="true">Phase 4 — Code Implementation</mic:next-phase>
+  </mic:approval>
+
+</mic:micro-blocking>

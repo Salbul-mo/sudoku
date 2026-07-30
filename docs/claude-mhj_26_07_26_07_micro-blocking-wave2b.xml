@@ -1,0 +1,828 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mic:micro-blocking
+    xmlns:mic="urn:sudoku:micro-blocking:v1"
+    xmlns:mb="urn:sudoku:micro-block:v1"
+    xmlns:dev="urn:sudoku:deviation:v1"
+    xml:id="sudoku-micro-blocking-wave2b"
+    xml:lang="ko-KR"
+    version="1.0"
+    phase="3"
+    wave="W2"
+    part="B"
+    status="awaiting-user-approval"
+    repository="sudoku_django"
+    generated-on="2026-07-26">
+
+  <!--
+    Phase 3 Micro Blocking, Wave 2 part B.
+    part A가 DOM-free 계층이었다면 part B는 DOM 계층 하나(UI-B06)와 DLX track의 알고리즘 게이트 셋이다.
+    검증 수단이 서로 다르므로 part A와 분리했다.
+  -->
+
+  <mic:document-control xml:id="document-control">
+    <mic:title>Micro Blocking — Wave 2 part B (board view and DLX gates)</mic:title>
+    <mic:owner>claude-mhj</mic:owner>
+    <mic:baseline>
+      <mic:file>docs/claude-mhj_26_07_26_03_sudoku-master-macro-plan.xml</mic:file>
+      <mic:blocks-covered>UI-B06, DX-B02, DX-B03, DX-B04</mic:blocks-covered>
+    </mic:baseline>
+    <mic:deliverable>
+      <mic:file>docs/claude-mhj_26_07_26_07_micro-blocking-wave2b.xml</mic:file>
+      <mic:scope>Micro Block 정의만 포함한다. application code는 변경하지 않았다.</mic:scope>
+    </mic:deliverable>
+    <mic:verification-note>
+      UI-B06은 DOM을 다루므로 node:test로 전량 검증할 수 없다. 순수 함수로 분리 가능한 부분을
+      최대한 밀어내고 나머지는 browser 수동 검증과 axe로 판정한다. 이 분리가 UI-B06 micro 분해의 축이다.
+      DX-B02와 DX-B03은 DEC-DX-01 게이트 아래에 있어 "폐기"가 정상 종료다.
+    </mic:verification-note>
+    <mic:approval-state current="awaiting-user-approval">
+      <mic:next-on-approval>Wave 3 Micro Blocking</mic:next-on-approval>
+      <mic:prohibited-before-approval>모든 code implementation</mic:prohibited-before-approval>
+    </mic:approval-state>
+  </mic:document-control>
+
+  <mic:established-facts xml:id="established-facts" confidence="verified">
+    <mic:fact id="EF11" file="game/sudoku/solver.py">
+      alternative_exists는 값마다 <mic:code>with matrix.givens(probe)</mic:code>를 열고 search(limit=1)을 부른다.
+      peers_forbid로 걸러진 값은 행렬을 건드리지 않고 continue한다.
+    </mic:fact>
+    <mic:fact id="EF12" file="game/sudoku/dlx.py">
+      search()는 호출마다 stack_col, stack_node, stack_start 세 리스트를 depth_limit(=cells+1) 길이로
+      새로 할당한다. 예산 초과 시 state가 ADVANCE면 depth+1, 아니면 depth로 _unwind를 부른다.
+    </mic:fact>
+    <mic:fact id="EF13" file="game/sudoku/spec.py">
+      peers_forbid(board, index, value)가 이미 존재하며 row/column/box 충돌만 본다.
+      DX-B02의 선별기는 이보다 강한 검사를 추가하는 것이다.
+    </mic:fact>
+    <mic:fact id="EF14" file="game/tests/reference.py">
+      DLX와 코드를 공유하지 않는 독립 백트래킹 오라클이 존재한다. DX-B02의 정확성 게이트는 이것을 쓴다.
+    </mic:fact>
+  </mic:established-facts>
+
+  <mic:deviations xml:id="deviations">
+    <dev:deviation id="DV-05" from="UI-B06 validation V-UI-B06-02" severity="medium" needs-approval="true">
+      <dev:macro-text>
+        V-UI-B06-02는 "arrow, Ctrl+arrow, Home/End, Ctrl+Home/End 이동이 명세대로 동작한다"를 요구한다.
+      </dev:macro-text>
+      <dev:problem>
+        그런데 UI-B06의 exclusions는 "key 해석(UI-B07)"이다. 키를 해석하지 않는 블록이 키 이동을
+        검증할 수는 없다. 두 문장이 서로 모순이다.
+      </dev:problem>
+      <dev:resolution>
+        이동 규칙을 순수 함수 moveSelection(from, direction, modifier)로 UI-B06에 두고,
+        키를 그 함수에 연결하는 일만 UI-B07이 맡는다. 그러면 V-UI-B06-02는 함수의 이동 규칙을 검증하고
+        UI-B07은 바인딩을 검증한다. 책임이 갈리고 두 검증이 모두 자동화된다.
+        이동 규칙은 격자 기하이지 입력 장치 지식이 아니므로 UI-B06 소속이 옳다.
+      </dev:resolution>
+    </dev:deviation>
+  </mic:deviations>
+
+  <!-- ============================================================ UI-B06 -->
+  <mic:parent-block id="UI-B06" name="BoardView and grid accessibility" micro-count="5">
+    <mic:objective-recap>
+      81 gridcell이 하나의 tab stop과 arrow 이동을 갖고, store 변경이 해당 cell만 갱신하며,
+      accessible name이 상태를 한 문장으로 전달한다.
+    </mic:objective-recap>
+    <mic:order>M-UI-B06-01, 02는 독립 → 03 → 04 → 05</mic:order>
+
+    <mb:micro id="M-UI-B06-01" parent="UI-B06" name="ui/announcer.js polite live region">
+      <mb:rationale>
+        §11의 live region 정책은 "무엇을 알릴지"보다 "무엇을 알리지 않을지"가 핵심이다.
+        각 digit 입력을 알리면 screen reader 사용자에게 소음이 된다. 정책을 한 모듈에 가두면
+        이후 블록이 임의로 알림을 추가할 수 없다.
+      </mb:rationale>
+      <mb:objective>
+        polite live region을 만들고, 허용된 사건 종류만 알리며, 같은 문구의 연속 중복을 억제한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/announcer.js"/></mb:target-files>
+      <mb:preconditions>UI-B01 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+createAnnouncer(container: HTMLElement) -> Announcer
+Announcer.announce(kind: AnnounceKind, message: string) -> void
+AnnounceKind = "sticky-mode" | "undo-redo" | "note" | "given-rejected"
+             | "completion" | "link-copied" | "session" | "storage-warning"
+      ]]></mb:input-type>
+      <mb:input-validation>
+        kind가 목록 밖이면 RangeError. 이 목록이 §11 정책의 코드 표현이며, digit 입력은 애초에 kind가 없다.
+        message가 string이 아니면 TypeError.
+      </mb:input-validation>
+      <mb:output-type>void. live region의 textContent가 갱신된다.</mb:output-type>
+      <mb:output-validation>
+        region이 aria-live="polite", aria-atomic="true"이고 시각적으로 숨겨져 있으나
+        display:none이 아니다. display:none이면 읽히지 않는다.
+      </mb:output-validation>
+      <mb:exceptions>RangeError, TypeError</mb:exceptions>
+      <mb:side-effects>
+        container에 region element 1개를 추가한다. 같은 문구를 연속 호출하면 zero-width space를
+        덧붙여 재읽기를 유도한다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const KINDS = new Set([...8 kinds...]);
+createAnnouncer(container):
+    region = <div aria-live="polite" aria-atomic="true" class="visually-hidden">
+    container.appendChild(region)
+    let last = "";
+    announce(kind, message):
+        if (!KINDS.has(kind)) throw new RangeError(`unknown announce kind: ${kind}`);
+        region.textContent = (message === last) ? message + "​" : message;
+        last = message;
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B06-01" kind="unit">알 수 없는 kind가 RangeError다.</mb:test>
+        <mb:test id="T-UI-B06-02" kind="unit">region이 polite와 atomic 속성을 갖는다.</mb:test>
+        <mb:test id="T-UI-B06-03" kind="unit">같은 문구 연속 호출 시 textContent가 달라진다.</mb:test>
+        <mb:test id="T-UI-B06-04" kind="manual">screen reader가 실제로 읽는다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B06-02" parent="UI-B06" name="Selection movement rules as pure functions">
+      <mb:rationale>
+        DV-05의 귀결이다. 이동 규칙을 순수 함수로 떼면 자동 검증이 가능해지고
+        UI-B07은 키를 이 함수에 연결하기만 하면 된다.
+      </mb:rationale>
+      <mb:objective>
+        arrow, box 단위 점프, 행 처음과 끝, 격자 처음과 끝 이동이 순수 함수로 정의되고 경계에서 멈춘다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/board-nav.js"/></mb:target-files>
+      <mb:preconditions>UI-B03 완료(core/spec.js의 좌표 테이블 사용)</mb:preconditions>
+      <mb:input-type><![CDATA[
+moveSelection(from: number, direction: Direction, modifier: "none"|"ctrl") -> number
+Direction = "up" | "down" | "left" | "right" | "lineStart" | "lineEnd"
+      ]]></mb:input-type>
+      <mb:input-validation>
+        from이 0..80 밖이면 RangeError. direction과 modifier가 목록 밖이면 RangeError.
+      </mb:input-validation>
+      <mb:output-type>0..80의 새 index. 이동할 수 없으면 from을 그대로 반환한다.</mb:output-type>
+      <mb:output-validation><![CDATA[
+none + up/down/left/right : 한 칸, 격자 밖으로 나가지 않음 (wrap 없음)
+ctrl  + up/down/left/right : 한 box(3칸), 경계에서는 가장자리까지만
+none + lineStart/lineEnd  : 현재 행의 처음/끝
+ctrl  + lineStart/lineEnd  : 격자의 처음(0)/끝(80)
+      ]]></mb:output-validation>
+      <mb:exceptions>RangeError만</mb:exceptions>
+      <mb:side-effects>없음. DOM을 만지지 않는 순수 함수다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+const step = {up:[-1,0], down:[1,0], left:[0,-1], right:[0,1]};
+moveSelection(from, direction, modifier):
+    let r = (from / 9) | 0, c = from % 9;
+    if (direction === "lineStart") return modifier === "ctrl" ? 0  : r * 9;
+    if (direction === "lineEnd")   return modifier === "ctrl" ? 80 : r * 9 + 8;
+    const [dr, dc] = step[direction];
+    const n = modifier === "ctrl" ? 3 : 1;
+    r = clamp(r + dr * n, 0, 8);
+    c = clamp(c + dc * n, 0, 8);
+    return r * 9 + c;
+// clamp, not wrap: an unreachable edge must not teleport the caret across the board
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B06-05" kind="unit">
+          네 방향 한 칸 이동이 옳고 경계에서 제자리다(V-UI-B06-02 일부).
+        </mb:test>
+        <mb:test id="T-UI-B06-06" kind="unit">ctrl 이동이 3칸이고 경계에서 가장자리까지만 간다.</mb:test>
+        <mb:test id="T-UI-B06-07" kind="unit">lineStart/lineEnd와 ctrl 조합이 0과 80을 준다.</mb:test>
+        <mb:test id="T-UI-B06-08" kind="unit">81개 시작점 x 6방향 x 2수식자 전수에서 결과가 0..80이다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B06-03" parent="UI-B06" name="Accessible name builder">
+      <mb:rationale>
+        cell label은 screen reader 사용자의 유일한 상태 창이다. 문자열 조립을 순수 함수로 떼면
+        DOM 없이 전수 검증할 수 있고, 렌더와 label이 어긋나는 사고를 막는다.
+      </mb:rationale>
+      <mb:objective>
+        행, 열, 값 또는 given 여부, candidates, conflict, memo 유무를 한 문장으로 만든다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/cell-label.js"/></mb:target-files>
+      <mb:preconditions>UI-B03 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+cellLabel(state: {
+  index: number, given: number, value: number, candidates: number,
+  conflict: boolean, hasNote: boolean
+}) -> string
+      ]]></mb:input-type>
+      <mb:input-validation>
+        index 0..80, given과 value 0..9, candidates 0..511 밖이면 RangeError.
+        given과 value가 동시에 non-zero이면 Error. 정규화 위반이다.
+      </mb:input-validation>
+      <mb:output-type>한국어 한 문장. 빈 문자열을 반환하지 않는다.</mb:output-type>
+      <mb:output-validation><![CDATA[
+항상 "N행 M열"로 시작한다 (1-based)
+given이면 "고정 숫자 D", value가 있으면 "D", 둘 다 없으면 "빈 칸"
+candidates가 있으면 "후보 1, 3, 7"
+conflict면 "규칙 위반"
+hasNote면 "메모 있음"            (V4-05: marker 대신 이 텍스트가 접근 경로다)
+      ]]></mb:output-validation>
+      <mb:exceptions>RangeError, Error</mb:exceptions>
+      <mb:side-effects>없음</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+cellLabel(s):
+    validate(s)
+    const parts = [`${((s.index/9)|0)+1}행 ${(s.index%9)+1}열`];
+    if (s.given)      parts.push(`고정 숫자 ${s.given}`);
+    else if (s.value) parts.push(`${s.value}`);
+    else              parts.push("빈 칸");
+    if (s.candidates) parts.push(`후보 ${digitsOf(s.candidates).join(", ")}`);
+    if (s.conflict)   parts.push("규칙 위반");
+    if (s.hasNote)    parts.push("메모 있음");
+    return parts.join(", ");
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B06-09" kind="unit">
+          given, user value, 빈 칸 세 경우가 각각 옳은 문장을 만든다(V-UI-B06-04).
+        </mb:test>
+        <mb:test id="T-UI-B06-10" kind="unit">candidates 마스크가 오름차순 숫자 목록으로 나온다.</mb:test>
+        <mb:test id="T-UI-B06-11" kind="unit">conflict와 메모 유무가 문장에 반영된다.</mb:test>
+        <mb:test id="T-UI-B06-12" kind="unit">given과 value 동시 존재가 Error다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B06-04" parent="UI-B06" name="Grid construction and roving tabindex">
+      <mb:rationale>
+        R3가 요구하는 구조다. 81 input을 role=grid로 바꾸는 것이 UI track 전체에서 가장 큰
+        구조 변경이며 MR-U1의 조작 불가 구간이 여기서 끝난다.
+      </mb:rationale>
+      <mb:objective>
+        role=grid 하위에 81 gridcell이 생기고 tab stop이 정확히 1개이며 selection 이동이 focus를 따라간다.
+      </mb:objective>
+      <mb:target-files><mb:file action="create" path="game/static/game/js/ui/board-view.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B06-02, 03 완료. UI-B03 store 존재.</mb:preconditions>
+      <mb:input-type>mountBoard(root: HTMLElement, store: Store, announcer: Announcer) -> BoardView</mb:input-type>
+      <mb:input-validation>root가 Element가 아니면 TypeError. store가 subscribe를 갖지 않으면 TypeError.</mb:input-validation>
+      <mb:output-type>
+        BoardView {select(index), destroy()}. 내부 DOM 참조를 노출하지 않는다.
+      </mb:output-type>
+      <mb:output-validation><![CDATA[
+grid element에 role="grid"와 aria-label이 있다
+row 9개, gridcell 81개
+tabindex=0인 element가 정확히 1개, 나머지는 -1
+select(i) 후 tabindex=0이 i로 옮겨가고 document.activeElement가 그 cell이다
+      ]]></mb:output-validation>
+      <mb:exceptions>TypeError</mb:exceptions>
+      <mb:side-effects>
+        root 하위 DOM 생성, store 구독 1건. destroy()가 구독을 해지하고 DOM을 제거한다.
+        구독 해지를 빠뜨리면 재mount 시 갱신이 중복된다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+mountBoard(root, store, announcer):
+    grid = <div role="grid" aria-label="스도쿠 9x9 퍼즐">
+    for r in 0..8: row = <div role="row">
+        for c in 0..8: cell = <div role="gridcell" aria-rowindex={r+1} aria-colindex={c+1}
+                                   tabindex={-1} data-index={r*9+c}>
+    grid.querySelector('[data-index="0"]').tabIndex = 0        // single tab stop
+    unsubscribe = store.subscribe(({changed}) => changed.forEach(updateCell))
+    select(i): cells[current].tabIndex = -1; cells[i].tabIndex = 0; cells[i].focus(); current = i
+    destroy(): unsubscribe(); grid.remove()
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B06-13" kind="manual">
+          page tab sequence에 grid element가 정확히 1개다(V-UI-B06-01).
+        </mb:test>
+        <mb:test id="T-UI-B06-14" kind="manual">select 후 focus가 해당 cell로 이동한다.</mb:test>
+        <mb:test id="T-UI-B06-15" kind="manual">destroy 후 재mount해도 갱신이 중복되지 않는다.</mb:test>
+        <mb:test id="T-UI-B06-16" kind="manual">axe critical violation이 0이다(V-UI-B06-05).</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. UI-B07 이후에는 의존자가 생기므로 그때는 되돌리지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-UI-B06-05" parent="UI-B06" name="Partial cell update and textContent safety">
+      <mb:rationale>
+        전체 재렌더는 focus를 잃고 screen reader 위치를 초기화한다.
+        그리고 note 텍스트를 innerHTML로 넣으면 §12 보안 규칙 위반이다. 둘 다 이 micro block에서 고정된다.
+      </mb:rationale>
+      <mb:objective>
+        변경된 index만 갱신하고, 모든 사용자 문자열이 textContent로만 들어간다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/static/game/js/ui/board-view.js"/></mb:target-files>
+      <mb:preconditions>M-UI-B06-04 완료</mb:preconditions>
+      <mb:input-type>updateCell(index: number) -> void. store에서 현재 상태를 읽는다.</mb:input-type>
+      <mb:input-validation>index 0..80 밖이면 RangeError.</mb:input-validation>
+      <mb:output-type>void. 해당 cell의 textContent, data-* 속성, aria-label이 갱신된다.</mb:output-type>
+      <mb:output-validation><![CDATA[
+value 1개 변경 시 갱신되는 node가 그 cell과 peer highlight 대상으로 한정된다
+cell element 자체가 교체되지 않는다 (focus 보존)
+innerHTML, insertAdjacentHTML, outerHTML을 사용하지 않는다
+      ]]></mb:output-validation>
+      <mb:exceptions>RangeError</mb:exceptions>
+      <mb:side-effects>DOM 속성과 텍스트 갱신. element 생성은 candidate span 재사용으로 최소화한다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+updateCell(i):
+    const cell = cells[i];
+    cell.dataset.given    = givens[i] ? "1" : "0";
+    cell.dataset.conflict = conflicts.has(i) ? "1" : "0";
+    cell.dataset.note     = hasNote(i) ? "1" : "0";
+    valueNode(cell).textContent = String(givens[i] || values[i] || "");
+    renderCandidates(cell, candidates[i]);        // 9 fixed spans, textContent only
+    cell.setAttribute("aria-label", cellLabel(snapshotOf(i)));
+// never innerHTML: note text is user input and is rendered elsewhere by UI-B10,
+// but the same rule is enforced here so the board can never become an injection path
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-UI-B06-17" kind="manual">
+          value 1개 변경 시 갱신 범위가 해당 cell과 peer로 한정된다(V-UI-B06-03).
+        </mb:test>
+        <mb:test id="T-UI-B06-18" kind="manual">갱신 중 focus를 가진 cell이 교체되지 않는다.</mb:test>
+        <mb:test id="T-UI-B06-19" kind="unit">
+          board-view.js 소스에 innerHTML이 없음을 정적으로 확인한다(V-UI-B06-06).
+        </mb:test>
+        <mb:test id="T-UI-B06-20" kind="manual">
+          마크업이 든 note를 넣어도 문자 그대로 렌더된다(V-UI-B06-06).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>updateCell만 되돌린다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="UI-B06">
+      V-UI-B06-01 → T-UI-B06-13 | 02 → T-UI-B06-05..08 (DV-05로 순수 함수 검증) |
+      03 → T-UI-B06-17 | 04 → T-UI-B06-09 | 05 → T-UI-B06-16 | 06 → T-UI-B06-19,20. 6/6 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ DX-B02 -->
+  <mic:parent-block id="DX-B02" name="Probe reduction by cheap pre-filtering" micro-count="4" gate="DEC-DX-01">
+    <mic:objective-recap>
+      선별기로 probe를 줄여 A/B 개선을 보인다. 개선이 없으면 폐기한다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B02-01 → 02 → 03 → 04</mic:order>
+    <mic:gate-note>
+      M-DX-B02-04가 게이트 판정이다. 여기서 개선이 없으면 앞의 세 micro block을 되돌리고
+      기각 근거를 기록하는 것으로 DX-B02를 종결한다. 그것이 실패가 아니라 결과다.
+    </mic:gate-note>
+
+    <mb:micro id="M-DX-B02-01" parent="DX-B02" name="Bounded naked-single propagation predicate">
+      <mb:rationale>
+        MR-D1이 지목한 정확성 위험의 진원지다. 선별기는 반드시 단방향이어야 한다.
+        모순을 증명한 경우에만 배제하고, 모르면 probe로 넘긴다.
+      </mb:rationale>
+      <mb:objective>
+        값을 가정한 뒤 제한 깊이까지 naked single을 전파해, 후보가 0개인 칸이 생기면 True를 반환한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="create" path="game/sudoku/prefilter.py" note="solver.py를 부풀리지 않고 분리"/>
+      </mb:target-files>
+      <mb:preconditions>DX-B01 완료(계측 기준선 확보)</mb:preconditions>
+      <mb:input-type><![CDATA[
+def contradiction_proven(board: list[int], index: int, value: int,
+                         spec: SudokuSpec, max_depth: int = 1) -> bool
+      ]]></mb:input-type>
+      <mb:input-validation>
+        board 길이가 spec.cells가 아니면 ValueError. index 범위와 value 1..dim 위반도 ValueError.
+        board[index]는 0이어야 한다. 호출자가 파낸 칸을 넘기기 때문이다.
+      </mb:input-validation>
+      <mb:output-type>
+        bool. True는 "모순이 증명됨", False는 "모름 또는 모순 없음"이다.
+        세 번째 상태를 만들지 않는다. 애매함은 전부 False로 접는다.
+      </mb:output-type>
+      <mb:output-validation>
+        True를 반환한 모든 경우에 대해 solver.solve(board with value at index)가 빈 리스트여야 한다.
+        이 성질이 깨지면 유일해가 깨진다. T-DX-B02-02가 이를 무작위 표본으로 검사한다.
+      </mb:output-validation>
+      <mb:exceptions>ValueError만. 내부에서 예외를 삼키지 않는다.</mb:exceptions>
+      <mb:side-effects>없음. board를 복사해 쓰고 행렬을 건드리지 않는다(EF11의 비용 회피가 목적이다).</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+def contradiction_proven(board, index, value, spec, max_depth=1):
+    validate(board, index, value, spec)
+    work = list(board); work[index] = value
+    for _ in range(max_depth):
+        singles = []
+        for i, cell in enumerate(work):
+            if cell: continue
+            allowed = [v for v in range(1, spec.dim + 1)
+                       if not spec.peers_forbid(work, i, v)]
+            if not allowed:
+                return True                 # proven: a cell has no candidate left
+            if len(allowed) == 1:
+                singles.append((i, allowed[0]))
+        if not singles:
+            return False                    # nothing more to deduce, stay conservative
+        for i, v in singles:
+            if spec.peers_forbid(work, i, v):
+                return True                 # two singles collided
+            work[i] = v
+    return False
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B02-01" kind="unit">
+          손으로 만든 모순 보드에서 True를, 정상 보드에서 False를 반환한다.
+        </mb:test>
+        <mb:test id="T-DX-B02-02" kind="property">
+          무작위 보드 500건에서 True인 경우 solver.solve가 항상 빈 리스트다(MR-D1 게이트).
+        </mb:test>
+        <mb:test id="T-DX-B02-03" kind="unit">board를 수정하지 않는다.</mb:test>
+        <mb:test id="T-DX-B02-04" kind="unit">잘못된 인자가 ValueError다.</mb:test>
+      </mb:tests>
+      <mb:rollback>파일 삭제. solver는 아직 이 모듈을 부르지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B02-02" parent="DX-B02" name="Wire the prefilter into alternative_exists">
+      <mb:rationale>
+        EF11이 보여주듯 probe 1회는 단서 층 1회 진입이다. 선별기를 그 앞에 세우는 것이
+        F1이 지목한 비용을 실제로 깎는 지점이다.
+      </mb:rationale>
+      <mb:objective>
+        peers_forbid 통과 후 contradiction_proven이 True인 값은 행렬을 건드리지 않고 건너뛴다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/sudoku/solver.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B02-01 완료</mb:preconditions>
+      <mb:input-type>기존 alternative_exists 시그니처를 유지한다. 인자를 추가하지 않는다.</mb:input-type>
+      <mb:input-validation>기존과 동일. 선별기 호출은 내부 구현 세부다.</mb:input-validation>
+      <mb:output-type>bool | None. 기존 계약과 완전히 동일하다.</mb:output-type>
+      <mb:output-validation>
+        선별기 유무와 무관하게 반환값이 같아야 한다. 다르면 선별기가 틀린 것이다.
+      </mb:output-validation>
+      <mb:exceptions>기존과 동일</mb:exceptions>
+      <mb:side-effects>
+        행렬 접근 횟수가 줄어든다. 그 외 관측 가능한 동작 변화가 없어야 한다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for value in range(1, spec.dim + 1):
+    if value == exclude: continue
+    if spec.peers_forbid(board, index, value): continue
+    if contradiction_proven(board, index, value, spec): continue   # new, matrix-free
+    ... unchanged probe path: with matrix.givens(probe) ... search(limit=1) ...
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B02-05" kind="regression">
+          동일 seed에서 생성 퍼즐이 기존 구현과 byte 단위로 동일하다(V-DX-B02-01).
+        </mb:test>
+        <mb:test id="T-DX-B02-06" kind="unit">
+          선별기를 끈 경로와 켠 경로의 alternative_exists 반환값이 무작위 200건에서 일치한다.
+        </mb:test>
+        <mb:test id="T-DX-B02-07" kind="regression">기존 74 tests가 통과한다.</mb:test>
+      </mb:tests>
+      <mb:rollback>추가한 두 줄 제거. 완전 가역이다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B02-03" parent="DX-B02" name="Oracle-based uniqueness gate">
+      <mb:rationale>
+        MR-D1은 이번 라운드에서 정확성을 해칠 수 있는 유일한 지점이다.
+        엔진 자신이 아니라 EF14의 독립 오라클로 판정해야 exact-cover 기계의 버그를 잡을 수 있다.
+      </mb:rationale>
+      <mb:objective>
+        선별기를 켠 상태로 생성한 퍼즐이 오라클 기준으로 정확히 하나의 해를 갖는다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/tests/test_generator.py" note="기존 속성 test 옆에 추가"/>
+      </mb:target-files>
+      <mb:preconditions>M-DX-B02-02 완료</mb:preconditions>
+      <mb:input-type>생성된 (puzzle, solution) 쌍</mb:input-type>
+      <mb:input-validation>없음. 검증 전용이다.</mb:input-validation>
+      <mb:output-type>test 결과</mb:output-type>
+      <mb:output-validation>
+        9x9 40판, 12x12 5판에서 오라클 해 개수가 전부 1이다(V-DX-B02-02).
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>test 시간이 늘어난다. 12x12 5판이 수 초를 쓴다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for dim, trials in ((9, 40), (12, 5)):
+    for _ in range(trials):
+        puzzle, solution = generate_puzzle(dim=dim, rng=seeded)
+        assert reference.count_solutions(puzzle, dim, limit=2) == 1   # independent oracle
+        assert solver.solve(puzzle, dim) == solution
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B02-08" kind="property">오라클 유일해 검사가 전부 통과한다(V-DX-B02-02).</mb:test>
+        <mb:test id="T-DX-B02-09" kind="property">
+          선별기가 배제한 값에 실제 해가 없음을 무작위 표본에서 classify로 교차 확인한다(V-DX-B02-05).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>test 제거. 다만 MR-D1의 방어가 사라지므로 선별기를 남긴 채 지우지 않는다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B02-04" parent="DX-B02" name="Gate decision: measure or discard">
+      <mb:rationale>
+        DEC-DX-01의 집행이다. H-A가 보여준 대로 그럴듯한 최적화가 실제로는 느려질 수 있으므로,
+        채택 여부를 측정 뒤에 정한다.
+      </mb:rationale>
+      <mb:objective>
+        DX-B01의 계측과 A/B로 probe 감소와 시간 개선을 확인하고, 없으면 M-DX-B02-01,02를 되돌린다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="none" path="측정만 수행. 결과에 따라 앞선 micro block을 되돌린다."/>
+      </mb:target-files>
+      <mb:preconditions>M-DX-B02-03까지 완료</mb:preconditions>
+      <mb:input-type>call_counts와 ab_timing의 before/after 출력</mb:input-type>
+      <mb:input-validation>
+        before는 선별기 도입 전 커밋에서 같은 seed와 trials로 측정한 값이어야 한다.
+        조건이 다르면 비교가 성립하지 않는다.
+      </mb:input-validation>
+      <mb:output-type>채택 또는 폐기 결정과 그 근거 수치</mb:output-type>
+      <mb:output-validation><![CDATA[
+채택 조건 (모두 충족):
+  probe 수와 givens 진입 수가 감소 (V-DX-B02-03)
+  dim=9와 dim=16 모두에서 ms/puzzle 개선 (V-DX-B02-04)
+  T-DX-B02-05 (byte 동일)와 T-DX-B02-08 (오라클) 통과
+하나라도 불충족이면 폐기하고 기각 근거를 기록한다.
+      ]]></mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>
+        폐기 시 solver.py와 prefilter.py가 원상 복구된다. 기각 근거는 DX-B08 보고서에 남는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+measure before (git stash or previous commit) and after with identical seed/trials
+if probes down and both dims faster and correctness tests green:
+    adopt; record the numbers
+else:
+    revert M-DX-B02-01 and M-DX-B02-02
+    record why, in the same form as H-A, so the next round does not retry blindly
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B02-10" kind="measurement">
+          probe 수와 givens 진입 수 감소가 수치로 제시된다(V-DX-B02-03).
+        </mb:test>
+        <mb:test id="T-DX-B02-11" kind="measurement">
+          dim=9와 dim=16의 A/B 개선이 제시되거나 폐기가 결정된다(V-DX-B02-04).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>이 micro block 자체가 rollback 결정 지점이다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B02">
+      V-DX-B02-01 → T-DX-B02-05 | 02 → T-DX-B02-08 | 03 → T-DX-B02-10 |
+      04 → T-DX-B02-11 | 05 → T-DX-B02-09. 5/5 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ DX-B03 -->
+  <mic:parent-block id="DX-B03" name="Clue-layer strategy A/B" micro-count="3" gate="DEC-DX-01">
+    <mic:objective-recap>
+      층을 cover로 쌓기와 probe마다 축소 행렬을 짓기를 측정해 승자를 정한다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B03-01 → 02 → 03</mic:order>
+
+    <mb:micro id="M-DX-B03-01" parent="DX-B03" name="Reduced matrix builder">
+      <mb:rationale>
+        D2 방향의 실험 대상이다. 1차 개선이 떠나온 방향이므로 채택을 전제하지 않고
+        비교 가능한 형태로만 만든다.
+      </mb:rationale>
+      <mb:objective>
+        단서가 배제하는 후보 행을 아예 넣지 않은 행렬을 만들고, 원 행렬과 같은 해 집합을 갖는다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/sudoku/dlx.py"/></mb:target-files>
+      <mb:preconditions>DX-B01 완료</mb:preconditions>
+      <mb:input-type><![CDATA[
+@classmethod
+def reduced(cls, spec: SudokuSpec, board: list[int]) -> "DancingLinks | None"
+      ]]></mb:input-type>
+      <mb:input-validation>
+        board 길이가 spec.cells가 아니면 ValueError.
+        단서가 서로 모순이면 None을 반환한다. 예외가 아니다. givens()의 consistent=False와 같은 의미다.
+      </mb:input-validation>
+      <mb:output-type>
+        DancingLinks 인스턴스 또는 None. 캐시하지 않는 지역 객체다(MR-D2 완화).
+      </mb:output-type>
+      <mb:output-validation>
+        같은 board에 대해 reduced().search(limit=2).count가 기존 givens() 경로와 동일하다.
+      </mb:output-validation>
+      <mb:exceptions>ValueError만</mb:exceptions>
+      <mb:side-effects>
+        매 호출이 새 리스트 6벌을 할당한다. 메모리 사용 패턴이 기존과 다르므로 함께 측정한다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+@classmethod
+def reduced(cls, spec, board):
+    allowed = per-cell candidate sets derived from the clues
+    if any cell has an empty set: return None            # contradictory clues
+    build the matrix including only rows in `allowed`
+    node count is no longer the fixed 1 + 4*dim^2 + 4*dim^3, so size is computed first
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B03-01" kind="unit">
+          무작위 보드 200개에서 두 경로의 count_solutions가 완전히 일치한다(V-DX-B03-01).
+        </mb:test>
+        <mb:test id="T-DX-B03-02" kind="unit">모순 단서에서 None을 반환한다.</mb:test>
+        <mb:test id="T-DX-B03-03" kind="unit">탐색 종료 후 is_pristine이 참이다(V-DX-B03-02).</mb:test>
+      </mb:tests>
+      <mb:rollback>classmethod 제거. 기존 경로는 건드리지 않았으므로 완전 가역이다.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B03-02" parent="DX-B03" name="Selectable probe strategy">
+      <mb:rationale>
+        두 전략을 동일 workload에서 재려면 실행 중 전환이 가능해야 한다.
+        영구 설정이 아니라 측정용 스위치이며 승자 결정 후 제거된다.
+      </mb:rationale>
+      <mb:objective>
+        alternative_exists가 두 전략 중 하나를 쓰도록 선택 가능하고, 기본값은 현행이다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/sudoku/solver.py"/></mb:target-files>
+      <mb:preconditions>M-DX-B03-01 완료</mb:preconditions>
+      <mb:input-type>모듈 수준 상수 PROBE_STRATEGY: "layer" | "reduced" (기본 "layer")</mb:input-type>
+      <mb:input-validation>두 값 밖이면 ValueError.</mb:input-validation>
+      <mb:output-type>전략과 무관하게 동일한 bool | None</mb:output-type>
+      <mb:output-validation>
+        두 전략의 반환값이 무작위 표본에서 100% 일치한다. 불일치는 즉시 결함이다.
+      </mb:output-validation>
+      <mb:exceptions>ValueError</mb:exceptions>
+      <mb:side-effects>
+        측정용 전역 스위치는 스레드 안전하지 않다. 측정 중에만 쓰고 production 경로에 남기지 않는다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+if PROBE_STRATEGY == "layer":
+    with matrix.givens(probe) as consistent: ... search ...
+else:
+    m = DancingLinks.reduced(spec, probe)
+    if m is None: continue
+    outcome = m.search(limit=1, budget=budget, collect=False)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B03-04" kind="unit">두 전략의 반환값이 무작위 200건에서 일치한다.</mb:test>
+        <mb:test id="T-DX-B03-05" kind="regression">기본값에서 기존 동작이 그대로다.</mb:test>
+      </mb:tests>
+      <mb:rollback>분기 제거.</mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B03-03" parent="DX-B03" name="Gate decision and loser removal">
+      <mb:rationale>
+        MR-D2가 경고한 대로 잘못 채택하면 성능이 후퇴한다. 측정으로만 정하고,
+        정한 뒤에는 분기를 남기지 않는다. 분기 하나의 유지 비용이 이득보다 클 수 있다.
+      </mb:rationale>
+      <mb:objective>
+        dim 3종에서 시간과 메모리를 재고 승자를 채택한 뒤 패자 경로와 스위치를 제거한다.
+      </mb:objective>
+      <mb:target-files>
+        <mb:file action="edit" path="game/sudoku/dlx.py"/>
+        <mb:file action="edit" path="game/sudoku/solver.py"/>
+      </mb:target-files>
+      <mb:preconditions>M-DX-B03-02 완료</mb:preconditions>
+      <mb:input-type>두 전략의 A/B 측정 결과</mb:input-type>
+      <mb:input-validation>
+        같은 seed와 trials로 측정한 값이어야 한다. dim별 승자가 갈리면 단일 전략을 유지한다(macro 지침).
+      </mb:input-validation>
+      <mb:output-type>단일 전략만 남은 코드와 기록된 수치</mb:output-type>
+      <mb:output-validation>
+        PROBE_STRATEGY 상수와 패자 경로가 소스에 남아 있지 않다. 74 tests가 통과한다(V-DX-B03-05).
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>현행 유지가 이기면 코드 변경이 0이고 문서만 남는다. 그것도 정상 결과다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+for dim in (9, 12, 16): measure ms/puzzle and peak memory under both strategies
+pick the winner; if winners differ by dim, keep "layer" (single strategy rule)
+delete the loser path and the switch; record the table in the DX-B08 report
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B03-06" kind="measurement">dim 3종의 A/B 표가 기록된다(V-DX-B03-03).</mb:test>
+        <mb:test id="T-DX-B03-07" kind="regression">
+          승자 채택 후 동일 seed 생성 결과가 byte 동일하다(V-DX-B03-04).
+        </mb:test>
+        <mb:test id="T-DX-B03-08" kind="regression">패자 제거 후 74 tests가 통과한다(V-DX-B03-05).</mb:test>
+      </mb:tests>
+      <mb:rollback>이 micro block이 rollback 결정 지점이다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B03">
+      V-DX-B03-01 → T-DX-B03-01 | 02 → T-DX-B03-03 | 03 → T-DX-B03-06 |
+      04 → T-DX-B03-07 | 05 → T-DX-B03-08. 5/5 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <!-- ============================================================ DX-B04 -->
+  <mic:parent-block id="DX-B04" name="Low-risk search-path optimizations" micro-count="2">
+    <mic:objective-recap>
+      search() 호출당 할당을 줄이되 상태 기계와 행렬 복원 보장을 바꾸지 않는다. 이득 상한은 7~13%다.
+    </mic:objective-recap>
+    <mic:order>M-DX-B04-01 → 02</mic:order>
+
+    <mb:micro id="M-DX-B04-01" parent="DX-B04" name="Preallocated search stacks with re-entrancy guard">
+      <mb:rationale>
+        EF12가 확인한 호출당 3회 할당을 없앤다. 다만 buffer를 공유하면 재진입이 불가능해지므로,
+        MR-D5가 지적한 대로 그 제약을 암묵이 아니라 명시적 실패로 만든다.
+      </mb:rationale>
+      <mb:objective>
+        stack 3개를 인스턴스에 1회 할당해 재사용하고, 중첩 search 호출이 RuntimeError로 즉시 실패한다.
+      </mb:objective>
+      <mb:target-files><mb:file action="edit" path="game/sudoku/dlx.py"/></mb:target-files>
+      <mb:preconditions>DX-B01 완료</mb:preconditions>
+      <mb:input-type>기존 search 시그니처 유지. 인자를 추가하지 않는다.</mb:input-type>
+      <mb:input-validation>
+        기존 limit &lt; 1 검사를 유지한다. 추가로 self._searching이 True면 RuntimeError를 던진다.
+      </mb:input-validation>
+      <mb:output-type>SearchOutcome. 기존과 완전히 동일한 4-tuple이다.</mb:output-type>
+      <mb:output-validation>
+        모든 종료 경로에서 _searching이 False로 돌아온다. 예산 초과와 예외 경로를 포함한다.
+      </mb:output-validation>
+      <mb:exceptions>
+        RuntimeError(재진입), ValueError(limit). 조용히 잘못된 답을 내지 않는 것이 핵심이다.
+      </mb:exceptions>
+      <mb:side-effects>
+        __slots__에 세 buffer와 _searching 플래그가 추가된다. 인스턴스 메모리가 dim에 비례해 늘지만
+        행렬 자체에 비하면 무시할 수준이다.
+      </mb:side-effects>
+      <mb:pseudocode><![CDATA[
+__slots__ += ("_stack_col", "_stack_node", "_stack_start", "_searching")
+__init__: allocate the three lists at length self._max_depth; _searching = False
+
+def search(self, ...):
+    if self._searching:
+        raise RuntimeError("DancingLinks.search is not re-entrant")
+    if limit < 1: raise ValueError(...)
+    self._searching = True
+    try:
+        stack_col, stack_node, stack_start = self._stack_col, self._stack_node, self._stack_start
+        ... existing three-state loop, unchanged ...
+    finally:
+        self._searching = False
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B04-01" kind="unit">
+          cover 후 uncover 시 링크 상태가 바이트 단위로 동일하다(V-DX-B04-01).
+        </mb:test>
+        <mb:test id="T-DX-B04-02" kind="unit">
+          예산 1~120 전 구간에서 행렬이 복원되고 무한 루프가 없다(V-DX-B04-02).
+        </mb:test>
+        <mb:test id="T-DX-B04-03" kind="unit">
+          setrecursionlimit(60)에서 16x16 풀이가 성공한다(V-DX-B04-03).
+        </mb:test>
+        <mb:test id="T-DX-B04-04" kind="unit">
+          중첩 search 호출이 RuntimeError이고 이후 _searching이 False다(V-DX-B04-04).
+        </mb:test>
+        <mb:test id="T-DX-B04-05" kind="unit">4스레드 동시 풀이가 통과한다(V-DX-B04-05).</mb:test>
+      </mb:tests>
+      <mb:rollback>
+        지역 할당으로 되돌린다. 재진입 가드도 함께 제거해야 의미가 일관된다.
+      </mb:rollback>
+    </mb:micro>
+
+    <mb:micro id="M-DX-B04-02" parent="DX-B04" name="Measure and keep or revert">
+      <mb:rationale>
+        이득 상한이 7~13%라는 사실을 미리 알고 시작한다. 측정 잡음을 넘지 못하면
+        재진입 제약이라는 비용만 남으므로 되돌리는 편이 낫다.
+      </mb:rationale>
+      <mb:objective>A/B로 개선을 확인하고, 잡음 이하이면 M-DX-B04-01을 되돌린다.</mb:objective>
+      <mb:target-files><mb:file action="none" path="측정 후 유지 또는 되돌림"/></mb:target-files>
+      <mb:preconditions>M-DX-B04-01 완료</mb:preconditions>
+      <mb:input-type>ab_timing의 before/after</mb:input-type>
+      <mb:input-validation>동일 seed와 trials. 최소 3회 반복해 분산을 본다.</mb:input-validation>
+      <mb:output-type>유지 또는 되돌림 결정과 수치</mb:output-type>
+      <mb:output-validation>
+        개선이 반복 측정의 분산을 넘어야 유지한다. 단일 측정의 우연한 차이를 근거로 삼지 않는다(MR-D4).
+      </mb:output-validation>
+      <mb:exceptions>없음</mb:exceptions>
+      <mb:side-effects>되돌리면 MR-D5의 위험도 함께 사라진다.</mb:side-effects>
+      <mb:pseudocode><![CDATA[
+run ab_timing three times before and after with identical seeds
+if median improvement > observed spread: keep
+else: revert M-DX-B04-01 and record "below noise" with the numbers   (V-DX-B04-06)
+      ]]></mb:pseudocode>
+      <mb:tests>
+        <mb:test id="T-DX-B04-06" kind="measurement">
+          개선이 잡음을 넘지 못하면 되돌린다(V-DX-B04-06).
+        </mb:test>
+      </mb:tests>
+      <mb:rollback>이 micro block이 rollback 결정 지점이다.</mb:rollback>
+    </mb:micro>
+
+    <mic:coverage-check parent="DX-B04">
+      V-DX-B04-01..05 → T-DX-B04-01..05 | 06 → T-DX-B04-06. 6/6 수용.
+    </mic:coverage-check>
+  </mic:parent-block>
+
+  <mic:risks xml:id="wave2b-risks">
+    <mic:risk id="W2B-R1" severity="high" refs="M-DX-B02-01">
+      선별기가 단방향 규칙을 어기면 유일해가 깨지고, 그 결함은 생성 시점이 아니라 사용자가 풀다가
+      막히는 형태로 나타난다. T-DX-B02-02의 500건 property test가 유일한 조기 경보다.
+      max_depth를 늘리고 싶은 유혹이 생기면 정확성 부담도 함께 커진다는 점을 기억한다.
+    </mic:risk>
+    <mic:risk id="W2B-R2" severity="medium" refs="M-UI-B06-04, M-UI-B06-05">
+      UI-B06은 자동 검증 비율이 낮다. 순수 함수로 뗀 세 micro block 외에는 수동과 axe에 의존한다.
+      수동 항목을 건너뛰고 통과를 선언하지 않는다.
+    </mic:risk>
+    <mic:risk id="W2B-R3" severity="medium" refs="M-DX-B03-02">
+      PROBE_STRATEGY 전역 스위치는 스레드 안전하지 않다. 측정 중에만 쓰고 M-DX-B03-03에서 반드시 제거한다.
+      남기면 solver의 스레드 모델 보장을 훼손한다.
+    </mic:risk>
+    <mic:risk id="W2B-R4" severity="low" refs="M-DX-B04-01">
+      __slots__ 변경은 인스턴스 레이아웃을 바꾼다. 기존 pickle이나 직렬화가 있으면 깨지지만
+      DancingLinks는 직렬화 대상이 아니므로 실제 영향은 없다. 확인만 하고 넘어간다.
+    </mic:risk>
+  </mic:risks>
+
+  <mic:open-questions xml:id="open-questions">
+    <mic:question id="OQ-W2B-1" blocking="false" refs="DV-05">
+      moveSelection을 ui/board-nav.js로 분리하는 조정에 동의하는지 확인이 필요하다.
+      DEC-UI-04의 파일 목록에 없는 새 파일이므로 배치도 함께 갱신해야 한다.
+    </mic:question>
+    <mic:question id="OQ-W2B-2" blocking="false" refs="M-DX-B02-01">
+      선별기의 max_depth 기본값을 1로 잡았다. 깊이를 늘리면 probe를 더 줄이지만 전파 비용과
+      정확성 부담이 함께 커진다. 1과 2를 모두 측정해 비교할지 확인이 필요하다.
+    </mic:question>
+    <mic:question id="OQ-W2B-3" blocking="false" refs="M-DX-B02-01">
+      prefilter를 solver.py가 아니라 새 모듈 game/sudoku/prefilter.py로 두었다.
+      solver.py를 부풀리지 않으려는 판단이며, 폐기 시 파일 삭제로 깔끔히 되돌릴 수 있다는 이점도 있다.
+    </mic:question>
+  </mic:open-questions>
+
+  <mic:approval xml:id="approval" status="awaiting-user-approval">
+    <mic:current-phase>3. Micro Blocking — Wave 2 part B</mic:current-phase>
+    <mic:validation-performed>
+      XML well-formedness, micro block과 test id 유일성,
+      Macro 검증 항목 수용 완전성(UI-B06 6/6, DX-B02 5/5, DX-B03 5/5, DX-B04 6/6),
+      solver.py와 dlx.py 실제 코드 대조
+    </mic:validation-performed>
+    <mic:checkbox checked="false">Wave 2 part B Micro Blocking 승인</mic:checkbox>
+    <mic:checkbox checked="false">DV-05 이탈 승인 (moveSelection을 UI-B06 소속 순수 함수로)</mic:checkbox>
+    <mic:next-phase blocked="true">Wave 3 — UI-B07, UI-B08, DX-B05, DX-B06</mic:next-phase>
+  </mic:approval>
+
+</mic:micro-blocking>

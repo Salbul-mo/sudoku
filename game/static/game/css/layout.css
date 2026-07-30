@@ -1,0 +1,89 @@
+/* §9 breakpoints and §10's single 48px control floor (L3) -- never 44px.
+   The full-viewport-height unit that ignores mobile browser chrome is never
+   used here; the dynamic/small variants are used instead. */
+
+:root {
+    --control-floor: 48px;
+    --board-width: min(70dvh, 640px);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--bg-page);
+    color: var(--fg-body);
+}
+
+.control {
+    min-inline-size: var(--control-floor);
+    min-block-size: var(--control-floor);
+}
+
+.board {
+    inline-size: var(--board-width);
+    block-size: var(--board-width);
+    aspect-ratio: 1;
+}
+
+.digit-bar {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    block-size: 60px; /* L2: row 60 = button 48 + 6px padding on each side */
+    gap: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.digit-bar button {
+    inline-size: calc(var(--board-width) / 9);
+    block-size: 48px;
+}
+
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+}
+
+.notes-rail {
+    inline-size: 280px;
+}
+
+/* wide: side-by-side board and notes rail, board can shrink but never overlays. */
+@media (min-width: 1024px) {
+    :root {
+        --board-width: min(70dvh, 640px);
+    }
+
+    .app-shell {
+        flex-direction: row;
+    }
+}
+
+/* medium: portrait stacks the board over controls; landscape puts them side by
+   side; notes live in a bottom sheet rather than a fixed rail. */
+@media (min-width: 600px) and (max-width: 1023px) {
+    :root {
+        --board-width: min(80dvh, 90vw);
+    }
+
+    .notes-rail {
+        inline-size: auto;
+        block-size: auto;
+    }
+}
+
+/* narrow: board fills the viewport width minus a small margin; digit targets
+   are exactly board-width/9 with no inter-button gap. */
+@media (max-width: 599px) {
+    :root {
+        --board-width: calc(100vw - 16px);
+    }
+
+    .digit-bar {
+        gap: 0;
+    }
+}
