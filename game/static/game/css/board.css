@@ -64,9 +64,17 @@
     inset: 0;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr); /* explicit, matching the columns,
+        rather than relying on the grid's default row-stretch behavior. */
 }
 
 .candidate {
+    /* text-align alone only centers horizontally; without flex centering,
+       each digit sits wherever line-height happens to put it in its 1/9th
+       square instead of dead-center. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 9px;
     font-size: max(9px, 24cqi); /* cqi unsupported falls back to the 9px floor above it */
     color: var(--fg-candidate);
