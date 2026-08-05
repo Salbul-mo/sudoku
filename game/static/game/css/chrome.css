@@ -74,6 +74,14 @@
     padding: 0 8px;
 }
 
+/* The wide-layout row gap (layout.css) already separates board and
+   controls-area; when the digit bar itself is collapsed (desktop, no
+   coarse pointer) its wrapper's own padding would otherwise add a stray
+   trailing sliver of empty space past the board. */
+.controls-area:has(.digit-bar[data-visibility="collapsed"]) {
+    padding: 0;
+}
+
 /* Completion is signalled by a text badge, not by color alone (V4-05). */
 .app-shell-header-host[data-state="solved"]::after {
     content: "완성";

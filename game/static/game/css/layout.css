@@ -48,7 +48,13 @@ body {
     min-height: 100dvh;
 }
 
-/* wide: board can shrink but never overlays. */
+/* wide: board can shrink but never overlays. The header host is a flex
+   item containing a wrapping button row, so its shrink-to-fit width
+   defaults to the row's *unwrapped* max-content size -- capping it forces
+   the buttons to wrap into a tidy block instead of claiming far more
+   horizontal space than they visually use. Centering the row as a group
+   (rather than left-packing header/board/controls) keeps the header and
+   board a fixed, deliberate distance apart regardless of viewport width. */
 @media (min-width: 1024px) {
     :root {
         --board-width: min(70dvh, 640px);
@@ -56,14 +62,41 @@ body {
 
     .app-shell {
         flex-direction: row;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 32px;
+        padding-block-start: 24px;
+    }
+
+    .app-shell-header-host {
+        max-inline-size: 360px;
     }
 }
 
 /* medium: portrait stacks the board over controls; landscape puts them side by
-   side. */
+   side, same header-wrapping/centering treatment as the wide breakpoint but
+   sized down for the narrower viewport range. */
 @media (min-width: 600px) and (max-width: 1023px) {
     :root {
         --board-width: min(80dvh, 90vw);
+    }
+
+    @media (orientation: landscape) {
+        :root {
+            --board-width: min(70dvh, 60vw);
+        }
+
+        .app-shell {
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 24px;
+            padding-block-start: 16px;
+        }
+
+        .app-shell-header-host {
+            max-inline-size: 320px;
+        }
     }
 }
 
