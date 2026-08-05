@@ -1,5 +1,14 @@
 {
   "name": "sudoku-django-pages",
   "pages_build_output_dir": "./game/static",
-  "compatibility_date": "2026-08-02"
+  "compatibility_date": "2026-08-02",
+  // /api/new-puzzle/ now runs a real Dancing Links generation+digging pass
+  // per request instead of a static-pool lookup (see
+  // docs/codex-mhj_26_08_02_08_cloudflare-pages-deployment.md). Requires the
+  // Workers Paid plan, whose CPU limit is configurable up to 30,000ms;
+  // 10,000ms leaves headroom over the ~2-17ms observed locally while
+  // bounding the pathological worst case.
+  "limits": {
+    "cpu_ms": 10000
+  }
 }
