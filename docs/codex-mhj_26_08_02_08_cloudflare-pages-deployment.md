@@ -68,6 +68,30 @@ Confirm the reported compressed bundle size (3 MB ceiling applies regardless
 of plan) and inspect preview invocation metrics -- in particular actual CPU
 time per request -- before production promotion.
 
+## Git-integration (dashboard) build settings
+
+If the Pages project is connected to this repository via Cloudflare's Git
+integration (auto-deploy on push), two dashboard settings under **Settings ->
+Build & deployments** must be set correctly -- neither lives in a repo file,
+so they cannot be fixed by editing code:
+
+- **Deploy command**: must be `npx wrangler pages deploy game/static`, not
+  the `npx wrangler deploy` default some project templates prefill.
+  `wrangler.jsonc` has `pages_build_output_dir` (a Pages-specific field, no
+  `main` or `assets.directory`), so plain `wrangler deploy` fails with
+  "Missing entry-point to Worker script or to assets directory" -- it does
+  not know this is a Pages project without the `pages` subcommand.
+- **Build command**: leave empty. `game/static` is already the final output;
+  there is no build step to run.
+- **Environment variable `SKIP_DEPENDENCY_INSTALL=1`**: Cloudflare's build
+  image auto-detects `requirements.txt` at the repo root and runs
+  `pip install -r requirements.txt` before the deploy command, even though
+  Python is never invoked at request time (see above). This variable is
+  Cloudflare's documented way to skip that automatic dependency-install step
+  regardless of which language it detected. `requirements.txt` itself stays
+  in the repo (Django remains the local-dev/rollback path); this only stops
+  the Cloudflare build from installing it.
+
 ## Optional authenticated deployment
 
 Live deployment changes external Cloudflare state and requires an authenticated
