@@ -45,8 +45,6 @@ export function resolveAction(ev) {
         case "ArrowRight": return "moveRight";
         case "Home": return "lineStart";
         case "End": return "lineEnd";
-        case "KeyN": return ev.shiftKey ? "regionNote" : "note";
-        case "KeyM": return "notesList";
         case "Space": return "stickyToggle";
         case "F1": return "help";
         default:

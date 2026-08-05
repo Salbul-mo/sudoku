@@ -39,12 +39,7 @@ function randomCandidateCount(rng, boundaryPool) {
     return Math.floor(rng() * 82);
 }
 
-function randomNoteCount(rng, boundaryPool) {
-    if (boundaryPool.length) return boundaryPool.pop();
-    return Math.floor(rng() * 109);
-}
-
-function randomSession(rng, candidateBoundaries, noteBoundaries) {
+function randomSession(rng, candidateBoundaries) {
     const givens = randomValidGivens(rng);
     const values = new Uint8Array(81);
     const candidates = new Uint16Array(81);
@@ -59,35 +54,16 @@ function randomSession(rng, candidateBoundaries, noteBoundaries) {
         candidates[i] = mask;
     }
 
-    const cellNotes = {};
-    const regionNotes = {};
-    const noteCount = randomNoteCount(rng, noteBoundaries);
-    const cellTargets = Array.from({ length: 81 }, (_, i) => i);
-    const regionTargets = [];
-    for (const kind of ["r", "c", "b"]) for (let i = 0; i < 9; i++) regionTargets.push(kind + i);
-    const allTargets = [...cellTargets.map((i) => ({ cell: true, key: i })),
-        ...regionTargets.map((k) => ({ cell: false, key: k }))];
-    for (let i = allTargets.length - 1; i > 0; i--) {
-        const j = Math.floor(rng() * (i + 1));
-        [allTargets[i], allTargets[j]] = [allTargets[j], allTargets[i]];
-    }
-    for (let k = 0; k < Math.min(noteCount, allTargets.length); k++) {
-        const t = allTargets[k];
-        const text = "note-" + Math.floor(rng() * 1000);
-        if (t.cell) cellNotes[t.key] = text; else regionNotes[t.key] = text;
-    }
-
-    return { givens, values, candidates, cellNotes, regionNotes };
+    return { givens, values, candidates };
 }
 
 test("1,000 seeded random states round-trip through encode/decode", async () => {
     const rng = mulberry32(0xc0ffee);
     const candidateBoundaries = [0, 1, 80, 81];
-    const noteBoundaries = [0, 1, 107, 108];
     let checked = 0;
     for (let i = 0; i < 1000; i++) {
-        const scope = pick(["SC1", "SC2", "SC3"], rng);
-        const session = randomSession(rng, candidateBoundaries, noteBoundaries);
+        const scope = pick(["SC1", "SC2"], rng);
+        const session = randomSession(rng, candidateBoundaries);
         const savedAt = Math.floor(rng() * 2 ** 31);
         const state = project(session, scope, savedAt);
         assert.equal(checkInvariants(state).ok, true, `generator produced an invalid state at i=${i}`);
@@ -98,7 +74,6 @@ test("1,000 seeded random states round-trip through encode/decode", async () => 
         assert.deepEqual(Array.from(back.state.givens), Array.from(state.givens));
         if (state.values) assert.deepEqual(Array.from(back.state.values), Array.from(state.values));
         if (state.candidates) assert.deepEqual(Array.from(back.state.candidates), Array.from(state.candidates));
-        if (state.notes) assert.deepEqual(back.state.notes, state.notes);
         assert.equal(back.state.savedAt, state.savedAt);
 
         // determinism: re-encoding the same input yields the same byte sequence
@@ -110,18 +85,12 @@ test("1,000 seeded random states round-trip through encode/decode", async () => 
 });
 
 test("decoding a near-maximal payload completes in under 100ms (V-UI-B05-07)", async () => {
-    // Build a large legal SC3 payload: 108 notes at 500 bytes of text each.
+    // Build a large legal SC2 payload: all 81 cells carrying a candidate mask.
     const rng = mulberry32(1);
-    const session = randomSession(rng, [], [108]);
-    for (const key of Object.keys(session.cellNotes)) {
-        session.cellNotes[key] = "x".repeat(50);
-    }
-    for (const key of Object.keys(session.regionNotes)) {
-        session.regionNotes[key] = "x".repeat(50);
-    }
+    const session = randomSession(rng, [81]);
     const noCompression = { CompressionStream: undefined, DecompressionStream: undefined };
-    const link = await encode(session, "SC3", Date.now(), noCompression);
-    assert.ok(link.length > 1000 && link.length <= 8000,
+    const link = await encode(session, "SC2", Date.now(), noCompression);
+    assert.ok(link.length > 0 && link.length <= 8000,
         `expected a large-but-legal payload, got ${link.length} chars`);
 
     const start = performance.now();

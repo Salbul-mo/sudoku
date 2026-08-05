@@ -7,7 +7,7 @@ function freshSession(overrides = {}) {
     return {
         schemaVersion: 1, puzzleId: "t", dim: 9,
         givens: new Uint8Array(81), values: new Uint8Array(81), candidates: new Uint16Array(81),
-        cellNotes: {}, regionNotes: {}, createdAt: 0, updatedAt: 0,
+        createdAt: 0, updatedAt: 0,
         ...overrides,
     };
 }
@@ -18,8 +18,6 @@ function noopDeps(store, overrides = {}) {
         settings: { get: () => ({ autoRemoveCandidates: true }) },
         boardView: { select() {} },
         announcer: { announce() {} },
-        openNoteEditor() {},
-        openNotesList() {},
         ...overrides,
     };
 }
@@ -76,16 +74,6 @@ test("sticky mode routes digit entry through toggleCandidate instead of setValue
     adapter.onCellTap(20);
     assert.equal(store.session.values[20], 0);
     assert.notEqual(store.session.candidates[20] & (1 << 5), 0);
-});
-
-test("mounting without the required callbacks throws TypeError", () => {
-    const store = createStore(freshSession());
-    assert.throws(() => createTouchAdapter({
-        root: {}, store, settings: { get: () => ({}) },
-        boardView: { select() {} }, announcer: { announce() {} },
-        openNoteEditor() {},
-        // openNotesList missing
-    }), TypeError);
 });
 
 test("touch-adapter.js source never creates an input, textarea, or contenteditable element (hard invariant)", async () => {

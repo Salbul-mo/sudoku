@@ -3,13 +3,11 @@
 // gets compressed so decode can tell what it received before trying to
 // inflate it (V4-01 removed a circular dependency that used to live here).
 import { crc32 } from "./crc32.js";
-import { encodeULEB128, decodeULEB128 } from "./leb128.js";
 import { checkInvariants, project } from "./canonical.js";
 
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2;
 const DECOMPRESSION_LIMIT = 65536;
 const MAX_FRAGMENT_LENGTH = 8000;
-const MAX_NOTE_TEXT_BYTES = 512;
 const B64URL_RE = /^[A-Za-z0-9_-]*$/;
 
 class Malformed extends Error {}
@@ -75,39 +73,6 @@ function readCandidateBlock(cursor) {
     return candidates;
 }
 
-function readNoteBlock(cursor) {
-    const countResult = decodeULEB128(cursor.bytes, cursor.pos);
-    if (!countResult) throw new Malformed();
-    cursor.pos = countResult.next;
-    if (countResult.value > 108) throw new Malformed();
-
-    const decoder = new TextDecoder("utf-8", { fatal: true });
-    const notes = [];
-    for (let n = 0; n < countResult.value; n++) {
-        const kind = cursor.u8();
-        const key = cursor.u8();
-        const lenResult = decodeULEB128(cursor.bytes, cursor.pos);
-        if (!lenResult) throw new Malformed();
-        cursor.pos = lenResult.next;
-        const utf8 = cursor.bytesN(lenResult.value);
-        let text;
-        try {
-            text = decoder.decode(utf8);
-        } catch {
-            throw new Malformed();
-        }
-        if (utf8.length > MAX_NOTE_TEXT_BYTES) throw new Malformed();
-        notes.push({ kind, key, text });
-    }
-    for (let i = 1; i < notes.length; i++) {
-        const prev = notes[i - 1];
-        const cur = notes[i];
-        const strictlyIncreasing = prev.kind < cur.kind || (prev.kind === cur.kind && prev.key < cur.key);
-        if (!strictlyIncreasing) throw new Malformed(); // order violation or duplicate (kind, key) target
-    }
-    return notes;
-}
-
 class Cursor {
     constructor(bytes) {
         this.bytes = bytes;
@@ -153,8 +118,7 @@ class Cursor {
 // ------------------------------------------------------------------ BodyV1
 export function writeBody(state) {
     const out = [];
-    const flags = (state.values ? 1 : 0) | (state.candidates ? 2 : 0)
-        | (state.notes ? 4 : 0) | (state.savedAt != null ? 8 : 0);
+    const flags = (state.values ? 1 : 0) | (state.candidates ? 2 : 0) | (state.savedAt != null ? 8 : 0);
     out.push(flags, 9);
     if (state.savedAt != null) {
         const v = state.savedAt >>> 0;
@@ -163,16 +127,6 @@ export function writeBody(state) {
     pushNibbles(out, state.givens);
     if (state.values) pushNibbles(out, state.values);
     if (state.candidates) out.push(...writeCandidateBlock(state.candidates));
-    if (state.notes) {
-        encodeULEB128(state.notes.length, out);
-        const encoder = new TextEncoder();
-        for (const n of state.notes) {
-            out.push(n.kind, n.key);
-            const utf8 = encoder.encode(n.text);
-            encodeULEB128(utf8.length, out);
-            for (const b of utf8) out.push(b);
-        }
-    }
     return Uint8Array.from(out);
 }
 
@@ -186,9 +140,8 @@ export function readBody(bytes) {
         const givens = cursor.nibbles(81);
         const values = flags & 1 ? cursor.nibbles(81) : null;
         const candidates = flags & 2 ? readCandidateBlock(cursor) : null;
-        const notes = flags & 4 ? readNoteBlock(cursor) : null;
         if (!cursor.atEnd()) throw new Malformed();
-        const state = { givens, values, candidates, notes, savedAt };
+        const state = { givens, values, candidates, savedAt };
         const check = checkInvariants(state);
         if (!check.ok) return { ok: false, code: check.code, message: check.code };
         return { ok: true, state };

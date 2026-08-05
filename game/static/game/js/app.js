@@ -15,7 +15,6 @@ import { createAnnouncer } from "./ui/announcer.js";
 import { createDialogHost } from "./ui/dialog-host.js";
 import { mountShell } from "./ui/app-shell.js";
 import { mountBoard } from "./ui/board-view.js";
-import { mountNotes } from "./ui/notes-view.js";
 import { mountTouchControls } from "./ui/touch-controls.js";
 import { createKeyboardAdapter } from "./ui/keyboard-adapter.js";
 import { createTouchAdapter, resolveVisibility } from "./ui/touch-adapter.js";
@@ -29,7 +28,6 @@ const COARSE_POINTER = "(pointer: coarse)";
 const SHARE_SCOPES = [
     ["SC1", "문제만", "빈 퍼즐만 공유합니다."],
     ["SC2", "진행 포함", "입력한 숫자와 후보까지 공유합니다."],
-    ["SC3", "메모까지 포함", "작성한 메모가 링크에 포함됩니다. 링크를 받은 사람이 모두 읽을 수 있습니다."],
 ];
 
 // localStorage throws on access in some privacy modes rather than merely
@@ -108,13 +106,11 @@ export async function start(root, env = {}) {
     const headerHost = element("div", "app-shell-header-host");
     const boardArea = element("div", "board-area");
     const controlsArea = element("div", "controls-area");
-    const notesArea = element("div", "notes-area");
     const dialogHost = element("div", "dialog-host");
 
     shell.appendChild(headerHost);
     shell.appendChild(boardArea);
     shell.appendChild(controlsArea);
-    shell.appendChild(notesArea);
     root.appendChild(announcerHost);
     root.appendChild(shell);
     root.appendChild(dialogHost);
@@ -202,17 +198,6 @@ export async function start(root, env = {}) {
 
         const result = await shareView.build(scope);
         const message = document.createElement("p");
-        if (!result.ok) {
-            message.textContent =
-                `링크가 너무 깁니다 (${result.length}자). ${result.suggest} 범위로 다시 시도하세요.`;
-            await dialogs.open({
-                kind: "share-error",
-                title: "공유 실패",
-                body: message,
-                actions: [{ id: "close", label: "닫기", initialFocus: true }],
-            });
-            return;
-        }
         message.textContent = result.warn
             ? `링크가 준비되었습니다 (${result.length}자). 일부 앱에서 잘릴 수 있습니다.`
             : `링크가 준비되었습니다 (${result.length}자).`;
@@ -259,19 +244,12 @@ export async function start(root, env = {}) {
             onPointerCancel: () => touch.onPointerMove(Infinity, Infinity),
         });
 
-        const notes = mountNotes(notesArea, store, {
-            confirm: (question) => dialogs.confirm(question),
-            announcer,
-        });
-
         const touch = createTouchAdapter({
             root: boardArea,
             store,
             settings,
             boardView,
             announcer,
-            openNoteEditor: (target) => notes.openEditor(target, null),
-            openNotesList: () => notes.openNotesList(),
         });
 
         const touchControls = mountTouchControls(controlsArea, touch, {
@@ -284,12 +262,6 @@ export async function start(root, env = {}) {
             settings,
             boardView,
             announcer,
-            openNote: (selection) => {
-                if (selection === null) return notes.openNotesList();
-                return notes.openEditor({ kind: "cell", key: selection }, null);
-            },
-            openRegionNote: (selection) => notes.openTargetSelector(selection, null),
-            openNotesList: () => notes.openNotesList(),
             openHelp,
         });
 
@@ -299,7 +271,6 @@ export async function start(root, env = {}) {
             boardView,
             startNewGame: () => { void restart(); },
             openShare: () => { void openShare(shareView); },
-            openNotes: () => notes.openNotesList(),
             openSettings: () => { void openSettings(); },
             openHelp: () => { void openHelp(); },
         });

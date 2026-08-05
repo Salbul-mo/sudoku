@@ -1,10 +1,7 @@
-// SC3 is the scope that can leak notes into a shared link (RK5), so it is
-// never the default and always carries a privacy warning. Length has two
-// separate thresholds: 2,000 is a soft warning, 8,000 is a hard rejection
-// that only applies when notes (SC3) are the reason for the length.
-const SCOPES = ["SC1", "SC2", "SC3"];
+// Length has a single threshold: 2,000 is a soft warning that a shared link
+// is getting long.
+const SCOPES = ["SC1", "SC2"];
 const WARN_LENGTH = 2000;
-const REJECT_LENGTH = 8000;
 
 export async function buildLink(deps, scope, savedAt) {
     const { location, session, encode } = deps;
@@ -15,9 +12,6 @@ export async function buildLink(deps, scope, savedAt) {
     const link = `${location.origin}${location.pathname}#s=${fragment}`;
     // Never assigns location.hash and never calls pushState here (V4-12):
     // building a link must not touch the address bar as a side effect.
-    if (scope === "SC3" && link.length > REJECT_LENGTH) {
-        return { ok: false, code: "too-long", suggest: "SC2", length: link.length };
-    }
     return { ok: true, link, length: link.length, warn: link.length > WARN_LENGTH };
 }
 

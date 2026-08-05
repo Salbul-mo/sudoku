@@ -11,7 +11,7 @@ function freshSession(overrides = {}) {
     return {
         schemaVersion: 1, puzzleId: "t", dim: 9,
         givens: new Uint8Array(81), values: new Uint8Array(81), candidates: new Uint16Array(81),
-        cellNotes: {}, regionNotes: {}, createdAt: 0, updatedAt: 0,
+        createdAt: 0, updatedAt: 0,
         ...overrides,
     };
 }
@@ -20,7 +20,7 @@ function noopDeps(overrides = {}) {
     return {
         dialogs: { confirm: async () => true },
         announcer: { announce() {} },
-        openShare() {}, openNotes() {}, openSettings() {}, openHelp() {},
+        openShare() {}, openSettings() {}, openHelp() {},
         startNewGame() {},
         ...overrides,
     };
@@ -33,10 +33,10 @@ test("mounting without a required callback throws TypeError", () => {
     assert.throws(() => mountShell(fakeRoot(), store, { get: () => ({}) }, deps), TypeError);
 });
 
-test("all 8 header actions are rendered", () => {
+test("all 6 header actions are rendered", () => {
     const store = createStore(freshSession());
     const shell = mountShell(fakeRoot(), store, { get: () => ({}) }, noopDeps());
-    assert.equal(Object.keys(shell.actions).length, 8);
+    assert.equal(Object.keys(shell.actions).length, 6);
 });
 
 test("an unknown destructive action throws RangeError", async () => {
@@ -56,16 +56,6 @@ test("clearAll removes user values and candidates but leaves givens intact (T-UI
     assert.equal(store.session.givens[0], 7);
     assert.equal(store.session.values[1], 0);
     assert.equal(store.session.candidates[2], 0);
-});
-
-test("deleteAllNotes clears both note bags and clearAll/deleteAllNotes each undo in one step (T-UI-B14-09)", async () => {
-    const store = createStore(freshSession());
-    store.setNote({ kind: "cell", key: 0 }, "note");
-    const shell = mountShell(fakeRoot(), store, { get: () => ({}) }, noopDeps());
-    await shell.onDestructive("deleteAllNotes");
-    assert.equal(store.getNote({ kind: "cell", key: 0 }), "");
-    store.undo();
-    assert.equal(store.getNote({ kind: "cell", key: 0 }), "note");
 });
 
 test("cancelling a destructive action leaves the store untouched", async () => {

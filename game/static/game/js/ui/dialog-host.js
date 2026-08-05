@@ -1,7 +1,6 @@
-// The only real modal in the app. Keeping focus containment in one place
-// means UI-B10's non-modal note editor never has to reason about it. Nested
-// dialogs are not supported -- restoring inert state in the wrong order
-// would leave the background half-interactive.
+// The only real modal in the app. Nested dialogs are not supported --
+// restoring inert state in the wrong order would leave the background
+// half-interactive.
 export function createDialogHost(root, backgroundEls) {
     let current = null;
 

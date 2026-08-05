@@ -21,12 +21,12 @@ function freshSession() {
     return {
         schemaVersion: 1, puzzleId: "t", dim: 9,
         givens: new Uint8Array(81), values: new Uint8Array(81), candidates: new Uint16Array(81),
-        cellNotes: {}, regionNotes: {}, createdAt: 0, updatedAt: 0,
+        createdAt: 0, updatedAt: 0,
     };
 }
 
 function noopCallbacks() {
-    return { openNote() {}, openRegionNote() {}, openNotesList() {}, openHelp() {} };
+    return { openHelp() {} };
 }
 
 test("boardHasFocus is true only for a gridcell descendant of gridRoot", () => {
@@ -54,20 +54,19 @@ test("boardHasFocus requires gridRoot to be an Element", () => {
     assert.throws(() => boardHasFocus(null, {}), TypeError);
 });
 
-test("mounting without all four callbacks throws TypeError", () => {
+test("mounting without the required callback throws TypeError", () => {
     const { grid } = gridWithOneCell();
     const store = createStore(freshSession());
     assert.throws(() => createKeyboardAdapter({
         gridRoot: grid, store, settings: { get: () => ({}) },
         boardView: { select() {} }, announcer: { announce() {} },
-        openNote() {}, openRegionNote() {}, openNotesList() {},
         // openHelp missing
     }), TypeError);
 });
 
-test("KEYMAP covers move, digit, sticky, clear, note, undo/redo, and help", () => {
+test("KEYMAP covers move, digit, sticky, clear, undo/redo, and help", () => {
     const actions = KEYMAP.map((row) => row.action);
-    for (const expected of ["value", "candidate", "stickyToggle", "clear", "note", "undo", "redo", "help"]) {
+    for (const expected of ["value", "candidate", "stickyToggle", "clear", "undo", "redo", "help"]) {
         assert.ok(actions.includes(expected), `KEYMAP is missing an entry for "${expected}"`);
     }
 });

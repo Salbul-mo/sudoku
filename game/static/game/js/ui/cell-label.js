@@ -8,7 +8,7 @@ function digitsOf(mask) {
 }
 
 export function cellLabel(state) {
-    const { index, given, value, candidates, conflict, hasNote } = state;
+    const { index, given, value, candidates, conflict } = state;
     if (!Number.isInteger(index) || index < 0 || index > 80) {
         throw new RangeError(`index out of range: ${index}`);
     }
@@ -29,6 +29,5 @@ export function cellLabel(state) {
     else parts.push("빈 칸");
     if (candidates) parts.push(`후보 ${digitsOf(candidates).join(", ")}`);
     if (conflict) parts.push("규칙 위반");
-    if (hasNote) parts.push("메모 있음");
     return parts.join(", ");
 }

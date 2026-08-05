@@ -29,15 +29,7 @@ test("a link over 2000 chars warns but is still allowed (V-UI-B11-03)", async ()
     assert.equal(result.warn, true);
 });
 
-test("an SC3 link over 8000 chars is rejected with an SC2 suggestion (V-UI-B11-03)", async () => {
-    const encode = async () => "x".repeat(9000);
-    const result = await buildLink(baseDeps({ encode }), "SC3");
-    assert.equal(result.ok, false);
-    assert.equal(result.code, "too-long");
-    assert.equal(result.suggest, "SC2");
-});
-
-test("an SC2 link over 8000 chars is only a warning, not a rejection (only SC3 triggers the hard cap)", async () => {
+test("an SC2 link over 8000 chars is only a warning, not a rejection (no scope enforces a hard cap)", async () => {
     const encode = async () => "x".repeat(9000);
     const result = await buildLink(baseDeps({ encode }), "SC2");
     assert.equal(result.ok, true);

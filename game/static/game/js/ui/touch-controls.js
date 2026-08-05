@@ -1,5 +1,5 @@
 // The on-screen chrome for TouchAdapter: the 1-9 digit bar plus the pencil
-// and memo controls. TouchAdapter itself stays DOM-free -- a source-level test
+// control. TouchAdapter itself stays DOM-free -- a source-level test
 // asserts it never creates an input, textarea, or contenteditable element, and
 // mixing element construction into it would make that invariant untestable.
 //
@@ -21,7 +21,7 @@ export function mountTouchControls(root, adapter, deps = {}) {
     if (!root || typeof root.appendChild !== "function") {
         throw new TypeError("mountTouchControls: root must be an Element");
     }
-    for (const name of ["onDigitTap", "onPencilTap", "onMemoTap"]) {
+    for (const name of ["onDigitTap", "onPencilTap"]) {
         if (typeof adapter?.[name] !== "function") {
             throw new TypeError(`mountTouchControls: adapter.${name} must be a function`);
         }
@@ -54,12 +54,7 @@ export function mountTouchControls(root, adapter, deps = {}) {
         deps.onStickyChange?.(adapter.sticky === true);
     });
 
-    const memo = controlButton("메모");
-    memo.dataset.role = "memo";
-    memo.addEventListener("click", () => adapter.onMemoTap());
-
     bar.appendChild(pencil);
-    bar.appendChild(memo);
     root.appendChild(bar);
 
     function sync() {

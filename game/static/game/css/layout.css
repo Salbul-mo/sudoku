@@ -48,11 +48,7 @@ body {
     min-height: 100dvh;
 }
 
-.notes-rail {
-    inline-size: 280px;
-}
-
-/* wide: side-by-side board and notes rail, board can shrink but never overlays. */
+/* wide: board can shrink but never overlays. */
 @media (min-width: 1024px) {
     :root {
         --board-width: min(70dvh, 640px);
@@ -64,15 +60,10 @@ body {
 }
 
 /* medium: portrait stacks the board over controls; landscape puts them side by
-   side; notes live in a bottom sheet rather than a fixed rail. */
+   side. */
 @media (min-width: 600px) and (max-width: 1023px) {
     :root {
         --board-width: min(80dvh, 90vw);
-    }
-
-    .notes-rail {
-        inline-size: auto;
-        block-size: auto;
     }
 }
 

@@ -3,7 +3,7 @@
 // allowed event kinds in one module stops later blocks from adding ad hoc
 // announcements.
 const KINDS = new Set([
-    "sticky-mode", "undo-redo", "note", "given-rejected",
+    "sticky-mode", "undo-redo", "given-rejected",
     "completion", "link-copied", "session", "storage-warning",
 ]);
 

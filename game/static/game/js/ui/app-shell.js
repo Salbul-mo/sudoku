@@ -1,48 +1,31 @@
 // The application shell: header, global actions, completion state, and the
 // hint strip. Filled a gap Phase 1's component list originally missed (H1) --
-// "규칙 확인", the three destructive actions, and the Share/Notes/Settings/Help
+// "규칙 확인", the destructive actions, and the Share/Settings/Help
 // entry points had behavior specified but no owning module until this block.
-const DESTRUCTIVE_KINDS = ["newGame", "clearAll", "deleteAllNotes"];
+const DESTRUCTIVE_KINDS = ["newGame", "clearAll"];
 
 function clearAllEntries(store) {
-    const changed = new Set();
     store.history.beginGroup();
     for (let i = 0; i < 81; i++) {
         if (store.session.givens[i]) continue;
         if (store.session.values[i]) {
             store.history.record({ kind: "value", key: i, before: store.session.values[i], after: 0, groupId: 0, at: Date.now() });
             store.session.values[i] = 0;
-            changed.add(i);
         }
         if (store.session.candidates[i]) {
             store.history.record({ kind: "candidates", key: i, before: store.session.candidates[i], after: 0, groupId: 0, at: Date.now() });
             store.session.candidates[i] = 0;
-            changed.add(i);
         }
     }
     store.history.endGroup();
-    store.notifyAll(changed);
-}
-
-function deleteAllNotesFrom(store) {
-    store.history.beginGroup();
-    for (const [key, before] of Object.entries(store.session.cellNotes)) {
-        store.history.record({ kind: "cellNote", key, before, after: "", groupId: 0, at: Date.now() });
-        delete store.session.cellNotes[key];
-    }
-    for (const [key, before] of Object.entries(store.session.regionNotes)) {
-        store.history.record({ kind: "regionNote", key, before, after: "", groupId: 0, at: Date.now() });
-        delete store.session.regionNotes[key];
-    }
-    store.history.endGroup();
-    // A region note can cover any cell in that row/column/box, so the note
-    // badge on any of the 81 cells may need to clear -- notify all of them
-    // rather than re-deriving which cells each deleted region note touched.
+    // Clearing a duplicate can resolve the conflict cue on a *given* cell it
+    // clashed with, which this loop skips mutating -- notify every cell
+    // rather than only the ones this loop actually touched.
     store.notifyAll(new Set(Array.from({ length: 81 }, (_, i) => i)));
 }
 
 export function mountShell(root, store, settings, deps) {
-    for (const name of ["openShare", "openNotes", "openSettings", "openHelp"]) {
+    for (const name of ["openShare", "openSettings", "openHelp"]) {
         if (typeof deps[name] !== "function") {
             throw new TypeError(`mountShell: deps.${name} must be a function`);
         }
@@ -55,7 +38,7 @@ export function mountShell(root, store, settings, deps) {
     const actions = {};
     const ACTION_LABELS = [
         ["check", "규칙 확인"], ["newGame", "새 게임"], ["clearAll", "전체 지우기"],
-        ["deleteAllNotes", "메모 전체 삭제"], ["share", "공유"], ["notes", "메모"],
+        ["share", "공유"],
         ["settings", "설정"], ["help", "도움말"],
     ];
     for (const [id, label] of ACTION_LABELS) {
@@ -69,12 +52,10 @@ export function mountShell(root, store, settings, deps) {
 
     actions.check.addEventListener("click", () => onCheck());
     actions.share.addEventListener("click", () => deps.openShare());
-    actions.notes.addEventListener("click", () => deps.openNotes());
     actions.settings.addEventListener("click", () => deps.openSettings());
     actions.help.addEventListener("click", () => deps.openHelp());
     actions.newGame.addEventListener("click", () => onDestructive("newGame"));
     actions.clearAll.addEventListener("click", () => onDestructive("clearAll"));
-    actions.deleteAllNotes.addEventListener("click", () => onDestructive("deleteAllNotes"));
 
     let wasSolved = false;
     const unsubscribe = store.subscribe(() => {
@@ -99,7 +80,6 @@ export function mountShell(root, store, settings, deps) {
     const DESTRUCTIVE = {
         newGame: { q: "새 게임을 시작할까요? 현재 진행은 사라집니다.", run: deps.startNewGame },
         clearAll: { q: "입력한 숫자와 후보를 모두 지울까요?", run: clearAllEntries },
-        deleteAllNotes: { q: "메모를 모두 삭제할까요?", run: deleteAllNotesFrom },
     };
 
     async function onDestructive(kind) {

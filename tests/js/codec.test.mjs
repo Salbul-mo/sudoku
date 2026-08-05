@@ -6,7 +6,6 @@ import { project } from "../../game/static/game/js/url/canonical.js";
 function freshSession(overrides = {}) {
     return {
         givens: new Uint8Array(81), values: new Uint8Array(81), candidates: new Uint16Array(81),
-        cellNotes: {}, regionNotes: {},
         ...overrides,
     };
 }
@@ -40,25 +39,20 @@ test("mask stream length is ceil(9n/8) with zero trailing padding for n = 1..81"
     }
 });
 
-test("round trip preserves givens, values, candidates, and notes", () => {
+test("round trip preserves givens, values, candidates, and savedAt", () => {
     const givens = new Uint8Array(81);
     givens[0] = 5;
     const values = new Uint8Array(81);
     values[1] = 3;
     const candidates = new Uint16Array(81);
     candidates[2] = 0b1_0000_0010;
-    const session = freshSession({
-        givens, values, candidates,
-        cellNotes: { "3": "hello" },
-        regionNotes: { r0: "row note" },
-    });
-    const state = project(session, "SC3", 999);
+    const session = freshSession({ givens, values, candidates });
+    const state = project(session, "SC2", 999);
     const result = readBody(writeBody(state));
     assert.equal(result.ok, true);
     assert.deepEqual(Array.from(result.state.givens), Array.from(state.givens));
     assert.deepEqual(Array.from(result.state.values), Array.from(state.values));
     assert.deepEqual(Array.from(result.state.candidates), Array.from(state.candidates));
-    assert.deepEqual(result.state.notes, state.notes);
     assert.equal(result.state.savedAt, 999);
 });
 
@@ -80,24 +74,6 @@ test("flipping the mask stream's trailing padding bit is rejected (V-UI-B05-04)"
     assert.equal(readBody(corrupted).ok, false);
 });
 
-test("109 notes are rejected, 108 round-trip (V-UI-B05-03)", async () => {
-    const cellNotes = {};
-    for (let i = 0; i < 81; i++) cellNotes[i] = "x";
-    const regionNotes = {};
-    for (let i = 0; i < 27; i++) {
-        const kind = i < 9 ? "r" : i < 18 ? "c" : "b";
-        regionNotes[kind + (i % 9)] = "y";
-    }
-    const state108 = project(freshSession({ cellNotes, regionNotes }), "SC3", null);
-    assert.equal(state108.notes.length, 108);
-    assert.equal(readBody(writeBody(state108)).ok, true);
-
-    const link = await encode({ givens: state108.givens, values: state108.values, candidates: state108.candidates, cellNotes, regionNotes }, "SC3", null);
-    const back = await decode(link);
-    assert.equal(back.ok, true);
-    assert.equal(back.state.notes.length, 108);
-});
-
 test("trailing bytes appended after the body are rejected", () => {
     const state = project(freshSession(), "SC1", null);
     const body = writeBody(state);
@@ -111,21 +87,6 @@ test("a truncated body fails closed without throwing", () => {
     const body = writeBody(state);
     assert.doesNotThrow(() => readBody(body.subarray(0, 10)));
     assert.equal(readBody(body.subarray(0, 10)).ok, false);
-});
-
-test("reversing note order is rejected", () => {
-    // Hand-build a BodyV1 with two notes out of canonical (kind, key) order:
-    // flags=4 (notes only), dim=9, givens all zero (41 bytes), 2 notes,
-    // (kind=1,key=5) before (kind=0,key=3) -- descending, which is invalid.
-    const bytes = [4, 9, ...new Array(41).fill(0), 2, 1, 5, 1, 0x62, 0, 3, 1, 0x61];
-    assert.equal(readBody(Uint8Array.from(bytes)).ok, false);
-});
-
-test("an invalid UTF-8 sequence in note text is rejected", () => {
-    // Hand-built BodyV1: flags=4 (notes only), dim=9, givens zero (41 bytes),
-    // 1 note, kind=0 key=0, text length 2, bytes 0xFF 0xFE (never valid UTF-8).
-    const bytes = [4, 9, ...new Array(41).fill(0), 1, 0, 0, 2, 0xff, 0xfe];
-    assert.equal(readBody(Uint8Array.from(bytes)).ok, false);
 });
 
 test("SC1 link is 66 characters, SC2 + 20 candidates + savedAt is 171 (V-UI-B05-06)", async () => {
@@ -172,10 +133,10 @@ test("a fragment over 8000 characters is too-long", async () => {
     assert.equal(result.code, "too-long");
 });
 
-test("formatVersion 2 is unsupported-version", async () => {
+test("formatVersion 1 (pre-notes-removal) is unsupported-version", async () => {
     const link = await encode(freshSession(), "SC1", null, { CompressionStream: undefined, DecompressionStream: undefined });
     const bytes = Uint8Array.from(atobUrl(link));
-    bytes[0] = 2;
+    bytes[0] = 1;
     const result = await decode(btoaUrl(bytes));
     assert.equal(result.ok, false);
     assert.equal(result.code, "unsupported-version");

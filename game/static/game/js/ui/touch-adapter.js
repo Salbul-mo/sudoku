@@ -20,12 +20,7 @@ export function resolveVisibility(setting, coarseMatches) {
 }
 
 export function createTouchAdapter(deps) {
-    const { root, store, settings, boardView, announcer, openNoteEditor, openNotesList } = deps;
-    for (const [name, cb] of Object.entries({ openNoteEditor, openNotesList })) {
-        if (typeof cb !== "function") {
-            throw new TypeError(`createTouchAdapter: deps.${name} must be a function`);
-        }
-    }
+    const { root, store, settings, boardView, announcer } = deps;
 
     let activeDigit = null;
     let sticky = false;
@@ -66,18 +61,11 @@ export function createTouchAdapter(deps) {
         return sticky;
     }
 
-    function onMemoTap() {
-        if (selection === null) return openNotesList();
-        return openNoteEditor({ kind: "cell", key: selection });
-    }
-
     function onPointerDown(index) {
         longPressFired = false;
         pointerDownAt = { x: 0, y: 0 };
         longPressTimer = setTimeout(() => {
             longPressFired = true;
-            navigator.vibrate?.(10);
-            openNoteEditor({ kind: "cell", key: index });
         }, LONG_PRESS_MS);
     }
 
@@ -102,7 +90,6 @@ export function createTouchAdapter(deps) {
         onDigitTap,
         onCellTap,
         onPencilTap,
-        onMemoTap,
         onPointerDown,
         onPointerMove,
         onPointerUp,

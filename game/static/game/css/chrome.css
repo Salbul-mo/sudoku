@@ -1,15 +1,15 @@
 /* Chrome around the board: the pieces every JS module already creates but
    that tokens/layout/board.css never styled -- the live region, the modal
-   host, the note editor and lists, the settings form, the hint strip, and the
-   retry panels. Kept in its own file because tokens.css is parsed by the
-   contrast gate and board.css/layout.css are asserted against by source-level
-   regex tests; adding here keeps those checks unambiguous. */
+   host, the settings form, the hint strip, and the retry panels. Kept in its
+   own file because tokens.css is parsed by the contrast gate and
+   board.css/layout.css are asserted against by source-level regex tests;
+   adding here keeps those checks unambiguous. */
 
 /* The announcer sets this class on its aria-live region. Without a definition
    the region renders as ordinary visible text, so every announcement ("후보
-   입력 모드 켜짐", "메모가 저장되었습니다") would appear on screen. Clip
-   rather than display:none -- a hidden element is dropped from the
-   accessibility tree and would never be announced at all. */
+   입력 모드 켜짐") would appear on screen. Clip rather than display:none --
+   a hidden element is dropped from the accessibility tree and would never be
+   announced at all. */
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -28,9 +28,6 @@
    class each module has to remember to add. */
 .app-shell-header button,
 .digit-bar button,
-.notes-list button,
-.note-target-selector button,
-.note-editor button,
 .retry-panel button,
 [role="dialog"] button,
 .control {
@@ -47,9 +44,6 @@
 
 .app-shell-header button:focus-visible,
 .digit-bar button:focus-visible,
-.notes-list button:focus-visible,
-.note-target-selector button:focus-visible,
-.note-editor button:focus-visible,
 .retry-panel button:focus-visible,
 [role="dialog"] button:focus-visible {
     outline: 2px solid var(--focus);
@@ -76,8 +70,7 @@
     padding: 8px;
 }
 
-.controls-area,
-.notes-area {
+.controls-area {
     padding: 0 8px;
 }
 
@@ -104,8 +97,8 @@
 
 /* ------------------------------------------------------------- digit bar */
 /* layout.css sizes .digit-bar as a single 60px row of nine digits. The pencil
-   and memo controls make eleven children in a nine-column grid, so the bar
-   needs a second row; the fixed height would otherwise clip it. */
+   control makes ten children in a nine-column grid, so the bar needs a
+   second row; the fixed height would otherwise clip it. */
 .digit-bar {
     block-size: auto;
     grid-auto-rows: minmax(var(--control-floor), auto);
@@ -154,42 +147,6 @@
 [role="dialog"] td {
     padding: 4px 8px;
     border-bottom: 1px solid var(--bg-cell-peer);
-}
-
-/* ------------------------------------------------------- notes and editor */
-.note-editor,
-.note-target-selector,
-.notes-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px;
-    background: var(--bg-cell);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-}
-
-.note-editor textarea {
-    flex: 1 1 100%;
-    min-block-size: 96px;
-    padding: 8px;
-    font: inherit;
-    color: var(--fg-body);
-    background: var(--bg-page);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    resize: vertical;
-}
-
-.notes-list {
-    flex-direction: column;
-}
-
-.notes-list button {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-start;
-    text-align: start;
 }
 
 /* ------------------------------------------------------- settings and share */

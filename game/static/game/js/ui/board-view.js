@@ -3,7 +3,7 @@
 // window ends once this mounts. Every mutation touches only the changed
 // cell -- a full re-render would drop focus and reset the screen reader's
 // position, and every string here goes through textContent only, never a
-// raw-markup DOM API, so user note text can never become an injection path.
+// raw-markup DOM API, so cell text can never become an injection path.
 //
 // Pointer events are bound per cell rather than delegated from the grid. The
 // index is already in scope at build time, so delegation would only add a
@@ -121,14 +121,12 @@ export function mountBoard(root, store, deps = {}) {
         const given = session.givens[i];
         const value = session.values[i];
         const conflict = conflicts.has(i);
-        const hasNote = Boolean(session.cellNotes[String(i)]);
 
         cell.dataset.given = given ? "1" : "0";
         // The visual cue obeys the setting; the accessible name below never
         // does -- hiding a rule violation from a screen reader user because a
         // *visual* preference is off would remove information, not decoration.
         cell.dataset.conflict = conflictShown(i, conflicts) ? "1" : "0";
-        cell.dataset.note = hasNote ? "1" : "0";
         valueNode.textContent = String(given || value || "");
 
         const mask = value ? 0 : session.candidates[i];
@@ -138,7 +136,7 @@ export function mountBoard(root, store, deps = {}) {
         }
 
         cell.setAttribute("aria-label", cellLabel({
-            index: i, given, value, candidates: mask, conflict, hasNote,
+            index: i, given, value, candidates: mask, conflict,
         }));
     }
 

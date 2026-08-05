@@ -9,7 +9,7 @@ function freshSession(overrides = {}) {
     return {
         schemaVersion: 1, puzzleId: "abc", dim: 9,
         givens: new Uint8Array(81), values: new Uint8Array(81), candidates: new Uint16Array(81),
-        cellNotes: {}, regionNotes: {}, createdAt: 1, updatedAt: 2,
+        createdAt: 1, updatedAt: 2,
         ...overrides,
     };
 }
@@ -41,11 +41,6 @@ test("a value of 10 is rejected as corrupt", () => {
     const values = new Array(81).fill(0);
     values[0] = 10;
     const raw = JSON.stringify({ ...serializeSession(freshSession()), values });
-    assert.equal(deserializeSession(raw).code, "corrupt");
-});
-
-test("an invalid note key is rejected as corrupt", () => {
-    const raw = JSON.stringify({ ...serializeSession(freshSession()), cellNotes: { "not-a-key": "x" } });
     assert.equal(deserializeSession(raw).code, "corrupt");
 });
 

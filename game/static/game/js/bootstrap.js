@@ -25,8 +25,6 @@ function sessionFromPuzzle(puzzle) {
         givens,
         values: new Uint8Array(81),
         candidates: new Uint16Array(81),
-        cellNotes: {},
-        regionNotes: {},
         createdAt: Date.now(),
         updatedAt: Date.now(),
     };
@@ -59,39 +57,9 @@ function sessionFromDecoded(state) {
         givens: Uint8Array.from(state.givens),
         values: state.values ? Uint8Array.from(state.values) : new Uint8Array(81),
         candidates: state.candidates ? Uint16Array.from(state.candidates) : new Uint16Array(81),
-        cellNotes: {},
-        regionNotes: {},
         createdAt: Date.now(),
         updatedAt: state.savedAt ?? Date.now(),
     };
-}
-
-function notesFromDecoded(state) {
-    const cellNotes = {};
-    const regionNotes = {};
-    const prefix = { row: "r", column: "c", box: "b" };
-    for (const n of state.notes ?? []) {
-        const kindName = ["cell", "row", "column", "box"][n.kind];
-        if (kindName === "cell") cellNotes[n.key] = n.text;
-        else regionNotes[prefix[kindName] + n.key] = n.text;
-    }
-    return { cellNotes, regionNotes };
-}
-
-function mergeNotesDisjointUnion(localNotes, urlNotes) {
-    // Targets present in only one side are unioned automatically; a target
-    // present in both is a real conflict, resolved per-target (default local).
-    const merged = { cellNotes: { ...localNotes.cellNotes }, regionNotes: { ...localNotes.regionNotes } };
-    const conflicts = [];
-    for (const [key, text] of Object.entries(urlNotes.cellNotes)) {
-        if (key in merged.cellNotes) conflicts.push({ bag: "cellNotes", key, urlText: text });
-        else merged.cellNotes[key] = text;
-    }
-    for (const [key, text] of Object.entries(urlNotes.regionNotes)) {
-        if (key in merged.regionNotes) conflicts.push({ bag: "regionNotes", key, urlText: text });
-        else merged.regionNotes[key] = text;
-    }
-    return { merged, conflicts };
 }
 
 export async function resolveConflict(url, local, deps) {
@@ -99,20 +67,9 @@ export async function resolveConflict(url, local, deps) {
         if (url) await deps.dialogs.confirm(`공유 링크를 해석하지 못했습니다 (${url.code}). 무시하고 계속할까요?`);
         return { session: local.ok ? local.session : null, consumedFragment: Boolean(url) };
     }
-    // No local session: the URL is the only source of state, so it is adopted
-    // whole. Notes have to be lifted across explicitly -- sessionFromDecoded
-    // builds an empty note bag, and this branch returns before the CR4 merge
-    // below, so omitting this silently drops every note an SC3 link carried.
-    // That is the one scope whose entire purpose is sharing notes, and the
-    // recipient of a shared link is exactly the person with no local session.
+    // No local session: the URL is the only source of state, so it is adopted whole.
     if (!local.ok) {
-        const session = sessionFromDecoded(url.state);
-        if (url.state.notes) {
-            const { cellNotes, regionNotes } = notesFromDecoded(url.state);
-            session.cellNotes = cellNotes;
-            session.regionNotes = regionNotes;
-        }
-        return { session, consumedFragment: true };
+        return { session: sessionFromDecoded(url.state), consumedFragment: true };
     }
 
     // CR1: different puzzle entirely -- the local session is archived, not lost.
@@ -134,29 +91,8 @@ export async function resolveConflict(url, local, deps) {
         if (choice === "url") coreSession = sessionFromDecoded(url.state);
     }
 
-    // CR4: notes. Omission is never deletion (V4-10) -- only merge when the
-    // URL actually carried notes; an absent notes section leaves local intact.
-    let cellNotes = coreSession.cellNotes;
-    let regionNotes = coreSession.regionNotes;
-    if (url.state.notes) {
-        const urlNotes = notesFromDecoded(url.state);
-        const { merged, conflicts } = mergeNotesDisjointUnion(
-            { cellNotes: coreSession.cellNotes, regionNotes: coreSession.regionNotes }, urlNotes
-        );
-        for (const c of conflicts) {
-            const choice = await deps.dialogs.open({
-                kind: "conflict", title: "메모 충돌",
-                body: document.createTextNode(`같은 대상에 서로 다른 메모가 있습니다.`),
-                actions: [{ id: "local", label: "이 기기 메모 유지" }, { id: "url", label: "공유된 메모 사용" }],
-            });
-            if (choice === "url") merged[c.bag][c.key] = c.urlText;
-        }
-        cellNotes = merged.cellNotes;
-        regionNotes = merged.regionNotes;
-    }
-
     return {
-        session: { ...coreSession, cellNotes, regionNotes },
+        session: { ...coreSession },
         consumedFragment: true,
     };
 }

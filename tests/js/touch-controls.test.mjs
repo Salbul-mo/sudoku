@@ -15,7 +15,6 @@ function fakeAdapter() {
         calls,
         onDigitTap(d) { activeDigit = activeDigit === d ? null : d; calls.push(["digit", d]); return activeDigit; },
         onPencilTap() { sticky = !sticky; calls.push(["pencil"]); return sticky; },
-        onMemoTap() { calls.push(["memo"]); },
         get activeDigit() { return activeDigit; },
         get sticky() { return sticky; },
     };
@@ -34,13 +33,12 @@ test("mounting without a usable adapter throws TypeError", () => {
     assert.throws(() => mountTouchControls(null, fakeAdapter()), TypeError);
 });
 
-test("the bar renders 1-9 plus the pencil and memo controls", () => {
+test("the bar renders 1-9 plus the pencil control", () => {
     const view = mountTouchControls(fakeRoot(), fakeAdapter());
     assert.equal(view.element.className, "digit-bar");
     assert.equal(view.element.getAttribute("role"), "toolbar");
     for (let d = 1; d <= 9; d++) assert.ok(digitButton(view, d), `missing digit ${d}`);
     assert.ok(roleButton(view, "pencil"));
-    assert.ok(roleButton(view, "memo"));
 });
 
 test("every control is a button -- never an input, textarea, or contenteditable", () => {

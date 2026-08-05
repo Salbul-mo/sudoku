@@ -2,10 +2,6 @@
 // untrusted input localStorage really is: users can and do edit it by hand.
 export const CURRENT_SCHEMA_VERSION = 1;
 
-const CELL_KEY = /^\d{1,2}$/;
-const REGION_KEY = /^[rcb][0-8]$/;
-const MAX_NOTE_BYTES = 512;
-
 // Registered migration steps, keyed by the version they migrate *from*.
 // Empty today (schema version 1 is the only one that has ever existed) but
 // the ladder exists now so a future version 2 does not need an ad hoc path.
@@ -29,8 +25,6 @@ export function serializeSession(session) {
         givens: Array.from(session.givens),
         values: Array.from(session.values),
         candidates: Array.from(session.candidates),
-        cellNotes: { ...session.cellNotes },
-        regionNotes: { ...session.regionNotes },
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
     };
@@ -43,16 +37,6 @@ function fail(code, message = code) {
 function isByteArray(arr, length, max) {
     return Array.isArray(arr) && arr.length === length
         && arr.every((v) => Number.isInteger(v) && v >= 0 && v <= max);
-}
-
-function validNotes(bag, keyPattern) {
-    if (typeof bag !== "object" || bag === null || Array.isArray(bag)) return false;
-    for (const [key, value] of Object.entries(bag)) {
-        if (!keyPattern.test(key)) return false;
-        if (typeof value !== "string") return false;
-        if (new TextEncoder().encode(value).length > MAX_NOTE_BYTES) return false;
-    }
-    return true;
 }
 
 export function deserializeSession(raw) {
@@ -79,8 +63,6 @@ export function deserializeSession(raw) {
     for (let i = 0; i < 81; i++) {
         if (obj.givens[i] && obj.values[i]) return fail("corrupt", `cell ${i} given and value overlap`);
     }
-    if (!validNotes(obj.cellNotes, CELL_KEY)) return fail("corrupt", "invalid cellNotes");
-    if (!validNotes(obj.regionNotes, REGION_KEY)) return fail("corrupt", "invalid regionNotes");
 
     return {
         ok: true,
@@ -91,8 +73,6 @@ export function deserializeSession(raw) {
             givens: Uint8Array.from(obj.givens),
             values: Uint8Array.from(obj.values),
             candidates: Uint16Array.from(obj.candidates),
-            cellNotes: { ...obj.cellNotes },
-            regionNotes: { ...obj.regionNotes },
             createdAt: obj.createdAt,
             updatedAt: obj.updatedAt,
         },

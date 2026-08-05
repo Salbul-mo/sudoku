@@ -10,8 +10,6 @@ function freshSession(overrides = {}) {
         givens: new Uint8Array(81),
         values: new Uint8Array(81),
         candidates: new Uint16Array(81),
-        cellNotes: {},
-        regionNotes: {},
         createdAt: 0,
         updatedAt: 0,
         ...overrides,
@@ -108,44 +106,4 @@ test("isSolved() is true once the grid is complete (V-UI-B03-04)", () => {
     );
     const store = createStore(freshSession({ givens }));
     assert.equal(store.isSolved(), true);
-});
-
-test("cell, row, column, box note targets all round-trip", () => {
-    const store = createStore(freshSession());
-    store.setNote({ kind: "cell", key: 0 }, "cell note");
-    store.setNote({ kind: "row", key: 0 }, "row note");
-    store.setNote({ kind: "column", key: 0 }, "col note");
-    store.setNote({ kind: "box", key: 0 }, "box note");
-    assert.equal(store.getNote({ kind: "cell", key: 0 }), "cell note");
-    assert.equal(store.getNote({ kind: "row", key: 0 }), "row note");
-    assert.equal(store.getNote({ kind: "column", key: 0 }), "col note");
-    assert.equal(store.getNote({ kind: "box", key: 0 }), "box note");
-});
-
-test("an empty string deletes the note and undo restores it", () => {
-    const store = createStore(freshSession());
-    store.setNote({ kind: "cell", key: 0 }, "keep me");
-    store.setNote({ kind: "cell", key: 0 }, "");
-    assert.equal(store.getNote({ kind: "cell", key: 0 }), "");
-    store.undo();
-    assert.equal(store.getNote({ kind: "cell", key: 0 }), "keep me");
-});
-
-test("region key 9 throws RangeError", () => {
-    const store = createStore(freshSession());
-    assert.throws(() => store.setNote({ kind: "row", key: 9 }, "x"), RangeError);
-});
-
-test("a 513-byte note throws RangeError and is not truncated", () => {
-    const store = createStore(freshSession());
-    assert.throws(() => store.setNote({ kind: "cell", key: 0 }, "x".repeat(513)), RangeError);
-});
-
-test("a note change undoes in the same history as a value change", () => {
-    const store = createStore(freshSession());
-    store.setValue(0, 5);
-    store.setNote({ kind: "cell", key: 1 }, "note");
-    store.undo();
-    assert.equal(store.getNote({ kind: "cell", key: 1 }), "");
-    assert.equal(store.session.values[0], 5);
 });

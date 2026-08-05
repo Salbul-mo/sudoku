@@ -14,7 +14,7 @@ const CSS_FILES = ["tokens.css", "layout.css", "board.css", "chrome.css"];
 const JS_FILES = [
     "app.js", "main.js",
     "ui/announcer.js", "ui/app-shell.js", "ui/board-view.js",
-    "ui/touch-controls.js", "ui/notes-view.js", "ui/settings-view.js",
+    "ui/touch-controls.js", "ui/settings-view.js",
     "bootstrap.js",
 ];
 
@@ -33,8 +33,6 @@ const PAIRS = [
     [".board", 'className = "board"'],
     [".digit-bar", 'className = "digit-bar"'],
     [".app-shell", '"app-shell"'],
-    [".note-editor", '"note-editor"'],
-    [".notes-list", '"notes-list"'],
     [".settings-form", '"settings-form"'],
     [".hint-strip", '"hint-strip"'],
     [".retry-panel", '"retry-panel"'],
@@ -53,7 +51,6 @@ test("state attributes the board stylesheet targets are actually set by board-vi
     for (const [attribute, assignment] of [
         ["data-conflict", "dataset.conflict"],
         ["data-given", "dataset.given"],
-        ["data-note", "dataset.note"],
         ["data-peer", "dataset.peer"],
         ["data-candidate-mode", "dataset.candidateMode"],
     ]) {

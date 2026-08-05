@@ -19,9 +19,6 @@ export const KEYMAP = Object.freeze([
     { combo: "Shift+숫자키", action: "candidate", desc: "후보 토글 (shiftQuasimode 설정 시)" },
     { combo: "Space", action: "stickyToggle", desc: "후보 입력 모드 고정 토글" },
     { combo: "Delete / Backspace", action: "clear", desc: "칸 지우기" },
-    { combo: "N", action: "note", desc: "셀 메모 열기" },
-    { combo: "Shift+N", action: "regionNote", desc: "영역 메모 열기" },
-    { combo: "M", action: "notesList", desc: "메모 목록 열기" },
     { combo: "Ctrl+Z", action: "undo", desc: "실행 취소" },
     { combo: "Ctrl+Shift+Z 또는 Ctrl+Y", action: "redo", desc: "다시 실행" },
     { combo: "? 또는 F1", action: "help", desc: "도움말 열기" },
@@ -43,9 +40,8 @@ export function boardHasFocus(active, gridRoot) {
 }
 
 export function createKeyboardAdapter(deps) {
-    const { gridRoot, store, settings, boardView, announcer,
-        openNote, openRegionNote, openNotesList, openHelp } = deps;
-    for (const [name, cb] of Object.entries({ openNote, openRegionNote, openNotesList, openHelp })) {
+    const { gridRoot, store, settings, boardView, announcer, openHelp } = deps;
+    for (const [name, cb] of Object.entries({ openHelp })) {
         if (typeof cb !== "function") {
             throw new TypeError(`createKeyboardAdapter: deps.${name} must be a function`);
         }
@@ -101,9 +97,6 @@ export function createKeyboardAdapter(deps) {
         }
 
         switch (action) {
-            case "note": openNote(selection); break;
-            case "regionNote": openRegionNote(selection); break;
-            case "notesList": openNotesList(); break;
             case "help": openHelp(); break;
             case "undo": store.undo(); break;
             case "redo": store.redo(); break;

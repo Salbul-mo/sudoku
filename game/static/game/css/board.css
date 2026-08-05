@@ -106,25 +106,6 @@
     background: var(--bg-cell-conflict);
 }
 
-/* Memo indicator: a dog-ear triangle, display-only (never a tap/focus target). */
-.cell[data-note="1"]::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 0;
-    height: 0;
-    border-style: solid;
-    border-width: 0 8px 8px 0;
-    border-color: transparent var(--fg-candidate) transparent transparent;
-    pointer-events: none;
-}
-
-.cell[data-note="1"] {
-    /* aria-hidden is set on the pseudo-element's real DOM sibling in board-view.js
-       where one exists; this file only supplies the non-interactive visual. */
-}
-
 @media (prefers-reduced-motion: reduce) {
     * {
         transition-duration: 0ms !important;
