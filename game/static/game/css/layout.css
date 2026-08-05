@@ -48,33 +48,55 @@ body {
     min-height: 100dvh;
 }
 
-/* wide: board can shrink but never overlays. The header host is a flex
-   item containing a wrapping button row, so its shrink-to-fit width
-   defaults to the row's *unwrapped* max-content size -- capping it forces
-   the buttons to wrap into a tidy block instead of claiming far more
-   horizontal space than they visually use. Centering the row as a group
-   (rather than left-packing header/board/controls) keeps the header and
-   board a fixed, deliberate distance apart regardless of viewport width. */
+/* wide: board can shrink but never overlays. A 2x2 grid -- not a 3-item
+   flex row -- because the digit bar (controls-area) is only ever visible
+   at this width when touchControls is forced to "show" or a coarse
+   pointer is detected on a large screen; a flex row sized for header+board
+   alone overflowed once controls-area actually had width, pushing the
+   header off-screen (its only content-independent constraint was a *max*
+   width, so flex-shrink had nowhere else to take space from). Putting the
+   digit bar directly under the board, in its own grid row, means the
+   layout only ever has two things competing for horizontal space (header,
+   board column), regardless of whether the digit bar is showing.
+   The header host is a flex item containing a wrapping button row, so its
+   shrink-to-fit width defaults to the row's *unwrapped* max-content size --
+   capping it forces the buttons to wrap into a tidy block instead of
+   claiming far more horizontal space than they visually use. */
 @media (min-width: 1024px) {
     :root {
         --board-width: min(70dvh, 640px);
     }
 
     .app-shell {
-        flex-direction: row;
+        display: grid;
+        grid-template-columns: minmax(0, 360px) auto;
+        grid-template-areas:
+            "header board"
+            "header controls";
         justify-content: center;
-        align-items: flex-start;
-        gap: 32px;
+        align-content: start;
+        align-items: start;
+        column-gap: 32px;
+        row-gap: 12px;
         padding-block-start: 24px;
     }
 
     .app-shell-header-host {
+        grid-area: header;
         max-inline-size: 360px;
+    }
+
+    .board-area {
+        grid-area: board;
+    }
+
+    .controls-area {
+        grid-area: controls;
     }
 }
 
-/* medium: portrait stacks the board over controls; landscape puts them side by
-   side, same header-wrapping/centering treatment as the wide breakpoint but
+/* medium: portrait stacks the board over controls; landscape puts them side
+   by side, same header-wrapping/grid treatment as the wide breakpoint but
    sized down for the narrower viewport range. */
 @media (min-width: 600px) and (max-width: 1023px) {
     :root {
@@ -87,15 +109,30 @@ body {
         }
 
         .app-shell {
-            flex-direction: row;
+            display: grid;
+            grid-template-columns: minmax(0, 320px) auto;
+            grid-template-areas:
+                "header board"
+                "header controls";
             justify-content: center;
-            align-items: flex-start;
-            gap: 24px;
+            align-content: start;
+            align-items: start;
+            column-gap: 24px;
+            row-gap: 8px;
             padding-block-start: 16px;
         }
 
         .app-shell-header-host {
+            grid-area: header;
             max-inline-size: 320px;
+        }
+
+        .board-area {
+            grid-area: board;
+        }
+
+        .controls-area {
+            grid-area: controls;
         }
     }
 }
