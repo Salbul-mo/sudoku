@@ -1,41 +1,52 @@
-/* Color tokens: a warm cream-paper palette (graphite grid lines, amber
-   selection highlight) meant to read as "solving Sudoku on paper" rather
-   than the cool blue-gray UI palette this replaced. Every fg/bg pair below
-   is verified against tools/check-contrast.mjs (WCAG: 4.5:1 text, 3:1
-   non-text) -- changing one value invalidates that calculation, so treat
-   this file as the output of that check, not a free-form palette edit. */
+/* Color tokens: a low-saturation gray-paper palette (graphite grid lines,
+   slate-blue selection highlight) meant to read as "solving Sudoku on
+   paper" while staying easy on the eyes -- it replaces an amber/cream
+   version whose yellow was too strong. Backgrounds sit at 2-14% saturation
+   (the amber palette ran 12-54%), yet every board-state step is *more*
+   separated than before, not less: cell-vs-peer 1.28:1 (was 1.23:1) and
+   cell-vs-selected 1.66:1 (was 1.57:1).
+
+   Every fg/bg pair below is verified against tools/check-contrast.mjs
+   (WCAG: 4.5:1 text, 3:1 non-text) -- changing one value invalidates that
+   calculation, so treat this file as the output of that check, not a
+   free-form palette edit. */
 :root {
-    --bg-page: #EFE7D3;
-    --bg-cell: #FAF6EA;
-    --bg-cell-given: #EDE3C7;
-    --bg-cell-selected: #E3C468;
-    --bg-cell-peer: #EBDFB8;
-    --bg-cell-digit: #E6D9A8;
-    --bg-cell-conflict: #EAC8BC;
-    --fg-body: #3A3226;
-    --fg-given: #221D14;
-    --fg-user: #3E5372;
-    --fg-candidate: #544D3D;
-    --fg-conflict: #7A2A1E;
-    --line: #3B362B;
-    --focus: #8A5A12;
+    --bg-page: #E8E7E3;
+    --bg-cell: #F6F5F2;
+    --bg-cell-given: #E4E3DE;
+    --bg-cell-selected: #B4C2D2;
+    --bg-cell-peer: #D6DBE0;
+    --bg-cell-digit: #CFD6DE;
+    --bg-cell-conflict: #E6D2CE;
+    --fg-body: #34332F;
+    --fg-given: #1E1D1A;
+    --fg-user: #2F4E70;
+    --fg-candidate: #4D4C46;
+    --fg-conflict: #7C2E24;
+    --line: #3A3935;
+    --focus: #3C5A7A;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg-page: #1C1712;
-        --bg-cell: #2A2318;
-        --bg-cell-given: #362D1E;
-        --bg-cell-selected: #5A4118;
-        --bg-cell-peer: #3C321F;
-        --bg-cell-digit: #4A3B20;
-        --bg-cell-conflict: #4A231D;
-        --fg-body: #E8DFC8;
-        --fg-given: #F5EFDD;
-        --fg-user: #BFCCE0;
-        --fg-candidate: #CFC3A6;
-        --fg-conflict: #F3B6A5;
-        --line: #B3A483;
-        --focus: #E8C572;
+        /* The dark board needs a wider spread between cell / peer / selected
+           than the light one: at these luminances the same ratios read as
+           much flatter, so the peer crosshair was nearly invisible until
+           both it and the selection were lifted (and the light text tokens
+           lifted with them, to hold 4.5:1 over the brighter selection). */
+        --bg-page: #17181A;
+        --bg-cell: #232528;
+        --bg-cell-given: #2E3033;
+        --bg-cell-selected: #3B4E68;
+        --bg-cell-peer: #333940;
+        --bg-cell-digit: #343A42;
+        --bg-cell-conflict: #43292A;
+        --fg-body: #E4E3DF;
+        --fg-given: #F4F3EF;
+        --fg-user: #BBD0E6;
+        --fg-candidate: #D0CFC9;
+        --fg-conflict: #F5C2B6;
+        --line: #B0AFA9;
+        --focus: #A6C0DC;
     }
 }
