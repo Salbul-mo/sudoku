@@ -22,43 +22,62 @@ export function resolveVisibility(setting, coarseMatches) {
 export function createTouchAdapter(deps) {
     const { root, store, settings, boardView, announcer } = deps;
 
-    let activeDigit = null;
     let sticky = false;
-    let selection = null;
     let longPressTimer = null;
     let longPressFired = false;
     let pointerDownAt = null;
 
+    // Cell First: tapping a cell selects it, and tapping a digit fills
+    // whatever is currently selected. boardView.selection is the single
+    // source of truth for that selection rather than a copy kept here, so
+    // the digit bar and the keyboard can never disagree about which cell the
+    // next digit lands in -- the board seeds a selection when it mounts, and
+    // both adapters move it through the same boardView.select().
     function onDigitTap(d) {
         if (!Number.isInteger(d) || d < 1 || d > DIM) throw new RangeError(`digit out of range: ${d}`);
-        activeDigit = activeDigit === d ? null : d;
-        return activeDigit;
+        const index = boardView.selection;
+        if (!Number.isInteger(index)) return { ok: false, reason: "no-selection" };
+        // Tapping the digit a cell already holds clears it (store.setValue
+        // routes that to clearCell) -- the only way to erase by touch alone.
+        const result = sticky
+            ? store.toggleCandidate(index, d)
+            : store.setValue(index, d, { autoRemoveCandidates: settings.get().autoRemoveCandidates });
+        if (!result.ok && result.reason === "given") {
+            announcer.announce("given-rejected", "고정된 칸입니다");
+        }
+        return result;
     }
 
     function onCellTap(index) {
         if (!Number.isInteger(index) || index < 0 || index >= DIM * DIM) {
             throw new RangeError(`index out of range: ${index}`);
         }
-        if (store.session.givens[index]) {
-            announcer.announce("given-rejected", "고정된 칸입니다");
-            return { ok: false, reason: "given" };
-        }
-        if (activeDigit === null) {
-            boardView.select(index);
-            selection = index;
-            return { ok: true, reason: "selected" };
-        }
-        const result = sticky
-            ? store.toggleCandidate(index, activeDigit)
-            : store.setValue(index, activeDigit, { autoRemoveCandidates: settings.get().autoRemoveCandidates });
-        selection = index;
-        return result;
+        // Givens are selectable: arrow keys already let the keyboard land on
+        // one, so refusing here would make the two input paths disagree about
+        // where the selection can be. Entering a digit is what gets rejected,
+        // in onDigitTap above.
+        boardView.select(index);
+        return { ok: true, reason: "selected" };
     }
 
     function onPencilTap() {
         sticky = !sticky;
         announcer.announce("sticky-mode", sticky ? "후보 입력 모드 켜짐" : "후보 입력 모드 꺼짐");
         return sticky;
+    }
+
+    // Re-tapping the digit already in a cell also clears it, but that is only
+    // reachable once the user knows which digit is there and is impossible for
+    // a cell holding only candidates -- store.clearCell wipes value and
+    // candidates together, so this is the one erase that always works.
+    function onEraseTap() {
+        const index = boardView.selection;
+        if (!Number.isInteger(index)) return { ok: false, reason: "no-selection" };
+        const result = store.clearCell(index);
+        if (!result.ok && result.reason === "given") {
+            announcer.announce("given-rejected", "고정된 칸입니다");
+        }
+        return result;
     }
 
     function onPointerDown(index) {
@@ -90,10 +109,10 @@ export function createTouchAdapter(deps) {
         onDigitTap,
         onCellTap,
         onPencilTap,
+        onEraseTap,
         onPointerDown,
         onPointerMove,
         onPointerUp,
-        get activeDigit() { return activeDigit; },
         get sticky() { return sticky; },
     };
 }

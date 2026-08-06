@@ -9,13 +9,12 @@ after(uninstall);
 
 function fakeAdapter() {
     const calls = [];
-    let activeDigit = null;
     let sticky = false;
     return {
         calls,
-        onDigitTap(d) { activeDigit = activeDigit === d ? null : d; calls.push(["digit", d]); return activeDigit; },
+        onDigitTap(d) { calls.push(["digit", d]); return { ok: true }; },
         onPencilTap() { sticky = !sticky; calls.push(["pencil"]); return sticky; },
-        get activeDigit() { return activeDigit; },
+        onEraseTap() { calls.push(["erase"]); return { ok: true }; },
         get sticky() { return sticky; },
     };
 }
@@ -33,12 +32,23 @@ test("mounting without a usable adapter throws TypeError", () => {
     assert.throws(() => mountTouchControls(null, fakeAdapter()), TypeError);
 });
 
-test("the bar renders 1-9 plus the pencil control", () => {
+test("the bar renders 1-9 plus the pencil and erase controls", () => {
     const view = mountTouchControls(fakeRoot(), fakeAdapter());
     assert.equal(view.element.className, "digit-bar");
     assert.equal(view.element.getAttribute("role"), "toolbar");
     for (let d = 1; d <= 9; d++) assert.ok(digitButton(view, d), `missing digit ${d}`);
     assert.ok(roleButton(view, "pencil"));
+    assert.ok(roleButton(view, "erase"));
+});
+
+test("the erase control forwards to the adapter and carries no pressed state", () => {
+    const adapter = fakeAdapter();
+    const view = mountTouchControls(fakeRoot(), adapter);
+    const erase = roleButton(view, "erase");
+    erase.dispatch("click");
+    erase.dispatch("click");
+    assert.deepEqual(adapter.calls, [["erase"], ["erase"]]);
+    assert.equal(erase.getAttribute("aria-pressed"), null);
 });
 
 test("every control is a button -- never an input, textarea, or contenteditable", () => {
@@ -49,28 +59,26 @@ test("every control is a button -- never an input, textarea, or contenteditable"
     }
 });
 
-test("tapping a digit reports the press state, and re-tapping releases it", () => {
+test("each digit tap forwards straight to the adapter, including the same digit twice", () => {
     const adapter = fakeAdapter();
     const view = mountTouchControls(fakeRoot(), adapter);
     const three = digitButton(view, 3);
 
     three.dispatch("click");
-    assert.deepEqual(adapter.calls, [["digit", 3]]);
-    assert.equal(three.getAttribute("aria-pressed"), "true");
-    assert.equal(three.dataset.active, "1");
-
     three.dispatch("click");
-    assert.equal(three.getAttribute("aria-pressed"), "false");
-    assert.equal(three.dataset.active, "0");
+    digitButton(view, 7).dispatch("click");
+    // Every tap is delivered: re-tapping is how a touch user erases a cell,
+    // so the bar must never swallow the second press as a toggle-off.
+    assert.deepEqual(adapter.calls, [["digit", 3], ["digit", 3], ["digit", 7]]);
 });
 
-test("only one digit reads as pressed at a time", () => {
+test("digit buttons are momentary, not toggles, so they carry no pressed state", () => {
     const adapter = fakeAdapter();
     const view = mountTouchControls(fakeRoot(), adapter);
-    digitButton(view, 3).dispatch("click");
-    digitButton(view, 7).dispatch("click");
-    assert.equal(digitButton(view, 3).getAttribute("aria-pressed"), "false");
-    assert.equal(digitButton(view, 7).getAttribute("aria-pressed"), "true");
+    const three = digitButton(view, 3);
+    assert.equal(three.getAttribute("aria-pressed"), null);
+    three.dispatch("click");
+    assert.equal(three.getAttribute("aria-pressed"), null);
 });
 
 test("the pencil control mirrors sticky mode and reports the change", () => {

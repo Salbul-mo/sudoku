@@ -21,7 +21,7 @@ export function mountTouchControls(root, adapter, deps = {}) {
     if (!root || typeof root.appendChild !== "function") {
         throw new TypeError("mountTouchControls: root must be an Element");
     }
-    for (const name of ["onDigitTap", "onPencilTap"]) {
+    for (const name of ["onDigitTap", "onPencilTap", "onEraseTap"]) {
         if (typeof adapter?.[name] !== "function") {
             throw new TypeError(`mountTouchControls: adapter.${name} must be a function`);
         }
@@ -32,17 +32,18 @@ export function mountTouchControls(root, adapter, deps = {}) {
     bar.setAttribute("role", "toolbar");
     bar.setAttribute("aria-label", "숫자 입력");
 
-    const digitButtons = [];
+    // Deliberately no aria-pressed on the digits: under Cell First they act
+    // on the selected cell the moment they are tapped rather than staying
+    // armed for a later cell tap, so they are momentary push buttons and
+    // announcing a pressed state would misdescribe them. The pencil control
+    // below is a real toggle and keeps aria-pressed.
     for (let d = 1; d <= DIM; d++) {
         const button = controlButton(String(d));
         button.dataset.digit = String(d);
-        button.setAttribute("aria-pressed", "false");
         button.addEventListener("click", () => {
             adapter.onDigitTap(d);
-            sync();
         });
         bar.appendChild(button);
-        digitButtons.push(button);
     }
 
     const pencil = controlButton("후보");
@@ -54,16 +55,17 @@ export function mountTouchControls(root, adapter, deps = {}) {
         deps.onStickyChange?.(adapter.sticky === true);
     });
 
+    const erase = controlButton("지우기");
+    erase.dataset.role = "erase";
+    erase.addEventListener("click", () => {
+        adapter.onEraseTap();
+    });
+
     bar.appendChild(pencil);
+    bar.appendChild(erase);
     root.appendChild(bar);
 
     function sync() {
-        const active = adapter.activeDigit ?? null;
-        for (const button of digitButtons) {
-            const pressed = Number(button.dataset.digit) === active;
-            button.setAttribute("aria-pressed", pressed ? "true" : "false");
-            button.dataset.active = pressed ? "1" : "0";
-        }
         const sticky = adapter.sticky === true;
         pencil.setAttribute("aria-pressed", sticky ? "true" : "false");
         pencil.dataset.active = sticky ? "1" : "0";
