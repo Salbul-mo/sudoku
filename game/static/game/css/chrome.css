@@ -71,6 +71,9 @@
 }
 
 .controls-area {
+    /* Query source for the digit bar's own width -- see the @container rule
+       in the digit bar section below. */
+    container-type: inline-size;
     padding: 0 8px;
 }
 
@@ -104,13 +107,40 @@
 }
 
 /* ------------------------------------------------------------- digit bar */
-/* layout.css sizes .digit-bar as a single 60px row of nine digits. The pencil
-   control makes ten children in a nine-column grid, so the bar needs a
-   second row; the fixed height would otherwise clip it. */
+/* layout.css sizes .digit-bar as a single 60px row. The pencil and erase
+   controls put the bar over one row, so the fixed height has to give way to
+   auto rows or it would clip everything past the first. */
 .digit-bar {
     block-size: auto;
     grid-auto-rows: minmax(var(--control-floor), auto);
     row-gap: 6px;
+}
+
+/* Half the bar each, so the control row ends flush with the digit row above
+   it. A single-digit column is far too narrow for a word: at that width
+   "후보" breaks mid-word and "지우기" runs to three lines. */
+.digit-bar button[data-role="pencil"],
+.digit-bar button[data-role="erase"] {
+    grid-column: span 9;
+}
+
+/* Nine targets at the 48px floor need 432px of row. When the bar is narrower
+   than that the row used to outgrow the page and scroll it sideways, so it
+   regroups as a 3x3 keypad (digits still span 2, of 6 columns) with the two
+   controls sharing the row below. Shrinking the targets instead is not an
+   option: L3's 48px is a floor, and a phone is where it matters most.
+   The query is on the bar's own width rather than the viewport's because
+   --board-width -- which the bar inherits -- is derived from dvh as well as
+   vw, so a short landscape window can squeeze it at any viewport width. */
+@container (max-width: 431px) {
+    .digit-bar {
+        grid-template-columns: repeat(6, 1fr);
+    }
+
+    .digit-bar button[data-role="pencil"],
+    .digit-bar button[data-role="erase"] {
+        grid-column: span 3;
+    }
 }
 
 .digit-bar[data-visibility="collapsed"] {

@@ -29,16 +29,21 @@ body {
     aspect-ratio: 1;
 }
 
+/* 18 columns rather than 9 so both row shapes divide the width exactly:
+   nine digits at span 2, and the two word controls at span 9. On a
+   9-column track the control row could only reach 6 columns, leaving a
+   ragged third of the bar empty. Widths come from the columns, not from a
+   per-button calc, so a span change cannot fall out of step with them. */
 .digit-bar {
     display: grid;
-    grid-template-columns: repeat(9, 1fr);
+    grid-template-columns: repeat(18, 1fr);
     block-size: 60px; /* L2: row 60 = button 48 + 6px padding on each side */
     gap: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .digit-bar button {
-    inline-size: calc(var(--board-width) / 9);
+    grid-column: span 2;
     block-size: 48px;
 }
 
