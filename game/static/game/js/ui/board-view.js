@@ -75,7 +75,7 @@ export function mountBoard(root, store, deps = {}) {
 
     root.appendChild(grid);
 
-    // A "규칙 확인" press has to be able to show conflicts even when the
+    // A "정답 체크" press has to be able to show conflicts even when the
     // showConflicts setting keeps them hidden during normal play, so an
     // explicit highlight overrides the setting until the next mutation.
     let forced = null;
@@ -120,11 +120,16 @@ export function mountBoard(root, store, deps = {}) {
         const { cell, valueNode, candidateNodes } = cells[i];
         const given = session.givens[i];
         const value = session.values[i];
-        const conflict = conflicts.has(i);
+        // A forced highlight (정답 체크 against a known solution) can flag a
+        // cell that violates no row/column/box rule at all -- true conflicts
+        // and forced highlights are ORed together so the accessible name
+        // always matches whatever the cell is actually flagged for, not just
+        // genuine rule violations.
+        const conflict = conflicts.has(i) || (forced ? forced.has(i) : false);
 
         cell.dataset.given = given ? "1" : "0";
         // The visual cue obeys the setting; the accessible name below never
-        // does -- hiding a rule violation from a screen reader user because a
+        // does -- hiding a flagged cell from a screen reader user because a
         // *visual* preference is off would remove information, not decoration.
         cell.dataset.conflict = conflictShown(i, conflicts) ? "1" : "0";
         valueNode.textContent = String(given || value || "");
@@ -146,7 +151,12 @@ export function mountBoard(root, store, deps = {}) {
     function refresh(changed) {
         const conflicts = store.conflicts();
         const shown = new Set();
-        for (const i of conflicts) if (conflictShown(i, conflicts)) shown.add(i);
+        // conflictShown() can be true for a forced cell that is not a real
+        // rule conflict (정답 체크 highlights a cell that is merely wrong vs.
+        // the solution) -- iterating `conflicts` alone would never consider
+        // it, so the forced set has to be scanned too whenever it is active.
+        const candidates = forced ? new Set([...conflicts, ...forced]) : conflicts;
+        for (const i of candidates) if (conflictShown(i, conflicts)) shown.add(i);
 
         const pending = new Set(changed);
         const addSymmetricDiff = (now, before) => {

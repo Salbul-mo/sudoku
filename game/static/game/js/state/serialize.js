@@ -25,6 +25,7 @@ export function serializeSession(session) {
         givens: Array.from(session.givens),
         values: Array.from(session.values),
         candidates: Array.from(session.candidates),
+        solution: session.solution ? Array.from(session.solution) : null,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
     };
@@ -63,6 +64,12 @@ export function deserializeSession(raw) {
     for (let i = 0; i < 81; i++) {
         if (obj.givens[i] && obj.values[i]) return fail("corrupt", `cell ${i} given and value overlap`);
     }
+    // solution is optional: absent in every save written before this field
+    // existed, and null for a session adopted from a shared link. Only a
+    // *present but malformed* value is corrupt.
+    if (obj.solution != null && !isByteArray(obj.solution, 81, 9)) {
+        return fail("corrupt", "invalid solution");
+    }
 
     return {
         ok: true,
@@ -73,6 +80,7 @@ export function deserializeSession(raw) {
             givens: Uint8Array.from(obj.givens),
             values: Uint8Array.from(obj.values),
             candidates: Uint16Array.from(obj.candidates),
+            solution: obj.solution != null ? Uint8Array.from(obj.solution) : null,
             createdAt: obj.createdAt,
             updatedAt: obj.updatedAt,
         },

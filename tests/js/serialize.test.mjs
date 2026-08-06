@@ -66,6 +66,35 @@ test("a normal round trip succeeds and the session is well-formed", () => {
     assert.ok(result.session.values instanceof Uint8Array);
 });
 
+test("solution round-trips through serialize/deserialize for 정답 체크", () => {
+    const solution = Uint8Array.from({ length: 81 }, (_, i) => (i % 9) + 1);
+    const result = deserializeSession(JSON.stringify(serializeSession(freshSession({ solution }))));
+    assert.equal(result.ok, true);
+    assert.ok(result.session.solution instanceof Uint8Array);
+    assert.deepEqual(Array.from(result.session.solution), Array.from(solution));
+});
+
+test("a session with no solution serializes/deserializes to solution: null", () => {
+    const result = deserializeSession(JSON.stringify(serializeSession(freshSession())));
+    assert.equal(result.ok, true);
+    assert.equal(result.session.solution, null);
+});
+
+test("a save written before the solution field existed still deserializes (backward compat)", () => {
+    const raw = JSON.stringify(serializeSession(freshSession()));
+    const withoutSolution = JSON.stringify({ ...JSON.parse(raw), solution: undefined });
+    const result = deserializeSession(withoutSolution);
+    assert.equal(result.ok, true);
+    assert.equal(result.session.solution, null);
+});
+
+test("a malformed (present but invalid) solution is rejected as corrupt", () => {
+    const raw = JSON.stringify({ ...serializeSession(freshSession()), solution: new Array(80).fill(1) });
+    const result = deserializeSession(raw);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "corrupt");
+});
+
 test("no malformed input ever throws (200-case fuzz)", () => {
     const inputs = [
         "not json", "", "null", "42", "[]", '{"schemaVersion": "one"}',

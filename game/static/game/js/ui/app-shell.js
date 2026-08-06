@@ -1,6 +1,6 @@
 // The application shell: header, global actions, completion state, and the
 // hint strip. Filled a gap Phase 1's component list originally missed (H1) --
-// "규칙 확인", the destructive actions, and the Share/Settings/Help
+// "정답 체크", the destructive actions, and the Share/Settings/Help
 // entry points had behavior specified but no owning module until this block.
 const DESTRUCTIVE_KINDS = ["newGame", "clearAll"];
 
@@ -37,7 +37,7 @@ export function mountShell(root, store, settings, deps) {
 
     const actions = {};
     const ACTION_LABELS = [
-        ["check", "규칙 확인"], ["newGame", "새 게임"], ["clearAll", "전체 지우기"],
+        ["check", "정답 체크"], ["newGame", "새 게임"], ["clearAll", "전체 지우기"],
         ["share", "공유"],
         ["settings", "설정"], ["help", "도움말"],
     ];
@@ -66,13 +66,23 @@ export function mountShell(root, store, settings, deps) {
     });
 
     function onCheck() {
-        const bad = store.conflicts();
         const done = store.isSolved();
+        const wrong = store.checkAnswer();
+        if (wrong) {
+            const msg = wrong.size ? `정답과 다른 칸 ${wrong.size}개`
+                : done ? "퍼즐을 완성했습니다"
+                    : "지금까지 입력한 답이 모두 맞습니다";
+            deps.announcer.announce("completion", msg);
+            deps.boardView?.highlightConflicts?.(wrong);
+            return;
+        }
+        // No solution is available (a session adopted from a shared link,
+        // or restored from a save written before this field existed) --
+        // fall back to a rule-violation check instead of doing nothing.
+        const bad = store.conflicts();
         const msg = bad.size ? `규칙 위반 ${bad.size}칸`
             : done ? "퍼즐을 완성했습니다"
                 : "지금까지 규칙 위반이 없습니다";
-        // No solution is ever consulted -- the store has no such field, by
-        // construction (V4-11), so this cannot silently start comparing to one.
         deps.announcer.announce("completion", msg);
         deps.boardView?.highlightConflicts?.(bad);
     }

@@ -107,3 +107,25 @@ test("isSolved() is true once the grid is complete (V-UI-B03-04)", () => {
     const store = createStore(freshSession({ givens }));
     assert.equal(store.isSolved(), true);
 });
+
+test("checkAnswer() returns null when the session has no solution", () => {
+    const store = createStore(freshSession({ solution: null }));
+    store.setValue(0, 5);
+    assert.equal(store.checkAnswer(), null);
+});
+
+test("checkAnswer() flags only filled cells that disagree with the solution", () => {
+    const solution = Uint8Array.from({ length: 81 }, (_, i) => (i % 9) + 1);
+    const store = createStore(freshSession({ solution }));
+    store.setValue(0, solution[0]); // correct
+    store.setValue(1, solution[1] === 9 ? 1 : solution[1] + 1); // wrong
+    const wrong = store.checkAnswer();
+    assert.deepEqual([...wrong], [1]);
+});
+
+test("checkAnswer() ignores empty cells (unfilled is not wrong)", () => {
+    const solution = Uint8Array.from({ length: 81 }, (_, i) => (i % 9) + 1);
+    const store = createStore(freshSession({ solution }));
+    const wrong = store.checkAnswer();
+    assert.equal(wrong.size, 0);
+});

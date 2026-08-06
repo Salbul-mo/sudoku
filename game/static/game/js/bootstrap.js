@@ -11,12 +11,15 @@ const UNDO_TOAST_MS = 8000;
 
 class RetryableError extends Error {}
 
-function isValidPuzzle(puzzle) {
-    return Array.isArray(puzzle) && puzzle.length === 81
-        && puzzle.every((v) => Number.isInteger(v) && v >= 0 && v <= 9);
+function isValidGrid(grid) {
+    return Array.isArray(grid) && grid.length === 81
+        && grid.every((v) => Number.isInteger(v) && v >= 0 && v <= 9);
 }
 
-function sessionFromPuzzle(puzzle) {
+// solution is optional: a malformed/missing one degrades "정답 체크" to a
+// rule-violation check (see ui/app-shell.js::onCheck) rather than failing
+// puzzle creation over a non-essential field.
+function sessionFromPuzzle(puzzle, solution) {
     const givens = Uint8Array.from(puzzle);
     return {
         schemaVersion: 1,
@@ -25,6 +28,7 @@ function sessionFromPuzzle(puzzle) {
         givens,
         values: new Uint8Array(81),
         candidates: new Uint16Array(81),
+        solution: isValidGrid(solution) ? Uint8Array.from(solution) : null,
         createdAt: Date.now(),
         updatedAt: Date.now(),
     };
@@ -49,6 +53,9 @@ function differentCore(urlState, localSession) {
     return a.filled !== b.filled || a.candidates !== b.candidates;
 }
 
+// A shared link never carries the solution (url/canonical.js's project()
+// has no such field), so a session adopted from one always has
+// solution: null -- "정답 체크" falls back to a rule-violation check for it.
 function sessionFromDecoded(state) {
     return {
         schemaVersion: 1,
@@ -57,6 +64,7 @@ function sessionFromDecoded(state) {
         givens: Uint8Array.from(state.givens),
         values: state.values ? Uint8Array.from(state.values) : new Uint8Array(81),
         candidates: state.candidates ? Uint16Array.from(state.candidates) : new Uint16Array(81),
+        solution: null,
         createdAt: Date.now(),
         updatedAt: state.savedAt ?? Date.now(),
     };
@@ -139,8 +147,8 @@ export async function createNewSession(deps) {
             if (res.status >= 500) throw new RetryableError();
             if (!res.ok) return showRetryPanel(deps, "server"); // 4xx: no retry
             const data = await res.json();
-            if (!isValidPuzzle(data.puzzle)) return showRetryPanel(deps, "server");
-            return sessionFromPuzzle(data.puzzle); // solution is read and discarded (V4-13)
+            if (!isValidGrid(data.puzzle)) return showRetryPanel(deps, "server");
+            return sessionFromPuzzle(data.puzzle, data.solution);
         } catch {
             if (attempt === 1) await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
             else return showRetryPanel(deps, "network");

@@ -83,6 +83,49 @@ test("the hint strip does not show once the seen count reaches 3", () => {
     assert.equal(shell.maybeShowHintStrip(true), null);
 });
 
+test("onCheck with a known solution reports wrong cells and highlights them, not the rule-conflict set", () => {
+    const solution = Uint8Array.from({ length: 81 }, (_, i) => (i % 9) + 1);
+    const store = createStore(freshSession({ solution }));
+    store.setValue(0, solution[0] === 9 ? 1 : solution[0] + 1); // wrong vs. solution, but not a rule conflict
+    const messages = [];
+    let highlighted = null;
+    const shell = mountShell(fakeRoot(), store, { get: () => ({}) }, noopDeps({
+        announcer: { announce: (kind, msg) => messages.push(msg) },
+        boardView: { highlightConflicts: (set) => { highlighted = set; } },
+    }));
+    shell.onCheck();
+    assert.equal(messages.at(-1), "정답과 다른 칸 1개");
+    assert.deepEqual([...highlighted], [0]);
+});
+
+test("onCheck with a known solution and all-correct entries reports success", () => {
+    const solution = Uint8Array.from({ length: 81 }, (_, i) => (i % 9) + 1);
+    const store = createStore(freshSession({ solution }));
+    store.setValue(0, solution[0]);
+    const messages = [];
+    const shell = mountShell(fakeRoot(), store, { get: () => ({}) }, noopDeps({
+        announcer: { announce: (kind, msg) => messages.push(msg) },
+        boardView: { highlightConflicts() {} },
+    }));
+    shell.onCheck();
+    assert.equal(messages.at(-1), "지금까지 입력한 답이 모두 맞습니다");
+});
+
+test("onCheck without a known solution falls back to a rule-violation check", () => {
+    const store = createStore(freshSession({ solution: null }));
+    store.setValue(0, 5);
+    store.setValue(1, 5); // rule conflict (same row)
+    const messages = [];
+    let highlighted = null;
+    const shell = mountShell(fakeRoot(), store, { get: () => ({}) }, noopDeps({
+        announcer: { announce: (kind, msg) => messages.push(msg) },
+        boardView: { highlightConflicts: (set) => { highlighted = set; } },
+    }));
+    shell.onCheck();
+    assert.equal(messages.at(-1), "규칙 위반 2칸");
+    assert.deepEqual([...highlighted].sort(), [0, 1]);
+});
+
 test("completion announces exactly once when the puzzle becomes solved", () => {
     function pattern(r, c) { return (3 * (r % 3) + Math.floor(r / 3) + c) % 9; }
     const solved = Array.from({ length: 81 }, (_, i) => pattern((i / 9) | 0, i % 9) + 1);

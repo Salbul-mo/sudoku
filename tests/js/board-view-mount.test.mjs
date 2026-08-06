@@ -74,6 +74,22 @@ test("highlightConflicts overrides the setting, and the next mutation clears it"
     assert.equal(cellAt(root, 0).dataset.conflict, "0");
 });
 
+test("highlightConflicts on a cell with no rule violation (정답 체크 vs. solution) still updates the accessible name", () => {
+    const root = fakeRoot();
+    const store = freshStore();
+    const view = mountBoard(root, store, { settings: fakeSettings() });
+
+    store.setValue(0, 5); // no peer shares this value -- not a rule conflict
+    assert.equal(cellAt(root, 0).dataset.conflict, "0");
+    assert.doesNotMatch(cellAt(root, 0).getAttribute("aria-label"), /규칙 위반/);
+
+    // Force-highlight it anyway, as onCheck() does for a cell that is wrong
+    // versus the known solution but violates no row/column/box rule.
+    view.highlightConflicts(new Set([0]));
+    assert.equal(cellAt(root, 0).dataset.conflict, "1");
+    assert.match(cellAt(root, 0).getAttribute("aria-label"), /규칙 위반/);
+});
+
 test("select() marks the selection's peers and moves the marking with it", () => {
     const root = fakeRoot();
     const view = mountBoard(root, freshStore(), { settings: fakeSettings() });

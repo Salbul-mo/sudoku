@@ -14,6 +14,12 @@ function validateSession(session) {
     if (session.candidates.length !== CELLS) {
         throw new RangeError("candidates must have length " + CELLS);
     }
+    // solution is optional (null for a session adopted from a shared link,
+    // or restored from a save written before this field existed) -- see
+    // bootstrap.js::sessionFromDecoded and checkAnswer() below.
+    if (session.solution != null && session.solution.length !== CELLS) {
+        throw new RangeError("solution must have length " + CELLS);
+    }
     for (let i = 0; i < CELLS; i++) {
         if (session.givens[i] && session.values[i]) {
             throw new Error(`cell ${i} has both a given and a user value`);
@@ -175,6 +181,20 @@ export function createStore(session) {
         redo,
         conflicts: () => conflicts(session.values, session.givens),
         isSolved: () => isSolved(session.values, session.givens),
+        // Every filled, non-given cell that disagrees with the known
+        // solution -- distinct from conflicts(), which only catches values
+        // that clash with a peer, not ones that are merely wrong. Returns
+        // null (not an empty Set) when no solution is available, so a
+        // caller can tell "checked, all correct" apart from "can't check".
+        checkAnswer: () => {
+            if (!session.solution) return null;
+            const wrong = new Set();
+            for (let i = 0; i < CELLS; i++) {
+                const v = session.values[i];
+                if (v && v !== session.solution[i]) wrong.add(i);
+            }
+            return wrong;
+        },
         // For a caller (app-shell's bulk operations) that mutates session/history
         // directly as a single undo group instead of through the methods above,
         // and so must trigger the same subscriber notification itself.

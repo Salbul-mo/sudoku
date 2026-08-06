@@ -116,7 +116,7 @@ test("a 4xx response does not retry (T-UI-B12-09)", async () => {
     assert.equal(attempts, 1);
 });
 
-test("the fetched solution is never stored on the session (V4-13, T-UI-B12-10)", async () => {
+test("the fetched solution is stored on the session for 정답 체크 (T-UI-B12-10)", async () => {
     const deps = baseDeps({
         fetchPuzzle: async () => ({
             ok: true, status: 200,
@@ -124,7 +124,18 @@ test("the fetched solution is never stored on the session (V4-13, T-UI-B12-10)",
         }),
     });
     const session = await createNewSession(deps);
-    assert.ok(!("solution" in session));
+    assert.deepEqual(Array.from(session.solution), new Array(81).fill(5));
+});
+
+test("a missing or malformed solution degrades to solution: null rather than failing puzzle creation", async () => {
+    const deps = baseDeps({
+        fetchPuzzle: async () => ({
+            ok: true, status: 200,
+            json: async () => ({ puzzle: new Array(81).fill(0) }), // no solution field at all
+        }),
+    });
+    const session = await createNewSession(deps);
+    assert.equal(session.solution, null);
 });
 
 test("offline skips the network call entirely", async () => {
