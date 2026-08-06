@@ -1,4 +1,4 @@
-/* §10 visual regime: three grid-line weights, three number tiers, and five
+/* §10 visual regime: two grid-line weights, three number tiers, and five
    state cues -- every cue pairs its color with a non-color signal (shape,
    underline, or badge text) so nothing here relies on color alone. */
 
@@ -39,23 +39,19 @@
     outline-offset: -2px;
 }
 
-/* Box boundaries: every 3rd column/row gets the heavier 2px line. */
+/* Box boundaries: every 3rd column/row carries the same 3px weight as the
+   board's outer edge. 2px was the original weight and it did not read --
+   against a 1px cell line it is a one-pixel difference, which at a 41px
+   cell on a phone is not enough to group the nine cells of a box by eye.
+   Tripling the weight is what makes the 3x3 structure legible.
+   9 is itself a multiple of 3, so these rules also supply the outer
+   right/bottom edges that .cell owns; no separate nth-child(9n) rule is
+   needed for them. */
 .cell:nth-child(3n) {
-    border-right-width: 2px;
-}
-
-[role="grid"] > [role="row"]:nth-child(3n) .cell {
-    border-bottom-width: 2px;
-}
-
-/* Outer right/bottom edges: 3px, matching the grid's own border-top/-left.
-   Declared after the 2px box-boundary rules (9 is also a multiple of 3) so
-   the heavier outer weight wins on the last column/row. */
-.cell:nth-child(9n) {
     border-right-width: 3px;
 }
 
-[role="grid"] > [role="row"]:nth-child(9n) .cell {
+[role="grid"] > [role="row"]:nth-child(3n) .cell {
     border-bottom-width: 3px;
 }
 
