@@ -5,7 +5,21 @@ import { installFakeDocument, fakeRoot } from "./helpers/fake-dom.mjs";
 const uninstall = installFakeDocument();
 const { mountShell } = await import("../../game/static/game/js/ui/app-shell.js");
 const { createStore } = await import("../../game/static/game/js/core/store.js");
+const { GIVENS_PRESETS, GIVENS_DEFAULT } =
+    await import("../../game/static/game/js/core/claude-mhj_26_08_07_01_givens.js");
 after(uninstall);
+
+// Records what the shell writes, so a test can tell "chose 26" apart from
+// "did nothing".
+function fakeSettings(initial = {}) {
+    const values = { newGameGivens: GIVENS_DEFAULT, hintStripSeenCount: 0, ...initial };
+    const writes = [];
+    return {
+        writes,
+        get: () => ({ ...values }),
+        set(key, value) { values[key] = value; writes.push([key, value]); },
+    };
+}
 
 function freshSession(overrides = {}) {
     return {
@@ -124,6 +138,60 @@ test("onCheck without a known solution falls back to a rule-violation check", ()
     shell.onCheck();
     assert.equal(messages.at(-1), "규칙 위반 2칸");
     assert.deepEqual([...highlighted].sort(), [0, 1]);
+});
+
+test("T-B04-01: choosing a clue count records it and starts the game", async () => {
+    const settings = fakeSettings();
+    let started = 0;
+    const shell = mountShell(fakeRoot(), createStore(freshSession()), settings, noopDeps({
+        dialogs: { open: async () => "26", confirm: async () => true },
+        startNewGame: () => { started++; },
+    }));
+    await shell.onNewGame();
+    assert.deepEqual(settings.writes, [["newGameGivens", 26]]);
+    assert.equal(started, 1);
+});
+
+test("T-B04-02/03: cancelling, dismissing, or any unrecognised answer starts nothing", async () => {
+    // "cancel" is what DialogHost returns for both the cancel button and
+    // Escape; the others stand in for a dismissal path that does not exist
+    // yet, which must never be read as a clue count.
+    for (const answer of ["cancel", undefined, null, "", "99", "abc"]) {
+        const settings = fakeSettings();
+        let started = 0;
+        const shell = mountShell(fakeRoot(), createStore(freshSession()), settings, noopDeps({
+            dialogs: { open: async () => answer, confirm: async () => true },
+            startNewGame: () => { started++; },
+        }));
+        await shell.onNewGame();
+        assert.deepEqual(settings.writes, [], `answer ${JSON.stringify(answer)} wrote a setting`);
+        assert.equal(started, 0, `answer ${JSON.stringify(answer)} started a game`);
+    }
+});
+
+test("T-B04-04: the dialog offers every preset plus cancel, and preselects the saved count", async () => {
+    const settings = fakeSettings({ newGameGivens: 40 });
+    let spec = null;
+    const shell = mountShell(fakeRoot(), createStore(freshSession()), settings, noopDeps({
+        dialogs: { open: async (s) => { spec = s; return "cancel"; }, confirm: async () => true },
+    }));
+    await shell.onNewGame();
+
+    const ids = spec.actions.map((a) => a.id);
+    assert.deepEqual(ids, [...GIVENS_PRESETS.map(String), "cancel"]);
+    const focused = spec.actions.filter((a) => a.initialFocus);
+    assert.equal(focused.length, 1);
+    assert.equal(focused[0].id, "40");
+});
+
+test("T-B04-05: the clearAll confirmation still behaves as before", async () => {
+    const store = createStore(freshSession());
+    store.setValue(0, 5);
+    const shell = mountShell(fakeRoot(), store, fakeSettings(), noopDeps({
+        dialogs: { confirm: async () => false, open: async () => "cancel" },
+    }));
+    await shell.onDestructive("clearAll");
+    assert.equal(store.session.values[0], 5);
 });
 
 test("completion announces exactly once when the puzzle becomes solved", () => {

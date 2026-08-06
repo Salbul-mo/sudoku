@@ -118,11 +118,18 @@ export async function start(root, env = {}) {
     announcer = createAnnouncer(announcerHost);
     const dialogs = createDialogHost(dialogHost, [shell]);
 
-    function fetchPuzzle({ signal } = {}) {
+    // The clue count rides on the settings rather than on an argument, so
+    // both paths that ask for a puzzle -- the first boot inside bootstrap and
+    // "새 게임" -- request the same count without bootstrap needing to know
+    // the feature exists. ui/app-shell.js writes the setting when the player
+    // picks, so by the time this runs it already holds their choice.
+    function fetchPuzzle({ signal, givens } = {}) {
         if (typeof fetchImpl !== "function") {
             return Promise.reject(new Error("fetch is unavailable in this environment"));
         }
-        return fetchImpl(newPuzzleUrl, { signal, headers: { Accept: "application/json" } });
+        const requested = Number.isInteger(givens) ? givens : settings.get().newGameGivens;
+        const url = `${newPuzzleUrl}?givens=${requested}`;
+        return fetchImpl(url, { signal, headers: { Accept: "application/json" } });
     }
 
     const bootDeps = {
@@ -323,13 +330,23 @@ export async function start(root, env = {}) {
     }
 
     async function restart() {
+        const requested = settings.get().newGameGivens;
         const session = await createNewSession(bootDeps);
         if (!session) return; // createNewSession already rendered a retry panel
         activeTeardown?.();
         const store = createStore(session);
         enableAdapters(store); // reassigns activeTeardown to the new adapter set
         persistence.flushNow();
-        announce("session", "새 게임을 시작했습니다");
+
+        // A clue count is a target, not a promise: the digger stops when it
+        // runs out of removable cells, which at the low end can leave a few
+        // more clues than asked for. Saying so keeps that from looking like
+        // the choice was ignored.
+        let actual = 0;
+        for (const v of session.givens) if (v) actual++;
+        announce("session", actual === requested
+            ? "새 게임을 시작했습니다"
+            : `힌트 ${requested}개로 요청했지만 ${actual}개로 만들었습니다`);
     }
 
     let result;

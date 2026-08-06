@@ -2,7 +2,12 @@
 // hint strip. Filled a gap Phase 1's component list originally missed (H1) --
 // "정답 체크", the destructive actions, and the Share/Settings/Help
 // entry points had behavior specified but no owning module until this block.
-const DESTRUCTIVE_KINDS = ["newGame", "clearAll"];
+import { GIVENS_PRESETS } from "../core/claude-mhj_26_08_07_01_givens.js";
+
+// "새 게임" is destructive too, but it no longer goes through onDestructive:
+// it asks which clue count to use rather than for a yes/no, and the choice
+// doubles as the confirmation.
+const DESTRUCTIVE_KINDS = ["clearAll"];
 
 function clearAllEntries(store) {
     store.history.beginGroup();
@@ -54,7 +59,7 @@ export function mountShell(root, store, settings, deps) {
     actions.share.addEventListener("click", () => deps.openShare());
     actions.settings.addEventListener("click", () => deps.openSettings());
     actions.help.addEventListener("click", () => deps.openHelp());
-    actions.newGame.addEventListener("click", () => onDestructive("newGame"));
+    actions.newGame.addEventListener("click", () => { void onNewGame(); });
     actions.clearAll.addEventListener("click", () => onDestructive("clearAll"));
 
     let wasSolved = false;
@@ -87,8 +92,40 @@ export function mountShell(root, store, settings, deps) {
         deps.boardView?.highlightConflicts?.(bad);
     }
 
+    // Picking a clue count both starts the game and confirms discarding the
+    // current one, so there is no separate yes/no step. Anything that is not
+    // one of the presets counts as backing out: DialogHost answers "cancel"
+    // for both the cancel button and Escape, and treating every unrecognised
+    // answer the same way means a future dismissal path cannot accidentally
+    // wipe a board in progress.
+    async function onNewGame() {
+        const currentGivens = settings.get().newGameGivens;
+        const body = document.createElement("p");
+        body.textContent = "힌트 갯수를 고르세요. 지금 진행 중인 퍼즐은 사라집니다.";
+        const choice = await deps.dialogs.open({
+            kind: "new-game",
+            title: "새 게임",
+            body,
+            actions: [
+                ...GIVENS_PRESETS.map((n) => ({
+                    id: String(n),
+                    label: `${n}개`,
+                    initialFocus: n === currentGivens,
+                })),
+                { id: "cancel", label: "취소" },
+            ],
+        });
+
+        const givens = Number(choice);
+        if (!GIVENS_PRESETS.includes(givens)) return; // cancelled, dismissed, or unknown
+
+        // Written before starting: the setting is what app.js reads when it
+        // builds the request, so this *is* how the choice reaches the API.
+        settings.set("newGameGivens", givens);
+        deps.startNewGame();
+    }
+
     const DESTRUCTIVE = {
-        newGame: { q: "새 게임을 시작할까요? 현재 진행은 사라집니다.", run: deps.startNewGame },
         clearAll: { q: "입력한 숫자와 후보를 모두 지울까요?", run: clearAllEntries },
     };
 
@@ -115,5 +152,5 @@ export function mountShell(root, store, settings, deps) {
         header.remove();
     }
 
-    return { actions, onCheck, onDestructive, maybeShowHintStrip, destroy };
+    return { actions, onCheck, onNewGame, onDestructive, maybeShowHintStrip, destroy };
 }

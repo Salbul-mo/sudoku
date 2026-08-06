@@ -6,6 +6,7 @@ import { installFakeDocument, fakeRoot } from "./helpers/fake-dom.mjs";
 const uninstall = installFakeDocument();
 const { start } = await import("../../game/static/game/js/app.js");
 const { stripFragmentPrefix } = await import("../../game/static/game/js/bootstrap.js");
+const { GIVENS_DEFAULT } = await import("../../game/static/game/js/core/claude-mhj_26_08_07_01_givens.js");
 after(uninstall);
 
 const SESSION_KEY = "sudoku:v1:session";
@@ -169,6 +170,53 @@ test("a failed puzzle fetch still ends somewhere the user can act on (never blan
     }));
     assert.equal(result.ok, false);
     assert.ok(root.querySelectorAll("button").length > 0, "a retry control must be reachable");
+});
+
+test("T-B04-06: the puzzle request carries the saved clue count", async () => {
+    const requested = [];
+    const storage = fakeStorage();
+    storage.setItem("sudoku:v1:settings", JSON.stringify({ schemaVersion: 1, newGameGivens: 26 }));
+    const result = await start(fakeRoot(), env({
+        storage,
+        fetch: async (url) => { requested.push(url); return puzzleResponse(); },
+    }));
+    assert.equal(result.ok, true);
+    assert.equal(requested.length, 1);
+    assert.match(requested[0], /\/api\/new-puzzle\/\?givens=26$/);
+});
+
+test("T-B04-06b: with no saved preference the request still names the default count", async () => {
+    const requested = [];
+    await start(fakeRoot(), env({
+        fetch: async (url) => { requested.push(url); return puzzleResponse(); },
+    }));
+    assert.match(requested[0], new RegExp(`\\?givens=${GIVENS_DEFAULT}$`));
+});
+
+test("T-B04-07: a board that lands on a different clue count says so", async () => {
+    const root = fakeRoot();
+    // The stub always answers with a 1-clue board, so whatever count is
+    // requested the result cannot match it -- exactly the shortfall the
+    // announcement exists for.
+    await start(root, env());
+
+    const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
+    // The fake DOM keeps `dataset` off the attribute map and has no class
+    // selectors, so buttons are located by their label and the live region by
+    // the aria-live attribute it really sets.
+    const buttonLabelled = (label) =>
+        root.querySelectorAll("button").find((b) => b.textContent === label);
+
+    buttonLabelled("새 게임").dispatch("click");
+    await flush();
+
+    const preset = buttonLabelled(`${GIVENS_DEFAULT}개`);
+    assert.ok(preset, "the new-game dialog should offer the default clue count");
+    preset.dispatch("click");
+    await flush();
+
+    const live = root.querySelectorAll('[aria-live="polite"]')[0].textContent;
+    assert.match(live, new RegExp(`힌트 ${GIVENS_DEFAULT}개로 요청했지만 1개로 만들었습니다`));
 });
 
 test("app.js and main.js never use raw-markup DOM APIs", async () => {

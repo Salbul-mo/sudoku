@@ -4,10 +4,26 @@ import { CELLS, DIM } from "./claude-mhj_26_08_05_01_spec.js";
 import { buildMatrix, search, DEFAULT_BUDGET } from "./claude-mhj_26_08_05_02_dlx.js";
 import { rowsToBoard, alternativeExists, hasUniqueSolution } from "./claude-mhj_26_08_05_03_solver.js";
 
-// Target clue counts. Only "medium" is implemented (System Design decision:
-// no difficulty selection in this feature's first cut) -- 32 matches
-// game/sudoku/generator.py::DIFFICULTIES[9]["medium"].
-const DIFFICULTY_MAP = Object.freeze({ medium: 32 });
+// The clue count the caller may ask for. The bounds are measured, not
+// chosen: digHoles is a single greedy pass, so it stops at the first set it
+// cannot shrink further, and over 2,000 runs asking for 17 it never once got
+// below 21 (median 24). With the retry loop in generatePuzzle below, 23+ is
+// reached essentially always and 22 about three quarters of the time, so 22
+// is the lowest count worth offering. 60 is the top end: past that the board
+// is mostly filled in and there is little puzzle left.
+//
+// Reaching the true minimum of 17 is out of reach for this family of
+// algorithms -- a random solved grid admits a 17-clue puzzle at best about 1
+// in 111,000, and the clue subset would then have to be found among ~1.3e17
+// candidates. Serving 17s needs a catalogue of known ones, not a generator.
+export const GIVENS_MIN = 22;
+export const GIVENS_MAX = 60;
+export const GIVENS_DEFAULT = 32;
+
+// Each attempt is a fresh solved grid plus a fresh dig (~1.75ms). 30 attempts
+// bound the worst case -- an unreachable target burns all of them -- at about
+// 53ms, which is 0.5% of wrangler.jsonc's limits.cpu_ms.
+const MAX_ATTEMPTS = 30;
 
 // Wall-clock ceiling for the digging phase, in milliseconds. Hitting it
 // yields a puzzle with more clues than requested rather than a slow
@@ -80,26 +96,50 @@ export function digHoles(solution, options) {
     return puzzle;
 }
 
+export function clueCount(board) {
+    let n = 0;
+    for (const v of board) if (v) n++;
+    return n;
+}
+
 // Return { puzzle, solution }; the puzzle has exactly one solution.
+//
+// `givens` is a target, not a promise. A dig stops as soon as it reaches the
+// target, so the result never has *fewer* clues than asked -- but a dig that
+// runs out of removable cells first lands above it. Retrying with a fresh
+// grid is what turns the low targets from luck into near-certainty; the best
+// (fewest-clue) attempt is kept so an unreachable target still returns the
+// closest puzzle found rather than failing.
 export function generatePuzzle(options = {}) {
-    const { dim = DIM, difficulty = "medium", rng = cryptoRng } = options;
+    const { dim = DIM, givens = GIVENS_DEFAULT, rng = cryptoRng } = options;
     if (dim !== DIM) throw new RangeError(`only dim=${DIM} is supported, got ${dim}`);
-    const targetGivens = DIFFICULTY_MAP[difficulty];
-    if (targetGivens === undefined) {
-        throw new RangeError(`unknown difficulty ${JSON.stringify(difficulty)}; expected one of ${Object.keys(DIFFICULTY_MAP)}`);
+    if (!Number.isInteger(givens) || givens < GIVENS_MIN || givens > GIVENS_MAX) {
+        throw new RangeError(
+            `givens must be an integer in ${GIVENS_MIN}..${GIVENS_MAX}, got ${givens}`
+        );
     }
 
-    const solution = generateSolvedBoard(rng);
-    const puzzle = digHoles(solution, { targetGivens, rng });
+    let best = null;
+    let bestCount = CELLS + 1;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const solution = generateSolvedBoard(rng);
+        const puzzle = digHoles(solution, { targetGivens: givens, rng });
+        const count = clueCount(puzzle);
+        if (count < bestCount) {
+            best = { puzzle, solution };
+            bestCount = count;
+        }
+        if (count <= givens) break; // target met -- no reason to keep trying
+    }
 
     // Defensive final check: generatePuzzle must never hand back a puzzle
     // that is not proven unique. Reaching the else-branch would indicate an
     // algorithm defect, not a normal runtime condition.
-    if (!hasUniqueSolution(puzzle)) {
+    if (!hasUniqueSolution(best.puzzle)) {
         throw new Error("generated puzzle failed its own uniqueness check");
     }
 
-    return { puzzle: Array.from(puzzle), solution: Array.from(solution) };
+    return { puzzle: Array.from(best.puzzle), solution: Array.from(best.solution) };
 }
 
 // Crypto-backed RNG returning a float in [0, 1), matching the quality bar

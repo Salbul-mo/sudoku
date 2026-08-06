@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generateSolvedBoard, digHoles, generatePuzzle, cryptoRng } from "../../functions/_lib/sudoku/claude-mhj_26_08_05_04_generator.js";
+import {
+    generateSolvedBoard, digHoles, generatePuzzle, cryptoRng, clueCount,
+    GIVENS_MIN, GIVENS_MAX, GIVENS_DEFAULT,
+} from "../../functions/_lib/sudoku/claude-mhj_26_08_05_04_generator.js";
 import { hasUniqueSolution } from "../../functions/_lib/sudoku/claude-mhj_26_08_05_03_solver.js";
 
 function isValidCompleteGrid(board) {
@@ -63,7 +66,7 @@ test("digHoles rejects an out-of-range targetGivens", () => {
 });
 
 test("generatePuzzle returns a schema-valid, uniquely-solvable puzzle", () => {
-    const { puzzle, solution } = generatePuzzle({ dim: 9, difficulty: "medium" });
+    const { puzzle, solution } = generatePuzzle();
     assert.equal(puzzle.length, 81);
     assert.equal(solution.length, 81);
     assert.ok(Array.isArray(puzzle) && Array.isArray(solution));
@@ -74,13 +77,50 @@ test("generatePuzzle returns a schema-valid, uniquely-solvable puzzle", () => {
     }
 });
 
-test("generatePuzzle rejects unsupported dim and difficulty", () => {
-    assert.throws(() => generatePuzzle({ dim: 12, difficulty: "medium" }), RangeError);
-    assert.throws(() => generatePuzzle({ dim: 9, difficulty: "hard" }), RangeError);
+test("T-B01-01: every offered clue count yields a unique puzzle that is a subset of its solution", () => {
+    for (const givens of [GIVENS_MIN, 26, GIVENS_DEFAULT, 40, 50, GIVENS_MAX]) {
+        const { puzzle, solution } = generatePuzzle({ givens });
+        // A dig stops the moment it reaches the target, so the result can
+        // land above the request but never below it.
+        assert.ok(clueCount(puzzle) >= givens, `givens=${givens} produced ${clueCount(puzzle)}`);
+        assert.equal(hasUniqueSolution(puzzle), true, `givens=${givens} was not unique`);
+        assert.ok(isValidCompleteGrid(solution));
+        for (let i = 0; i < 81; i++) {
+            if (puzzle[i]) assert.equal(puzzle[i], solution[i]);
+        }
+    }
+});
+
+test("T-B01-02: counts of 26 and above are hit exactly", () => {
+    // Retrying makes these deterministic in practice: a single dig already
+    // lands on 26 about 98% of the time, so 30 attempts miss with vanishing
+    // probability.
+    for (const givens of [26, GIVENS_DEFAULT, 40, 50, GIVENS_MAX]) {
+        assert.equal(clueCount(generatePuzzle({ givens }).puzzle), givens);
+    }
+});
+
+test("T-B01-03: the lowest offered count stays within a few clues of the request", () => {
+    // GIVENS_MIN is deliberately not asserted to land exactly: measured, the
+    // retry loop reaches 22 about three quarters of the time, so demanding
+    // equality here would be a test that fails at random roughly 1 run in 4.
+    const { puzzle } = generatePuzzle({ givens: GIVENS_MIN });
+    const actual = clueCount(puzzle);
+    assert.ok(actual >= GIVENS_MIN, `got ${actual}, below the requested ${GIVENS_MIN}`);
+    assert.ok(actual <= GIVENS_MIN + 6, `got ${actual}, unexpectedly far above ${GIVENS_MIN}`);
+    assert.equal(hasUniqueSolution(puzzle), true);
+});
+
+test("T-B01-04: givens outside the offered range, or not an integer, is rejected", () => {
+    for (const bad of [GIVENS_MIN - 1, GIVENS_MAX + 1, 0, -5, 26.5, "26", null, NaN]) {
+        assert.throws(() => generatePuzzle({ givens: bad }), RangeError, `accepted ${String(bad)}`);
+    }
+});
+
+test("T-B01-05: only dim 9 is supported", () => {
+    assert.throws(() => generatePuzzle({ dim: 12 }), RangeError);
 });
 
 test("generatePuzzle produces different puzzles across calls", () => {
-    const a = generatePuzzle({ dim: 9, difficulty: "medium" });
-    const b = generatePuzzle({ dim: 9, difficulty: "medium" });
-    assert.notDeepEqual(a.puzzle, b.puzzle);
+    assert.notDeepEqual(generatePuzzle().puzzle, generatePuzzle().puzzle);
 });
