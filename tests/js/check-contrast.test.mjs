@@ -10,21 +10,21 @@ const execFileAsync = promisify(execFile);
 const TOOL = new URL("../../tools/check-contrast.mjs", import.meta.url).pathname.replace(/^\/([A-Za-z]):/, "$1:");
 const TOKENS_PATH = new URL("../../game/static/game/css/tokens.css", import.meta.url).pathname.replace(/^\/([A-Za-z]):/, "$1:");
 
-// Phase 1 V4-17's fixed values -- see tokens.css's own header comment.
+// The warm cream-paper palette -- see tokens.css's own header comment.
 const EXPECTED = {
     light: {
-        "bg-page": "#F8FAFC", "bg-cell": "#FFFFFF", "bg-cell-given": "#E8EDF3",
-        "bg-cell-selected": "#CFE3FB", "bg-cell-peer": "#EFF4FA", "bg-cell-digit": "#DDE7FA",
-        "bg-cell-conflict": "#FBE4E4", "fg-body": "#1E293B", "fg-given": "#0F172A",
-        "fg-user": "#1B4FA8", "fg-candidate": "#4A5568", "fg-conflict": "#A32020",
-        "line": "#334155", "focus": "#1B4FA8",
+        "bg-page": "#EFE7D3", "bg-cell": "#FAF6EA", "bg-cell-given": "#EDE3C7",
+        "bg-cell-selected": "#E3C468", "bg-cell-peer": "#EBDFB8", "bg-cell-digit": "#E6D9A8",
+        "bg-cell-conflict": "#EAC8BC", "fg-body": "#3A3226", "fg-given": "#221D14",
+        "fg-user": "#3E5372", "fg-candidate": "#544D3D", "fg-conflict": "#7A2A1E",
+        "line": "#3B362B", "focus": "#8A5A12",
     },
     dark: {
-        "bg-page": "#0B1220", "bg-cell": "#161F2E", "bg-cell-given": "#243044",
-        "bg-cell-selected": "#20406E", "bg-cell-peer": "#1C2739", "bg-cell-digit": "#2A2F5C",
-        "bg-cell-conflict": "#4A1F22", "fg-body": "#E2E8F0", "fg-given": "#F1F5F9",
-        "fg-user": "#9EC5FF", "fg-candidate": "#B3C0D1", "fg-conflict": "#FF9E9E",
-        "line": "#94A3B8", "focus": "#9EC5FF",
+        "bg-page": "#1C1712", "bg-cell": "#2A2318", "bg-cell-given": "#362D1E",
+        "bg-cell-selected": "#5A4118", "bg-cell-peer": "#3C321F", "bg-cell-digit": "#4A3B20",
+        "bg-cell-conflict": "#4A231D", "fg-body": "#E8DFC8", "fg-given": "#F5EFDD",
+        "fg-user": "#BFCCE0", "fg-candidate": "#CFC3A6", "fg-conflict": "#F3B6A5",
+        "line": "#B3A483", "focus": "#E8C572",
     },
 };
 
@@ -59,15 +59,15 @@ test("token values match the Phase 1 table exactly (T-UI-B08-02)", async () => {
 test("check-contrast.mjs passes with 0 failures and reproduces the expected worst ratios (V-UI-B08-02)", async () => {
     const { stdout } = await execFileAsync(process.execPath, [TOOL, TOKENS_PATH]);
     assert.match(stdout, /76 pairs checked, 0 failing/);
-    assert.match(stdout, /\[light\] worst pair: fg-candidate on bg-cell-selected = 5\.75:1/);
-    assert.match(stdout, /\[dark\] fg-conflict on bg-cell-selected \(text\): 5\.2[67]:1 PASS/);
-    assert.match(stdout, /\[dark\] worst pair: line on bg-cell-selected = 4\.05:1/);
+    assert.match(stdout, /\[light\] worst pair: focus on bg-cell-selected = 3\.48:1/);
+    assert.match(stdout, /\[dark\] fg-conflict on bg-cell-selected \(text\): 5\.47:1 PASS/);
+    assert.match(stdout, /\[dark\] worst pair: line on bg-cell-selected = 3\.88:1/);
 });
 
 test("degrading one token's contrast makes the tool exit 1 and report the pair (negative)", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "contrast-"));
     const original = await readFile(TOKENS_PATH, "utf8");
-    const degraded = original.replace("--fg-candidate: #4A5568;", "--fg-candidate: #A8B0C0;");
+    const degraded = original.replace("--fg-candidate: #544D3D;", "--fg-candidate: #C8BFA0;");
     const badPath = path.join(dir, "bad-tokens.css");
     await writeFile(badPath, degraded, "utf8");
     try {
