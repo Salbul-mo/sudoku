@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# The puzzle endpoint returns a different board on every request and is
+# no-store, so there is nothing here for a crawler to index.
+Disallow: /api/
+
+Sitemap: https://sudoku-bw7.pages.dev/sitemap.xml
