@@ -5,6 +5,11 @@
 [role="grid"] {
     display: grid;
     grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr); /* [role="row"] is display:contents, so
+        the 81 .cell elements are the grid's direct items in one implicit
+        auto-flow -- without an explicit row template, a row whose cells are
+        all empty (no given/value/candidate text) can size to less than 1/9th
+        of the board's height instead of matching the other rows. */
     border: 3px solid var(--line); /* outer: 3px */
 }
 
