@@ -1,6 +1,7 @@
 // The only real modal in the app. Nested dialogs are not supported --
 // restoring inert state in the wrong order would leave the background
 // half-interactive.
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 export function createDialogHost(root, backgroundEls) {
     let current = null;
 
@@ -89,11 +90,11 @@ export function createDialogHost(root, backgroundEls) {
         body.textContent = question;
         return open({
             kind: "confirm",
-            title: "확인",
+            title: t("dialog.confirmTitle"),
             body,
             actions: [
-                { id: "cancel", label: "취소", initialFocus: true },
-                { id: "ok", label: "계속", destructive: true },
+                { id: "cancel", label: t("dialog.cancel"), initialFocus: true },
+                { id: "ok", label: t("dialog.continue"), destructive: true },
             ],
         }).then((r) => r === "ok");
     }

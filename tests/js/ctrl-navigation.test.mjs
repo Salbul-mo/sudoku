@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveAction } from "../../game/static/game/js/ui/key-resolve.js";
 import { moveSelection } from "../../game/static/game/js/ui/board-nav.js";
-import { KEYMAP } from "../../game/static/game/js/ui/keyboard-adapter.js";
+import { getKeymap } from "../../game/static/game/js/ui/keyboard-adapter.js";
 
 // Regression: the ctrl branch used to return null for everything except
 // ctrl+Z / ctrl+Y, so Ctrl+Arrow and Ctrl+Home/End never reached
@@ -30,8 +30,9 @@ test("the ctrl modifier reaches moveSelection and produces the documented jump",
     assert.equal(moveSelection(40, "right", "ctrl"), 43);
     assert.equal(moveSelection(40, "lineStart", "ctrl"), 0);
     assert.equal(moveSelection(40, "lineEnd", "ctrl"), 80);
-    assert.ok(KEYMAP.some((e) => e.combo.includes("Ctrl+방향키")));
-    assert.ok(KEYMAP.some((e) => e.combo.includes("Ctrl+Home/End")));
+    // Checked by action id rather than label so the assertion survives translation.
+    assert.ok(getKeymap().some((e) => e.action === "box jump"));
+    assert.ok(getKeymap().some((e) => e.action === "grid start/end"));
 });
 
 test("undo and redo still win over navigation, and other ctrl combos stay unclaimed", () => {

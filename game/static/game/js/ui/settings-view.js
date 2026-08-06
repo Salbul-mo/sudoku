@@ -1,15 +1,16 @@
 // Settings form and help content. Rendered as plain Nodes handed to
 // UI-B11's DialogHost, which owns modal presentation -- this module never
 // creates a dialog itself.
-import { KEYMAP } from "./keyboard-adapter.js";
+import { getKeymap } from "./keyboard-adapter.js";
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 
 const BOOLEAN_FIELDS = [
-    ["autoRemoveCandidates", "값 입력 시 후보 자동 제거"],
-    ["showConflicts", "규칙 위반 강조 표시"],
-    ["shiftQuasimode", "Shift+숫자로 후보 입력"],
+    ["autoRemoveCandidates", t("settings.autoRemoveCandidates")],
+    ["showConflicts", t("settings.showConflicts")],
+    ["shiftQuasimode", t("settings.shiftQuasimode")],
 ];
 const TOUCH_CONTROLS_OPTIONS = [
-    ["auto", "자동"], ["show", "항상 표시"], ["hide", "항상 숨김"],
+    ["auto", t("settings.touchAuto")], ["show", t("settings.touchShow")], ["hide", t("settings.touchHide")],
 ];
 
 export function renderSettings(settings) {
@@ -50,7 +51,7 @@ export function renderSettings(settings) {
     return form;
 }
 
-export function renderHelp(keymap = KEYMAP) {
+export function renderHelp(keymap = getKeymap()) {
     if (!keymap.length) throw new Error("help cannot render an empty keymap");
     const table = document.createElement("table");
     for (const entry of keymap) {

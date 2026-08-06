@@ -7,22 +7,35 @@
 // session needs.
 import { moveSelection } from "./board-nav.js";
 import { resolveAction, resolveDigit } from "./key-resolve.js";
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 
 // Single source of truth for the keymap: UI-B14's help dialog reads this,
 // rather than keeping a second copy of the same text.
-export const KEYMAP = Object.freeze([
-    { combo: "방향키", action: "moveUp/Down/Left/Right", desc: "한 칸 이동" },
-    { combo: "Ctrl+방향키", action: "box jump", desc: "한 박스(3칸) 이동" },
-    { combo: "Home/End", action: "lineStart/lineEnd", desc: "행 처음/끝으로 이동" },
-    { combo: "Ctrl+Home/End", action: "grid start/end", desc: "격자 처음/끝으로 이동" },
-    { combo: "숫자키 1-9", action: "value", desc: "값 입력, 재입력 시 지움" },
-    { combo: "Shift+숫자키", action: "candidate", desc: "후보 토글 (shiftQuasimode 설정 시)" },
-    { combo: "Space", action: "stickyToggle", desc: "후보 입력 모드 고정 토글" },
-    { combo: "Delete / Backspace", action: "clear", desc: "칸 지우기" },
-    { combo: "Ctrl+Z", action: "undo", desc: "실행 취소" },
-    { combo: "Ctrl+Shift+Z 또는 Ctrl+Y", action: "redo", desc: "다시 실행" },
-    { combo: "? 또는 F1", action: "help", desc: "도움말 열기" },
+//
+// A function rather than a frozen constant, because the labels come from the
+// message catalogue: a constant built at import time would bake in whichever
+// language happened to be active when the module first loaded.
+const KEYMAP_IDS = Object.freeze([
+    ["arrows", "moveUp/Down/Left/Right"],
+    ["ctrlArrows", "box jump"],
+    ["homeEnd", "lineStart/lineEnd"],
+    ["ctrlHomeEnd", "grid start/end"],
+    ["digits", "value"],
+    ["shiftDigits", "candidate"],
+    ["space", "stickyToggle"],
+    ["delete", "clear"],
+    ["undo", "undo"],
+    ["redo", "redo"],
+    ["help", "help"],
 ]);
+
+export function getKeymap() {
+    return KEYMAP_IDS.map(([id, action]) => ({
+        combo: t(`keymap.${id}.combo`),
+        action,
+        desc: t(`keymap.${id}.desc`),
+    }));
+}
 
 const NAV = Object.freeze({
     moveUp: "up", moveDown: "down", moveLeft: "left", moveRight: "right",
@@ -61,7 +74,7 @@ export function createKeyboardAdapter(deps) {
                 ? store.toggleCandidate(selection, digit)
                 : store.setValue(selection, digit, { autoRemoveCandidates: settings.get().autoRemoveCandidates });
             if (!result.ok && result.reason === "given") {
-                announcer.announce("given-rejected", "고정된 칸입니다");
+                announcer.announce("given-rejected", t("cell.givenRejected"));
             }
             ev.preventDefault();
             return;
@@ -85,7 +98,7 @@ export function createKeyboardAdapter(deps) {
             // boardHasFocus already required role=gridcell to reach this point,
             // so Space here can never be a button activation (V-UI-B07-05).
             sticky = !sticky;
-            announcer.announce("sticky-mode", sticky ? "후보 입력 모드 켜짐" : "후보 입력 모드 꺼짐");
+            announcer.announce("sticky-mode", sticky ? t("touch.stickyOn") : t("touch.stickyOff"));
             ev.preventDefault();
             return;
         }

@@ -5,6 +5,7 @@
 // side-effect-free under `import` in node: a static import would pull the whole
 // view layer, and its document.createElement calls, into any test that merely
 // imports the entry point.
+import { t } from "./i18n/claude-mhj_26_08_07_05_messages.js";
 export function init(root) {
     if (!root || typeof root.appendChild !== "function") {
         throw new TypeError("init(root): root must be an Element");
@@ -23,7 +24,7 @@ function renderLoadFailure(root, cause) {
     const panel = document.createElement("div");
     panel.className = "retry-panel";
     const message = document.createElement("p");
-    message.textContent = "앱을 불러오지 못했습니다. 페이지를 새로고침해 주세요.";
+    message.textContent = t("fatal.load");
     panel.appendChild(message);
     const detail = document.createElement("p");
     detail.className = "retry-detail";

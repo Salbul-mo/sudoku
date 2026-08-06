@@ -21,14 +21,19 @@ import { createTouchAdapter, resolveVisibility } from "./ui/touch-adapter.js";
 import { renderHelp, renderSettings } from "./ui/settings-view.js";
 import { createShareView } from "./ui/share-view.js";
 import { decode, encode } from "./url/codec.js";
+import { t, applyCssStrings } from "./i18n/claude-mhj_26_08_07_05_messages.js";
 
 const NEW_PUZZLE_URL = "/api/new-puzzle/";
 const COARSE_POINTER = "(pointer: coarse)";
 
-const SHARE_SCOPES = [
-    ["SC1", "문제만", "빈 퍼즐만 공유합니다."],
-    ["SC2", "진행 포함", "입력한 숫자와 후보까지 공유합니다."],
-];
+// Built per call, not once at import: a constant would capture whichever
+// language was active when this module first loaded.
+function shareScopes() {
+    return [
+        ["SC1", t("share.sc1Label"), t("share.sc1Desc")],
+        ["SC2", t("share.sc2Label"), t("share.sc2Desc")],
+    ];
+}
 
 // localStorage throws on access in some privacy modes rather than merely
 // failing to persist, so the fallback has to stand in for the whole object.
@@ -81,6 +86,9 @@ export async function start(root, env = {}) {
     } = env;
 
     const storage = resolveStorage(rawStorage ?? memoryStorage());
+    // Before anything paints: these feed ::before/::after content, which
+    // renders as nothing at all while the variables are unset.
+    applyCssStrings(document.documentElement);
     clear(root); // drops main.js's first-paint skeleton before the real UI mounts
 
     // The announcer must exist before persistence can report a storage
@@ -97,7 +105,7 @@ export async function start(root, env = {}) {
         clearTimeout: cancel,
         onWarning: () => announce(
             "storage-warning",
-            "저장 공간을 사용할 수 없어 이번 진행은 기기에 저장되지 않습니다"
+            t("session.storageWarning")
         ),
     });
 
@@ -149,18 +157,18 @@ export async function start(root, env = {}) {
     async function openHelp() {
         await dialogs.open({
             kind: "help",
-            title: "도움말",
+            title: t("action.help"),
             body: renderHelp(),
-            actions: [{ id: "close", label: "닫기", initialFocus: true }],
+            actions: [{ id: "close", label: t("dialog.close"), initialFocus: true }],
         });
     }
 
     async function openSettings() {
         await dialogs.open({
             kind: "settings",
-            title: "설정",
+            title: t("action.settings"),
             body: renderSettings(settings),
-            actions: [{ id: "close", label: "닫기", initialFocus: true }],
+            actions: [{ id: "close", label: t("dialog.close"), initialFocus: true }],
         });
     }
 
@@ -180,10 +188,11 @@ export async function start(root, env = {}) {
     }
 
     async function openShare(shareView) {
+        const scopes = shareScopes();
         const intro = document.createElement("p");
-        intro.textContent = "공유 범위를 선택하세요.";
+        intro.textContent = t("share.scopePrompt");
         const list = document.createElement("ul");
-        for (const [, label, description] of SHARE_SCOPES) {
+        for (const [, label, description] of scopes) {
             const item = document.createElement("li");
             item.textContent = `${label} — ${description}`;
             list.appendChild(item);
@@ -194,27 +203,27 @@ export async function start(root, env = {}) {
 
         const scope = await dialogs.open({
             kind: "share-scope",
-            title: "공유",
+            title: t("action.share"),
             body,
             actions: [
-                ...SHARE_SCOPES.map(([id, label]) => ({ id, label })),
-                { id: "cancel", label: "취소", initialFocus: true },
+                ...scopes.map(([id, label]) => ({ id, label })),
+                { id: "cancel", label: t("dialog.cancel"), initialFocus: true },
             ],
         });
-        if (!SHARE_SCOPES.some(([id]) => id === scope)) return;
+        if (!scopes.some(([id]) => id === scope)) return;
 
         const result = await shareView.build(scope);
         const message = document.createElement("p");
         message.textContent = result.warn
-            ? `링크가 준비되었습니다 (${result.length}자). 일부 앱에서 잘릴 수 있습니다.`
-            : `링크가 준비되었습니다 (${result.length}자).`;
+            ? t("share.readyLong", { length: result.length })
+            : t("share.ready", { length: result.length });
         const choice = await dialogs.open({
             kind: "share-result",
-            title: "공유 링크",
+            title: t("share.resultTitle"),
             body: message,
             actions: [
-                { id: "copy", label: "복사", initialFocus: true },
-                { id: "close", label: "닫기" },
+                { id: "copy", label: t("share.copy"), initialFocus: true },
+                { id: "close", label: t("dialog.close") },
             ],
         });
         if (choice === "copy") await shareView.copy();
@@ -345,8 +354,8 @@ export async function start(root, env = {}) {
         let actual = 0;
         for (const v of session.givens) if (v) actual++;
         announce("session", actual === requested
-            ? "새 게임을 시작했습니다"
-            : `힌트 ${requested}개로 요청했지만 ${actual}개로 만들었습니다`);
+            ? t("newGame.started")
+            : t("newGame.givensShortfall", { requested, actual }));
     }
 
     let result;
@@ -373,7 +382,7 @@ export async function start(root, env = {}) {
 function renderFatal(root, cause) {
     const panel = element("div", "retry-panel");
     const message = document.createElement("p");
-    message.textContent = "화면을 준비하지 못했습니다. 페이지를 새로고침해 주세요.";
+    message.textContent = t("fatal.mount");
     panel.appendChild(message);
     const detail = document.createElement("p");
     detail.className = "retry-detail";

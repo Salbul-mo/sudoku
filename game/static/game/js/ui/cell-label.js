@@ -1,6 +1,8 @@
 // Accessible name assembly, DOM-free so it can be exhaustively unit tested
 // and never drift from what the board actually renders (rendering calls this
 // same function -- see ui/board-view.js updateCell).
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+
 function digitsOf(mask) {
     const out = [];
     for (let d = 1; d <= 9; d++) if (mask & (1 << (d - 1))) out.push(d);
@@ -23,11 +25,11 @@ export function cellLabel(state) {
     }
     if (given && value) throw new Error(`cell ${index} has both a given and a value`);
 
-    const parts = [`${((index / 9) | 0) + 1}행 ${(index % 9) + 1}열`];
-    if (given) parts.push(`고정 숫자 ${given}`);
+    const parts = [t("cell.position", { row: ((index / 9) | 0) + 1, col: (index % 9) + 1 })];
+    if (given) parts.push(t("cell.given", { digit: given }));
     else if (value) parts.push(`${value}`);
-    else parts.push("빈 칸");
-    if (candidates) parts.push(`후보 ${digitsOf(candidates).join(", ")}`);
-    if (conflict) parts.push("규칙 위반");
+    else parts.push(t("cell.empty"));
+    if (candidates) parts.push(t("cell.candidates", { digits: digitsOf(candidates).join(", ") }));
+    if (conflict) parts.push(t("cell.conflict"));
     return parts.join(", ");
 }

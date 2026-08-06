@@ -10,6 +10,7 @@
 // dataset->attribute lookup that buys nothing.
 import { CELLS, DIM, PEERS } from "../core/spec.js";
 import { cellLabel } from "./cell-label.js";
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 
 const DEFAULT_SETTINGS = { get: () => ({ showConflicts: true }) };
 
@@ -53,7 +54,7 @@ export function mountBoard(root, store, deps = {}) {
     const grid = document.createElement("div");
     grid.className = "board";
     grid.setAttribute("role", "grid");
-    grid.setAttribute("aria-label", `스도쿠 ${DIM}x${DIM} 퍼즐`);
+    grid.setAttribute("aria-label", t("board.label", { dim: DIM }));
 
     const cells = [];
     for (let r = 0; r < DIM; r++) {

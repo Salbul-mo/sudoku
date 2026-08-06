@@ -27,6 +27,7 @@
    floor is expressed as a rule over the app's button hosts rather than as a
    class each module has to remember to add. */
 .app-shell-header button,
+.app-shell-header .lang-switch,
 .digit-bar button,
 .retry-panel button,
 [role="dialog"] button,
@@ -43,11 +44,23 @@
 }
 
 .app-shell-header button:focus-visible,
+.app-shell-header .lang-switch:focus-visible,
 .digit-bar button:focus-visible,
 .retry-panel button:focus-visible,
 [role="dialog"] button:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
+}
+
+/* An anchor, not a button: switching language is a real navigation to a real
+   URL, which is what lets a crawler follow it and a user bookmark it. The
+   rules above give it the control's box; these two give it the control's
+   alignment, which an inline anchor does not get for free. */
+.app-shell-header .lang-switch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
 }
 
 /* ------------------------------------------------------------- app shell */
@@ -87,7 +100,7 @@
 
 /* Completion is signalled by a text badge, not by color alone (V4-05). */
 .app-shell-header-host[data-state="solved"]::after {
-    content: "완성";
+    content: var(--i18n-solved);
     align-self: flex-start;
     padding: 4px 10px;
     border-radius: 999px;
@@ -103,7 +116,7 @@
 }
 
 .hint-strip::before {
-    content: "방향키로 이동하고 숫자키로 입력하세요. ? 키로 도움말을 엽니다.";
+    content: var(--i18n-hint);
 }
 
 /* ------------------------------------------------------------- digit bar */

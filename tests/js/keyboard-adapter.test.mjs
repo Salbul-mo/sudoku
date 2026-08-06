@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { installFakeDocument, fakeRoot, FakeElement } from "./helpers/fake-dom.mjs";
 
 const uninstall = installFakeDocument();
-const { boardHasFocus, createKeyboardAdapter, KEYMAP } =
+const { boardHasFocus, createKeyboardAdapter, getKeymap } =
     await import("../../game/static/game/js/ui/keyboard-adapter.js");
 const { createStore } = await import("../../game/static/game/js/core/store.js");
 after(uninstall);
@@ -65,7 +65,7 @@ test("mounting without the required callback throws TypeError", () => {
 });
 
 test("KEYMAP covers move, digit, sticky, clear, undo/redo, and help", () => {
-    const actions = KEYMAP.map((row) => row.action);
+    const actions = getKeymap().map((row) => row.action);
     for (const expected of ["value", "candidate", "stickyToggle", "clear", "undo", "redo", "help"]) {
         assert.ok(actions.includes(expected), `KEYMAP is missing an entry for "${expected}"`);
     }

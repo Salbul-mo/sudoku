@@ -7,6 +7,7 @@
 // text-entry element pops the software keyboard the moment it is tapped, which
 // is exactly what the touch design exists to avoid.
 const DIM = 9;
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 const VISIBILITY = new Set(["visible", "collapsed"]);
 
 function controlButton(label) {
@@ -30,7 +31,7 @@ export function mountTouchControls(root, adapter, deps = {}) {
     const bar = document.createElement("div");
     bar.className = "digit-bar";
     bar.setAttribute("role", "toolbar");
-    bar.setAttribute("aria-label", "숫자 입력");
+    bar.setAttribute("aria-label", t("touch.digitBar"));
 
     // Deliberately no aria-pressed on the digits: under Cell First they act
     // on the selected cell the moment they are tapped rather than staying
@@ -46,7 +47,7 @@ export function mountTouchControls(root, adapter, deps = {}) {
         bar.appendChild(button);
     }
 
-    const pencil = controlButton("후보");
+    const pencil = controlButton(t("touch.pencil"));
     pencil.dataset.role = "pencil";
     pencil.setAttribute("aria-pressed", "false");
     pencil.addEventListener("click", () => {
@@ -55,7 +56,7 @@ export function mountTouchControls(root, adapter, deps = {}) {
         deps.onStickyChange?.(adapter.sticky === true);
     });
 
-    const erase = controlButton("지우기");
+    const erase = controlButton(t("touch.erase"));
     erase.dataset.role = "erase";
     erase.addEventListener("click", () => {
         adapter.onEraseTap();

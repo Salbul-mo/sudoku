@@ -4,6 +4,7 @@
 // focusable text-entry element would pop the on-screen keyboard the moment
 // it is tapped, which this design can never allow.
 const DIM = 9;
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 const LONG_PRESS_MS = 400;
 const POINTERMOVE_SLOP = 10;
 
@@ -43,7 +44,7 @@ export function createTouchAdapter(deps) {
             ? store.toggleCandidate(index, d)
             : store.setValue(index, d, { autoRemoveCandidates: settings.get().autoRemoveCandidates });
         if (!result.ok && result.reason === "given") {
-            announcer.announce("given-rejected", "고정된 칸입니다");
+            announcer.announce("given-rejected", t("cell.givenRejected"));
         }
         return result;
     }
@@ -62,7 +63,7 @@ export function createTouchAdapter(deps) {
 
     function onPencilTap() {
         sticky = !sticky;
-        announcer.announce("sticky-mode", sticky ? "후보 입력 모드 켜짐" : "후보 입력 모드 꺼짐");
+        announcer.announce("sticky-mode", sticky ? t("touch.stickyOn") : t("touch.stickyOff"));
         return sticky;
     }
 
@@ -75,7 +76,7 @@ export function createTouchAdapter(deps) {
         if (!Number.isInteger(index)) return { ok: false, reason: "no-selection" };
         const result = store.clearCell(index);
         if (!result.ok && result.reason === "given") {
-            announcer.announce("given-rejected", "고정된 칸입니다");
+            announcer.announce("given-rejected", t("cell.givenRejected"));
         }
         return result;
     }

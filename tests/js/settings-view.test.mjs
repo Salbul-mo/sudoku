@@ -4,7 +4,7 @@ import { installFakeDocument, fakeRoot } from "./helpers/fake-dom.mjs";
 
 const uninstall = installFakeDocument();
 const { renderSettings, renderHelp } = await import("../../game/static/game/js/ui/settings-view.js");
-const { KEYMAP } = await import("../../game/static/game/js/ui/keyboard-adapter.js");
+const { getKeymap } = await import("../../game/static/game/js/ui/keyboard-adapter.js");
 after(uninstall);
 
 function fakeSettings(initial) {
@@ -49,7 +49,7 @@ test("selecting a touchControls radio calls settings.set with its value", () => 
 
 test("renderHelp produces one table row per KEYMAP entry (T-UI-B14-16)", () => {
     const table = renderHelp();
-    assert.equal(table.children.length, KEYMAP.length);
+    assert.equal(table.children.length, getKeymap().length);
 });
 
 test("renderHelp throws on an empty keymap", () => {

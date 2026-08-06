@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<!-- Each <url> lists the full alternate set including itself. That
+     self-reference is required: a sitemap where /en/ does not name /en/ as one
+     of its own alternates is treated as malformed and the grouping is dropped. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://sudoku-bw7.pages.dev/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/"/>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/en/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/"/>
     <changefreq>monthly</changefreq>
   </url>
 </urlset>

@@ -3,6 +3,7 @@
 // "정답 체크", the destructive actions, and the Share/Settings/Help
 // entry points had behavior specified but no owning module until this block.
 import { GIVENS_PRESETS } from "../core/claude-mhj_26_08_07_01_givens.js";
+import { t, resolveLocale } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 
 // "새 게임" is destructive too, but it no longer goes through onDestructive:
 // it asks which clue count to use rather than for a yes/no, and the choice
@@ -42,9 +43,9 @@ export function mountShell(root, store, settings, deps) {
 
     const actions = {};
     const ACTION_LABELS = [
-        ["check", "정답 체크"], ["newGame", "새 게임"], ["clearAll", "전체 지우기"],
-        ["share", "공유"],
-        ["settings", "설정"], ["help", "도움말"],
+        ["check", t("action.check")], ["newGame", t("action.newGame")], ["clearAll", t("action.clearAll")],
+        ["share", t("action.share")],
+        ["settings", t("action.settings")], ["help", t("action.help")],
     ];
     for (const [id, label] of ACTION_LABELS) {
         const button = document.createElement("button");
@@ -54,6 +55,19 @@ export function mountShell(root, store, settings, deps) {
         header.appendChild(button);
         actions[id] = button;
     }
+
+    // Deliberately an <a href> and not a button with a click handler: the two
+    // languages are two indexed URLs, so the switch has to be a link a crawler
+    // can follow and a user can middle-click. The in-progress game survives the
+    // navigation because it lives in localStorage, not in this page's memory.
+    const otherLocale = resolveLocale(document.documentElement.lang) === "en" ? "ko" : "en";
+    const langSwitch = document.createElement("a");
+    langSwitch.className = "lang-switch";
+    langSwitch.href = otherLocale === "en" ? "/en/" : "/";
+    langSwitch.textContent = t("nav.otherLanguage");
+    langSwitch.setAttribute("hreflang", otherLocale);
+    langSwitch.setAttribute("rel", "alternate");
+    header.appendChild(langSwitch);
 
     actions.check.addEventListener("click", () => onCheck());
     actions.share.addEventListener("click", () => deps.openShare());
@@ -65,7 +79,7 @@ export function mountShell(root, store, settings, deps) {
     let wasSolved = false;
     const unsubscribe = store.subscribe(() => {
         const solved = store.isSolved();
-        if (solved && !wasSolved) deps.announcer.announce("completion", "퍼즐을 완성했습니다");
+        if (solved && !wasSolved) deps.announcer.announce("completion", t("check.solved"));
         root.dataset.state = solved ? "solved" : "playing";
         wasSolved = solved;
     });
@@ -74,9 +88,9 @@ export function mountShell(root, store, settings, deps) {
         const done = store.isSolved();
         const wrong = store.checkAnswer();
         if (wrong) {
-            const msg = wrong.size ? `정답과 다른 칸 ${wrong.size}개`
-                : done ? "퍼즐을 완성했습니다"
-                    : "지금까지 입력한 답이 모두 맞습니다";
+            const msg = wrong.size ? t("check.wrongCount", { count: wrong.size })
+                : done ? t("check.solved")
+                    : t("check.allCorrect");
             deps.announcer.announce("completion", msg);
             deps.boardView?.highlightConflicts?.(wrong);
             return;
@@ -85,9 +99,9 @@ export function mountShell(root, store, settings, deps) {
         // or restored from a save written before this field existed) --
         // fall back to a rule-violation check instead of doing nothing.
         const bad = store.conflicts();
-        const msg = bad.size ? `규칙 위반 ${bad.size}칸`
-            : done ? "퍼즐을 완성했습니다"
-                : "지금까지 규칙 위반이 없습니다";
+        const msg = bad.size ? t("check.violationCount", { count: bad.size })
+            : done ? t("check.solved")
+                : t("check.noViolations");
         deps.announcer.announce("completion", msg);
         deps.boardView?.highlightConflicts?.(bad);
     }
@@ -101,18 +115,18 @@ export function mountShell(root, store, settings, deps) {
     async function onNewGame() {
         const currentGivens = settings.get().newGameGivens;
         const body = document.createElement("p");
-        body.textContent = "힌트 갯수를 고르세요. 지금 진행 중인 퍼즐은 사라집니다.";
+        body.textContent = t("newGame.body");
         const choice = await deps.dialogs.open({
             kind: "new-game",
-            title: "새 게임",
+            title: t("action.newGame"),
             body,
             actions: [
                 ...GIVENS_PRESETS.map((n) => ({
                     id: String(n),
-                    label: `${n}개`,
+                    label: t("newGame.preset", { count: n }),
                     initialFocus: n === currentGivens,
                 })),
-                { id: "cancel", label: "취소" },
+                { id: "cancel", label: t("dialog.cancel") },
             ],
         });
 
@@ -126,7 +140,7 @@ export function mountShell(root, store, settings, deps) {
     }
 
     const DESTRUCTIVE = {
-        clearAll: { q: "입력한 숫자와 후보를 모두 지울까요?", run: clearAllEntries },
+        clearAll: { q: t("clearAll.question"), run: clearAllEntries },
     };
 
     async function onDestructive(kind) {

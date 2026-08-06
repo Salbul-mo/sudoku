@@ -44,6 +44,14 @@ class FakeElement extends FakeNode {
         this.attributes = {};
         this.children = [];
         this.dataset = {};
+        // Only the custom-property surface the app actually uses: the message
+        // catalogue writes the pseudo-element strings onto :root this way.
+        this.style = {
+            properties: {},
+            setProperty(name, value) { this.properties[name] = value; },
+            getPropertyValue(name) { return this.properties[name] ?? ""; },
+            removeProperty(name) { delete this.properties[name]; },
+        };
         this._className = "";
         this._textContent = "";
         this._tabIndex = -1;
@@ -200,10 +208,16 @@ export function installFakeDocument() {
     const originalElement = globalThis.Element;
     const originalNode = globalThis.Node;
     const body = new FakeElement("body");
+    // The real documentElement carries the lang the message catalogue reads
+    // and the style object the CSS strings are written onto. Tests may set
+    // `document.documentElement.lang` to exercise the other language.
+    const documentElement = new FakeElement("html");
+    documentElement.lang = "ko";
     const docListeners = {};
     globalThis.document = {
         createElement: (tag) => new FakeElement(tag),
         createTextNode: (text) => new FakeTextNode(text),
+        documentElement,
         body,
         activeElement: body,
         visibilityState: "visible",

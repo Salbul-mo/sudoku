@@ -4,6 +4,7 @@
 // session conflicts) get evaluated, and the only place a failed new-puzzle
 // fetch has to end somewhere other than a blank page (M1).
 import { createStore } from "./core/store.js";
+import { t } from "./i18n/claude-mhj_26_08_07_05_messages.js";
 
 const NEW_PUZZLE_TIMEOUT_MS = 10_000;
 const RETRY_DELAY_MS = 1000;
@@ -72,7 +73,7 @@ function sessionFromDecoded(state) {
 
 export async function resolveConflict(url, local, deps) {
     if (!url || !url.ok) {
-        if (url) await deps.dialogs.confirm(`공유 링크를 해석하지 못했습니다 (${url.code}). 무시하고 계속할까요?`);
+        if (url) await deps.dialogs.confirm(t("session.decodeFailed", { code: url.code }));
         return { session: local.ok ? local.session : null, consumedFragment: Boolean(url) };
     }
     // No local session: the URL is the only source of state, so it is adopted whole.
@@ -83,7 +84,7 @@ export async function resolveConflict(url, local, deps) {
     // CR1: different puzzle entirely -- the local session is archived, not lost.
     if (!sameGivens(url.state.givens, local.session.givens)) {
         deps.archive?.(local.session);
-        deps.announcer?.announce("session", "이전 진행을 보관함으로 옮기고 8초 안에 되돌릴 수 있습니다");
+        deps.announcer?.announce("session", t("session.archived"));
         deps.toastUndo?.(UNDO_TOAST_MS);
         return { session: sessionFromDecoded(url.state), consumedFragment: true };
     }
@@ -92,9 +93,9 @@ export async function resolveConflict(url, local, deps) {
     let coreSession = local.session;
     if (url.state.values && differentCore(url.state, local.session)) {
         const choice = await deps.dialogs.open({
-            kind: "conflict", title: "진행 상태 선택",
-            body: deps.buildCoreSummary?.(url.state, local.session) ?? document.createTextNode("어느 진행을 쓸까요?"),
-            actions: [{ id: "local", label: "이 기기" }, { id: "url", label: "공유된 진행" }],
+            kind: "conflict", title: t("session.conflictTitle"),
+            body: deps.buildCoreSummary?.(url.state, local.session) ?? document.createTextNode(t("session.conflictBody")),
+            actions: [{ id: "local", label: t("session.useLocal") }, { id: "url", label: t("session.useShared") }],
         });
         if (choice === "url") coreSession = sessionFromDecoded(url.state);
     }
@@ -113,27 +114,25 @@ function renderInertSkeleton(root) {
     return shell;
 }
 
-const RETRY_MESSAGES = {
-    offline: "오프라인 상태입니다. 연결 후 다시 시도하세요.",
-    server: "서버에 문제가 있습니다. 잠시 후 다시 시도하세요.",
-    network: "네트워크에 연결할 수 없습니다. 다시 시도하세요.",
-};
+const RETRY_CAUSES = Object.freeze(["offline", "server", "network"]);
+// Resolved per call for the same reason as shareScopes() in app.js.
+const retryMessage = (cause) => t(`retry.${cause}`);
 
 function showRetryPanel(deps, cause) {
-    if (!(cause in RETRY_MESSAGES)) throw new RangeError(`unknown retry cause: ${cause}`);
+    if (!RETRY_CAUSES.includes(cause)) throw new RangeError(`unknown retry cause: ${cause}`);
     const panel = document.createElement("div");
     panel.className = "retry-panel";
     const message = document.createElement("p");
-    message.textContent = RETRY_MESSAGES[cause];
+    message.textContent = retryMessage(cause);
     panel.appendChild(message);
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = "다시 시도";
+    button.textContent = t("retry.button");
     panel.appendChild(button);
     deps.root.appendChild(panel);
     button.focus();
     globalThis.window?.addEventListener?.("online", () => { button.dataset.highlight = "1"; }, { once: true });
-    deps.announcer?.announce("session", RETRY_MESSAGES[cause]);
+    deps.announcer?.announce("session", retryMessage(cause));
     return null; // never a blank page
 }
 

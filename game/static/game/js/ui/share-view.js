@@ -1,5 +1,6 @@
 // Length has a single threshold: 2,000 is a soft warning that a shared link
 // is getting long.
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
 const SCOPES = ["SC1", "SC2"];
 const WARN_LENGTH = 2000;
 
@@ -21,11 +22,11 @@ export function createShareView(deps) {
     async function copy(link) {
         try {
             await navigator.clipboard.writeText(link);
-            deps.announcer.announce("link-copied", "링크를 복사했습니다");
+            deps.announcer.announce("link-copied", t("share.copied"));
             return { ok: true };
         } catch {
             deps.showSelectableInput?.(link);
-            deps.announcer.announce("link-copied", "복사 권한이 없어 직접 선택할 수 있게 표시했습니다");
+            deps.announcer.announce("link-copied", t("share.copyFallback"));
             return { ok: false, fallback: true };
         }
     }

@@ -113,7 +113,9 @@
 }
 
 .cell[data-candidate-mode="1"]::before {
-    content: "후보";
+    /* Set on :root at boot from the message catalogue -- a pseudo-element's
+       text cannot be written by JS, so the language reaches it this way. */
+    content: var(--i18n-candidate);
     position: absolute;
     top: 2px;
     left: 2px;
