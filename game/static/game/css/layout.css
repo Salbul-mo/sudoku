@@ -4,7 +4,31 @@
 
 :root {
     --control-floor: 48px;
-    --board-width: min(70dvh, 640px);
+    --board-raw: min(70dvh, 640px);
+    --board-width: var(--board-raw);
+}
+
+/* Nine 1fr columns out of an arbitrary width give cells a fractional size --
+   at 360px the board is 344px and cells come out 37.875 and 37.891 wide, two
+   different values in the same row. Each cell paints its own 1px right border,
+   so those borders land on fractional device pixels and the browser snaps each
+   one independently: some render, some vanish. The result is a grid whose
+   inner lines look broken, worst on phones where the device pixel ratio is 3.
+   Sizing the board so the nine cells divide it evenly makes every cell the
+   same whole number of pixels, so every border snaps the same way.
+   The 3px is the grid's own border-left, which box-sizing folds into the
+   declared width -- the nine cells share what is left, so it is (W - 3) that
+   has to divide by 9, not W. Rounding W itself would leave every cell a third
+   of a pixel short, which is how this was first written and why it did not
+   help.
+   Guarded by @supports because a custom property holding an unparseable value
+   is only invalid at computed-value time -- .board's inline-size would fall
+   back to auto and the board would collapse, rather than merely stay
+   unrounded. Each breakpoint below sets --board-raw; this derives from it. */
+@supports (width: round(down, 10px, 3px)) {
+    :root {
+        --board-width: calc(round(down, var(--board-raw) - 3px, 9px) + 3px);
+    }
 }
 
 * {
@@ -69,7 +93,7 @@ body {
    claiming far more horizontal space than they visually use. */
 @media (min-width: 1024px) {
     :root {
-        --board-width: min(70dvh, 640px);
+        --board-raw: min(70dvh, 640px);
     }
 
     .app-shell {
@@ -105,12 +129,12 @@ body {
    sized down for the narrower viewport range. */
 @media (min-width: 600px) and (max-width: 1023px) {
     :root {
-        --board-width: min(80dvh, 90vw);
+        --board-raw: min(80dvh, 90vw);
     }
 
     @media (orientation: landscape) {
         :root {
-            --board-width: min(70dvh, 60vw);
+            --board-raw: min(70dvh, 60vw);
         }
 
         .app-shell {
@@ -146,7 +170,7 @@ body {
    are exactly board-width/9 with no inter-button gap. */
 @media (max-width: 599px) {
     :root {
-        --board-width: calc(100vw - 16px);
+        --board-raw: calc(100vw - 16px);
     }
 
     .digit-bar {
