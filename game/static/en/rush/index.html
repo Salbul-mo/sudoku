@@ -1,0 +1,43 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Sudoku Rush - one cell at a time, against the clock</title>
+    <meta name="description" content="A speed Sudoku where you find the cell that has only one possible digit and fill it before time runs out. The limit shrinks as you go, and a combo multiplies your score. No install, playable straight from the browser.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/en/rush/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/rush/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/rush/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/rush/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/en/rush/">
+    <meta property="og:title" content="Sudoku Rush - one cell at a time, against the clock">
+    <meta property="og:description" content="A speed Sudoku: find the cell with only one possible digit before time runs out, and keep the combo going.">
+    <meta property="og:locale" content="en_US">
+    <meta name="twitter:card" content="summary">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/board.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/claude-mhj_26_08_07_20_rush.css">
+</head>
+<body>
+    <!-- Outside #app on purpose: the entry point empties that element on boot,
+         so a heading placed inside it would be destroyed. -->
+    <h1 class="visually-hidden">Sudoku Rush</h1>
+
+    <main id="app" class="app-shell"></main>
+
+    <noscript>
+        <p>Sudoku Rush runs on JavaScript. Turn it on in your browser and the game will appear.</p>
+    </noscript>
+
+    <script type="module" src="/game/js/claude-mhj_26_08_07_19_rush-main.js"></script>
+</body>
+</html>

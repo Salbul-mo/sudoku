@@ -1,0 +1,131 @@
+/* Rush-only chrome. The board, the digit bar and every colour token come from
+   the shared stylesheets; this file adds the header stats, the countdown and
+   the end-of-run panel, and nothing else. */
+
+.rush-shell-host {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}
+
+.rush-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+}
+
+.rush-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.rush-stat-label {
+    font-size: 0.8125rem;
+    color: var(--fg-candidate);
+}
+
+.rush-stat-value {
+    font-variant-numeric: tabular-nums; /* the score must not jitter as it counts */
+    font-weight: 600;
+    color: var(--fg-given);
+}
+
+/* The last life is worth flagging, but never by colour alone -- the value is
+   already the literal count, so this only reinforces what the text says. */
+.rush-header[data-lives="1"] .rush-stat-value {
+    color: var(--fg-conflict);
+}
+
+.rush-view-host {
+    padding: 0 8px;
+}
+
+.rush-timer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    block-size: var(--control-floor);
+}
+
+.rush-timer-fill {
+    block-size: 10px;
+    flex: 0 0 auto;
+    inline-size: 100%;
+    max-inline-size: calc(100% - 4.5rem); /* leaves room for the readout */
+    background: var(--bg-cell-selected);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: inline-size 100ms linear;
+}
+
+.rush-timer-fill[data-low="1"] {
+    background: var(--bg-cell-conflict);
+    border-color: var(--fg-conflict);
+}
+
+/* The bar is decoration; this is the part that actually states the time, so it
+   is never hidden and never shortened. */
+.rush-timer-readout {
+    min-inline-size: 4rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-body);
+}
+
+.rush-hint {
+    margin: 0 0 8px;
+    font-size: 0.875rem;
+    color: var(--fg-candidate);
+}
+
+.rush-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.rush-panel button {
+    min-inline-size: var(--control-floor);
+    min-block-size: var(--control-floor);
+    padding: 0 16px;
+    font: inherit;
+    color: var(--fg-body);
+    background: var(--bg-cell);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.rush-panel button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.rush-summary,
+.rush-record {
+    margin: 0;
+}
+
+.rush-summary {
+    font-weight: 600;
+}
+
+.rush-record {
+    color: var(--fg-candidate);
+}
+
+/* While a run is on there is no panel to show, and an empty flex column would
+   still claim its gap. */
+.rush-view[data-state="playing"] .rush-panel {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rush-timer-fill {
+        transition-duration: 0ms;
+    }
+}

@@ -10,10 +10,17 @@ const ROOT = path.resolve(
 const BUILD = path.join(ROOT, "tools", "codex-mhj_26_08_02_05_build_pages.mjs");
 const ORIGIN = "https://sudoku-bw7.pages.dev";
 
+// `group` is what hreflang may link across. The two games are separate content,
+// not translations, so a link between groups is a bug rather than a nicety.
 const PAGES = [
-    { locale: "ko", url: `${ORIGIN}/`, file: ["game", "static", "index.html"], heading: "스도쿠" },
-    { locale: "en", url: `${ORIGIN}/en/`, file: ["game", "static", "en", "index.html"], heading: "Sudoku" },
+    { group: "classic", locale: "ko", url: `${ORIGIN}/`, file: ["game", "static", "index.html"], heading: "스도쿠" },
+    { group: "classic", locale: "en", url: `${ORIGIN}/en/`, file: ["game", "static", "en", "index.html"], heading: "Sudoku" },
+    { group: "rush", locale: "ko", url: `${ORIGIN}/rush/`, file: ["game", "static", "rush", "index.html"], heading: "스도쿠 러시" },
+    { group: "rush", locale: "en", url: `${ORIGIN}/en/rush/`, file: ["game", "static", "en", "rush", "index.html"], heading: "Sudoku Rush" },
 ];
+
+const groupOf = (page) => PAGES.filter((p) => p.group === page.group);
+const xDefaultOf = (page) => groupOf(page).find((p) => p.locale === "ko");
 
 const read = (page) => readFile(path.join(ROOT, ...page.file), "utf8");
 
@@ -44,14 +51,30 @@ test("T-B04-03: each page is canonical to itself, not to the other language", as
 test("T-B04-04: every page lists the full alternate set including itself", async () => {
     for (const page of PAGES) {
         const html = await read(page);
-        for (const other of PAGES) {
+        for (const other of groupOf(page)) {
             assert.match(
                 html,
                 new RegExp(`<link rel="alternate" hreflang="${other.locale}" href="${other.url}">`),
-                `${page.locale} -> ${other.locale}`,
+                `${page.group}/${page.locale} -> ${other.locale}`,
             );
         }
-        assert.match(html, new RegExp(`hreflang="x-default" href="${ORIGIN}/">`), page.locale);
+        const fallback = xDefaultOf(page).url;
+        assert.match(html, new RegExp(`hreflang="x-default" href="${fallback}">`), page.group);
+    }
+});
+
+// Naming the other game as an alternate language would tell a crawler the two
+// are the same page in two languages, and it would pick one and drop the other.
+test("T-B05-02: hreflang never crosses from one game to the other", async () => {
+    for (const page of PAGES) {
+        const html = await read(page);
+        for (const stranger of PAGES.filter((p) => p.group !== page.group)) {
+            assert.doesNotMatch(
+                html,
+                new RegExp(`rel="alternate" hreflang="[a-z-]+" href="${stranger.url}"`),
+                `${page.group}/${page.locale} must not name ${stranger.url}`,
+            );
+        }
     }
 });
 
@@ -63,9 +86,11 @@ test("T-B04-05: no build scaffolding survives into the generated pages", async (
     }
 });
 
-test("T-B04-06: the English page carries no leftover Korean", async () => {
-    const html = await read(PAGES[1]);
-    assert.doesNotMatch(html, /[가-힣]/, html.match(/.*[가-힣].*/)?.[0] ?? "");
+test("T-B04-06: the English pages carry no leftover Korean", async () => {
+    for (const page of PAGES.filter((p) => p.locale === "en")) {
+        const html = await read(page);
+        assert.doesNotMatch(html, /[가-힣]/, `${page.group}: ${html.match(/.*[가-힣].*/)?.[0] ?? ""}`);
+    }
 });
 
 test("T-B04-07: the sitemap lists both languages with their alternates", async () => {
@@ -74,6 +99,15 @@ test("T-B04-07: the sitemap lists both languages with their alternates", async (
     for (const page of PAGES) {
         assert.match(xml, new RegExp(`<loc>${page.url}</loc>`), page.locale);
     }
-    // Two <url> entries, each naming ko + en + x-default.
-    assert.equal((xml.match(/<xhtml:link /g) ?? []).length, 6);
+    // Four <url> entries, each naming ko + en + x-default of its own group.
+    assert.equal((xml.match(/<xhtml:link /g) ?? []).length, PAGES.length * 3);
+    for (const page of PAGES) {
+        for (const stranger of PAGES.filter((p) => p.group !== page.group)) {
+            assert.doesNotMatch(
+                xml,
+                new RegExp(`<loc>${page.url}</loc>[\s\S]*?href="${stranger.url}"[\s\S]*?</url>`),
+                `${page.url} must not list ${stranger.url}`,
+            );
+        }
+    }
 });

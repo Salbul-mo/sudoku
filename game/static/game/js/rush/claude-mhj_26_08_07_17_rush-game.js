@@ -51,14 +51,20 @@ export function createRushGame(deps) {
     for (const name of ["source", "shell", "view", "boardHost", "controlsHost", "announcer", "settings"]) {
         if (deps?.[name] === undefined) throw new TypeError(`createRushGame: missing deps.${name}`);
     }
-    const timer = deps.timer ?? { setInterval, clearInterval };
+    // Wrapped rather than passed by reference: called as deps.setTimeout(...)
+    // a bare browser timer sees `this` as the deps object and throws "Illegal
+    // invocation". Node does not care, so only a real browser catches it.
+    const timer = deps.timer ?? {
+        setInterval: (fn, ms) => globalThis.setInterval(fn, ms),
+        clearInterval: (id) => globalThis.clearInterval(id),
+    };
     const rng = deps.rng ?? Math.random;
 
     const score = createScore({ storage: deps.storage });
     const clock = createClock({
         now: deps.now ?? (() => Date.now()),
-        setTimeout: deps.setTimeout ?? setTimeout,
-        clearTimeout: deps.clearTimeout ?? clearTimeout,
+        setTimeout: deps.setTimeout ?? ((fn, ms) => globalThis.setTimeout(fn, ms)),
+        clearTimeout: deps.clearTimeout ?? ((id) => globalThis.clearTimeout(id)),
         onExpire: () => judge(null, null),
     });
 
