@@ -136,6 +136,26 @@ export const MESSAGES = Object.freeze({
 
         "fatal.mount": "화면을 준비하지 못했습니다. 페이지를 새로고침해 주세요.",
         "fatal.load": "앱을 불러오지 못했습니다. 페이지를 새로고침해 주세요.",
+
+        "meta.rushTitle": "스도쿠 러시 - 제한시간 안에 한 칸씩",
+        "meta.rushDescription": "제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠. 시간이 갈수록 짧아지는 제한시간과 콤보로 점수를 겨룹니다. 설치 없이 브라우저에서 바로 즐기세요.",
+        "meta.rushOgDescription": "제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠. 콤보를 이어 최고 점수에 도전하세요.",
+        "meta.rushHeading": "스도쿠 러시",
+        "meta.rushNoscript": "스도쿠 러시는 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를 켜면 게임이 나타납니다.",
+
+        "rush.start": "시작",
+        "rush.restart": "다시 하기",
+        "rush.howTo": "숫자가 하나로 확정되는 칸이 표시됩니다. 제한시간 안에 그 숫자를 누르세요.",
+        "rush.score": "점수",
+        "rush.combo": "콤보",
+        "rush.lives": "목숨",
+        "rush.timeLeft": "{seconds}초",
+        "rush.gameOver": "게임 종료. 점수 {score}점, 최고 콤보 {combo}.",
+        "rush.best": "최고 기록 {score}점",
+        "rush.newBest": "최고 기록 경신! {score}점",
+        "rush.noRecord": "이 브라우저에서는 기록이 저장되지 않습니다.",
+        "rush.boardCleared": "보드 완성. 새 보드를 시작합니다.",
+        "rush.target": "이 칸을 채우세요",
     }),
 
     en: Object.freeze({
@@ -248,6 +268,26 @@ export const MESSAGES = Object.freeze({
 
         "fatal.mount": "The page could not be prepared. Please reload.",
         "fatal.load": "The app could not be loaded. Please reload.",
+
+        "meta.rushTitle": "Sudoku Rush - one cell at a time, against the clock",
+        "meta.rushDescription": "A speed Sudoku where you find the cell that has only one possible digit and fill it before time runs out. The limit shrinks as you go, and a combo multiplies your score. No install, playable straight from the browser.",
+        "meta.rushOgDescription": "A speed Sudoku: find the cell with only one possible digit before time runs out, and keep the combo going.",
+        "meta.rushHeading": "Sudoku Rush",
+        "meta.rushNoscript": "Sudoku Rush runs on JavaScript. Turn it on in your browser and the game will appear.",
+
+        "rush.start": "Start",
+        "rush.restart": "Play again",
+        "rush.howTo": "One cell is marked whose digit is already decided. Type that digit before the time runs out.",
+        "rush.score": "Score",
+        "rush.combo": "Combo",
+        "rush.lives": "Lives",
+        "rush.timeLeft": "{seconds}s",
+        "rush.gameOver": "Game over. Score {score}, best combo {combo}.",
+        "rush.best": "Best {score}",
+        "rush.newBest": "New best! {score}",
+        "rush.noRecord": "This browser will not save your record.",
+        "rush.boardCleared": "Board complete. Starting a new one.",
+        "rush.target": "Fill this cell",
     }),
 });
 

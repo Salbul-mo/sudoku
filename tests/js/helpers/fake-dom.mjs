@@ -91,6 +91,19 @@ class FakeElement extends FakeNode {
         return child;
     }
 
+    // The variadic siblings of appendChild. Real code reaches for these when
+    // it has several nodes to place at once, so the fake has to know them or
+    // the production module gets written around the test double.
+    append(...nodes) {
+        for (const node of nodes) this.appendChild(node);
+    }
+
+    replaceChildren(...nodes) {
+        for (const child of this.children) child.parentNode = null;
+        this.children = [];
+        this.append(...nodes);
+    }
+
     remove() {
         if (this.parentNode) {
             const idx = this.parentNode.children.indexOf(this);
