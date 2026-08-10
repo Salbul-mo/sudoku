@@ -28,6 +28,7 @@
    class each module has to remember to add. */
 .app-shell-header button,
 .app-shell-header .lang-switch,
+.app-shell-header .game-switch,
 .digit-bar button,
 .retry-panel button,
 [role="dialog"] button,
@@ -45,6 +46,7 @@
 
 .app-shell-header button:focus-visible,
 .app-shell-header .lang-switch:focus-visible,
+.app-shell-header .game-switch:focus-visible,
 .digit-bar button:focus-visible,
 .retry-panel button:focus-visible,
 [role="dialog"] button:focus-visible {
@@ -52,11 +54,12 @@
     outline-offset: 2px;
 }
 
-/* An anchor, not a button: switching language is a real navigation to a real
-   URL, which is what lets a crawler follow it and a user bookmark it. The
-   rules above give it the control's box; these two give it the control's
+/* Anchors, not buttons: switching language or game is a real navigation to a
+   real URL, which is what lets a crawler follow it and a user bookmark it. The
+   rules above give them the control's box; these give them the control's
    alignment, which an inline anchor does not get for free. */
-.app-shell-header .lang-switch {
+.app-shell-header .lang-switch,
+.app-shell-header .game-switch {
     display: inline-flex;
     align-items: center;
     justify-content: center;

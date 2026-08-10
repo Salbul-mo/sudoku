@@ -3,23 +3,9 @@
 // Deliberately not ui/app-shell.js. That module is the classic game's header --
 // check answer, new game, clear all, share, settings, help -- and none of it
 // applies to a run against a clock.
-import { t, resolveLocale } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { createLangSwitch, createGameSwitch } from "../ui/claude-mhj_26_08_07_22_page-links.js";
 import { RUSH } from "./claude-mhj_26_08_07_11_config.js";
-
-// Duplicated from ui/app-shell.js on purpose and only until the cross-game
-// links land: extracting it now would mean editing the classic game's shell,
-// which this work is staying out of until that block. The extraction into
-// ui/lang-switch.js is the first thing that block does.
-function buildLangSwitch() {
-    const other = resolveLocale(document.documentElement.lang) === "en" ? "ko" : "en";
-    const link = document.createElement("a");
-    link.className = "lang-switch";
-    link.href = other === "en" ? "/en/rush/" : "/rush/";
-    link.textContent = t("nav.otherLanguage");
-    link.setAttribute("hreflang", other);
-    link.setAttribute("rel", "alternate");
-    return link;
-}
 
 function statBlock(labelKey) {
     const wrap = document.createElement("div");
@@ -44,7 +30,8 @@ export function mountRushShell(root, deps = {}) {
     const score = statBlock("rush.score");
     const combo = statBlock("rush.combo");
     const lives = statBlock("rush.lives");
-    header.append(score.wrap, combo.wrap, lives.wrap, buildLangSwitch());
+    header.append(score.wrap, combo.wrap, lives.wrap,
+        createGameSwitch("rush"), createLangSwitch("rush"));
     root.appendChild(header);
 
     function setStats(state) {

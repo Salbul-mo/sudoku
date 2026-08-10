@@ -3,7 +3,8 @@
 // "정답 체크", the destructive actions, and the Share/Settings/Help
 // entry points had behavior specified but no owning module until this block.
 import { GIVENS_PRESETS } from "../core/claude-mhj_26_08_07_01_givens.js";
-import { t, resolveLocale } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { createLangSwitch, createGameSwitch } from "./claude-mhj_26_08_07_22_page-links.js";
 
 // "새 게임" is destructive too, but it no longer goes through onDestructive:
 // it asks which clue count to use rather than for a yes/no, and the choice
@@ -56,18 +57,11 @@ export function mountShell(root, store, settings, deps) {
         actions[id] = button;
     }
 
-    // Deliberately an <a href> and not a button with a click handler: the two
-    // languages are two indexed URLs, so the switch has to be a link a crawler
-    // can follow and a user can middle-click. The in-progress game survives the
-    // navigation because it lives in localStorage, not in this page's memory.
-    const otherLocale = resolveLocale(document.documentElement.lang) === "en" ? "ko" : "en";
-    const langSwitch = document.createElement("a");
-    langSwitch.className = "lang-switch";
-    langSwitch.href = otherLocale === "en" ? "/en/" : "/";
-    langSwitch.textContent = t("nav.otherLanguage");
-    langSwitch.setAttribute("hreflang", otherLocale);
-    langSwitch.setAttribute("rel", "alternate");
-    header.appendChild(langSwitch);
+    // Both are <a href> and not buttons: each target is an indexed URL, so a
+    // crawler has to be able to follow it and a reader to bookmark it. The
+    // in-progress game survives either navigation because it lives in
+    // localStorage, not in this page's memory.
+    header.append(createGameSwitch("classic"), createLangSwitch("classic"));
 
     actions.check.addEventListener("click", () => onCheck());
     actions.share.addEventListener("click", () => deps.openShare());

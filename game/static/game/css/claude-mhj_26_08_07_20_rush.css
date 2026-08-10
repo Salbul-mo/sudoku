@@ -39,6 +39,26 @@
     color: var(--fg-conflict);
 }
 
+/* Matches the classic header's controls so the two pages read as one site. */
+.rush-header .lang-switch,
+.rush-header .game-switch {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--control-floor);
+    padding: 0 12px;
+    color: var(--fg-body);
+    text-decoration: none;
+    background: var(--bg-cell);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+
+.rush-header .lang-switch:focus-visible,
+.rush-header .game-switch:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
 .rush-view-host {
     padding: 0 8px;
 }

@@ -62,3 +62,47 @@ test("T-B05-04: an unrecognised lang falls back to Korean rather than breaking",
     assert.equal(link.href, "/en/");
     assert.equal(link.textContent, "English");
 });
+
+// --- B-06: the link to the other game ---------------------------------------
+
+const { createGameSwitch, createLangSwitch } =
+    await import("../../game/static/game/js/ui/claude-mhj_26_08_07_22_page-links.js");
+
+function linkFor(build, page, lang) {
+    document.documentElement.lang = lang;
+    return build(page);
+}
+
+test("T-B06-04: each page links to the other game in the reader's own language", () => {
+    const cases = [
+        ["classic", "ko", "/rush/", "러시"],
+        ["classic", "en", "/en/rush/", "Rush"],
+        ["rush", "ko", "/", "클래식"],
+        ["rush", "en", "/en/", "Classic"],
+    ];
+    for (const [page, lang, href, label] of cases) {
+        const link = linkFor(createGameSwitch, page, lang);
+        assert.equal(link.href, href, `${page}/${lang}`);
+        assert.equal(link.textContent, label, `${page}/${lang}`);
+        assert.equal(link.tagName.toLowerCase(), "a");
+    }
+});
+
+// Marking it rel="alternate" would tell a crawler the two games are the same
+// content in two forms, and it would keep one and drop the other.
+test("T-B06-05: the game link is not advertised as a translation", () => {
+    const link = linkFor(createGameSwitch, "classic", "ko");
+    assert.equal(link.getAttribute("rel"), null);
+    assert.equal(link.getAttribute("hreflang"), null);
+});
+
+test("T-B06-06: the language switch stays on the page it was built for", () => {
+    assert.equal(linkFor(createLangSwitch, "rush", "ko").href, "/en/rush/");
+    assert.equal(linkFor(createLangSwitch, "rush", "en").href, "/rush/");
+    assert.equal(linkFor(createLangSwitch, "classic", "ko").href, "/en/");
+});
+
+test("T-B06-07: an unknown page is a programming error", () => {
+    assert.throws(() => createGameSwitch("nope"), RangeError);
+    assert.throws(() => createLangSwitch("nope"), RangeError);
+});

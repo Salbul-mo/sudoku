@@ -38,6 +38,8 @@ export const MESSAGES = Object.freeze({
         "css.hint": "방향키로 이동하고 숫자키로 입력하세요. ? 키로 도움말을 엽니다.",
 
         "nav.otherLanguage": "English",
+        "nav.playRush": "러시",
+        "nav.playClassic": "클래식",
 
         "action.check": "정답 체크",
         "action.newGame": "새 게임",
@@ -170,6 +172,8 @@ export const MESSAGES = Object.freeze({
         "css.hint": "Move with the arrow keys and type a digit to fill a cell. Press ? for help.",
 
         "nav.otherLanguage": "한국어",
+        "nav.playRush": "Rush",
+        "nav.playClassic": "Classic",
 
         "action.check": "Check answer",
         "action.newGame": "New game",
