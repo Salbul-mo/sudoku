@@ -27,7 +27,7 @@ export const CSS_STRING_KEYS = Object.freeze([
 
 export const MESSAGES = Object.freeze({
     ko: Object.freeze({
-        "meta.title": "스도쿠 - 매번 새로 만드는 유일해 퍼즐",
+        "meta.title": "스도쿠 - 매번 새로 만드는 무료 온라인 퍼즐",
         "meta.description": "난이도를 골라 새 퍼즐을 만드는 무료 온라인 스도쿠. 매번 새로 생성되며 정답이 하나뿐인 것이 보장됩니다. 설치 없이 브라우저에서 바로, 키보드와 터치 모두 지원합니다.",
         "meta.ogDescription": "난이도를 골라 새 퍼즐을 만드는 무료 온라인 스도쿠. 정답이 하나뿐인 것이 보장됩니다.",
         "meta.heading": "스도쿠",
