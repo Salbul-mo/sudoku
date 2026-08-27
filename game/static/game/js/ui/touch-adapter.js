@@ -4,7 +4,7 @@
 // focusable text-entry element would pop the on-screen keyboard the moment
 // it is tapped, which this design can never allow.
 const DIM = 9;
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 const LONG_PRESS_MS = 400;
 const POINTERMOVE_SLOP = 10;
 

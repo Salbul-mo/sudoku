@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createSettings, DEFAULTS } from "../../game/static/game/js/state/settings.js";
-import { GIVENS_MIN, GIVENS_MAX, GIVENS_DEFAULT } from "../../game/static/game/js/core/claude-mhj_26_08_07_01_givens.js";
+import { GIVENS_MIN, GIVENS_MAX, GIVENS_DEFAULT } from "../../game/static/game/js/core/givens.js";
+import { DEFAULT_DIFFICULTY } from "../../game/static/game/js/core/difficulty.js";
 
 function memoryStorage(initial) {
     const map = new Map(initial ? Object.entries(initial) : []);
@@ -69,8 +70,29 @@ test("T-B03-04: settings saved before newGameGivens existed still load", () => {
     });
     const values = createSettings(storage).get();
     assert.equal(values.newGameGivens, GIVENS_DEFAULT);
+    assert.equal(values.newGameDifficulty, DEFAULT_DIFFICULTY);
     assert.equal(values.showConflicts, false);
     assert.equal(values.touchControls, "show");
+});
+
+test("a legacy clue-count preference migrates to its named difficulty", () => {
+    for (const [givens, expected] of [[60, "beginner"], [40, "easy"], [32, "medium"], [26, "hard"], [22, "expert"]]) {
+        const storage = memoryStorage({
+            "sudoku:v1:settings": JSON.stringify({ schemaVersion: 1, newGameGivens: givens }),
+        });
+        assert.equal(createSettings(storage).get().newGameDifficulty, expected, `givens=${givens}`);
+    }
+});
+
+test("newGameDifficulty accepts only a shipped difficulty id", () => {
+    const settings = createSettings(memoryStorage());
+    for (const value of ["beginner", "easy", "medium", "hard", "expert"]) {
+        settings.set("newGameDifficulty", value);
+        assert.equal(settings.get().newGameDifficulty, value);
+    }
+    for (const value of ["", "impossible", "MEDIUM", 32, null]) {
+        assert.throws(() => settings.set("newGameDifficulty", value), RangeError);
+    }
 });
 
 test("partially stored settings are filled in with defaults for the rest", () => {

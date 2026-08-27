@@ -7,7 +7,7 @@
 // session needs.
 import { moveSelection } from "./board-nav.js";
 import { resolveAction, resolveDigit } from "./key-resolve.js";
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 
 // Single source of truth for the keymap: UI-B14's help dialog reads this,
 // rather than keeping a second copy of the same text.

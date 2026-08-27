@@ -3,7 +3,7 @@ import {
   GIVENS_MIN,
   GIVENS_MAX,
   GIVENS_DEFAULT,
-} from '../_lib/sudoku/claude-mhj_26_08_05_04_generator.js';
+} from '../_lib/sudoku/generator.js';
 
 // Digits only, no sign, decimal point, whitespace or suffix. The looser
 // conversions all let something wrong through: parseInt('26abc') is 26,

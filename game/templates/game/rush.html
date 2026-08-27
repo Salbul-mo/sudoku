@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- i18n:head:start -->
+    <!-- Everything inside an i18n region is regenerated per language by
+         tools/build_pages.mjs, this comment included.
+         The Korean below is not a placeholder: Django serves this template
+         as-is for local development, so it has to stand on its own. -->
+    <title>스도쿠 러시 - 제한시간 안에 한 칸씩</title>
+    <meta name="description" content="제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠. 시간이 갈수록 짧아지는 제한시간과 콤보로 점수를 겨룹니다.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/rush/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/rush/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/rush/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/rush/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/rush/">
+    <meta property="og:title" content="스도쿠 러시 - 제한시간 안에 한 칸씩">
+    <meta property="og:description" content="제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠.">
+    <meta property="og:locale" content="ko_KR">
+    <meta name="twitter:card" content="summary">
+    <!-- i18n:head:end -->
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="{% static 'game/css/tokens.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/layout.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/board.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/chrome.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/rush.css' %}">
+</head>
+<body>
+    <!-- Outside #app on purpose: the entry point empties that element on boot,
+         so a heading placed inside it would be destroyed. -->
+    <!-- i18n:heading:start -->
+    <h1 class="visually-hidden">스도쿠 러시</h1>
+    <!-- i18n:heading:end -->
+
+    <main id="app" class="app-shell rush-app"></main>
+
+    <!-- i18n:noscript:start -->
+    <noscript>
+        <p>스도쿠 러시는 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를
+        켜면 게임이 나타납니다.</p>
+    </noscript>
+    <!-- i18n:noscript:end -->
+
+    <script type="module" src="{% static 'game/js/rush-main.js' %}"></script>
+</body>
+</html>

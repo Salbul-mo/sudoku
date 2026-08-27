@@ -7,7 +7,7 @@
 // text-entry element pops the software keyboard the moment it is tapped, which
 // is exactly what the touch design exists to avoid.
 const DIM = 9;
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 const VISIBILITY = new Set(["visible", "collapsed"]);
 
 function controlButton(label) {

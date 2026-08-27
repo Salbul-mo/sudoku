@@ -10,7 +10,7 @@
 // dataset->attribute lookup that buys nothing.
 import { CELLS, DIM, PEERS } from "../core/spec.js";
 import { cellLabel } from "./cell-label.js";
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 
 const DEFAULT_SETTINGS = { get: () => ({ showConflicts: true }) };
 
@@ -72,6 +72,8 @@ export function mountBoard(root, store, deps = {}) {
     cells[0].cell.tabIndex = 0;
     let current = 0;
     let peerOf = null;
+    let focusSet = null;
+    let targetOf = null;
     let candidateMode = false;
 
     root.appendChild(grid);
@@ -129,6 +131,7 @@ export function mountBoard(root, store, deps = {}) {
         const conflict = conflicts.has(i) || (forced ? forced.has(i) : false);
 
         cell.dataset.given = given ? "1" : "0";
+        cell.dataset.target = i === targetOf ? "1" : "0";
         // The visual cue obeys the setting; the accessible name below never
         // does -- hiding a flagged cell from a screen reader user because a
         // *visual* preference is off would remove information, not decoration.
@@ -142,7 +145,7 @@ export function mountBoard(root, store, deps = {}) {
         }
 
         cell.setAttribute("aria-label", cellLabel({
-            index: i, given, value, candidates: mask, conflict,
+            index: i, given, value, candidates: mask, conflict, target: i === targetOf,
         }));
     }
 
@@ -199,6 +202,41 @@ export function mountBoard(root, store, deps = {}) {
         }
     }
 
+    // Narrows the board to a given set of cells -- the rush mode paints the
+    // cells a deduction actually rests on. Deliberately not folded into
+    // setPeerOf: that channel means "peers of the selection" to the classic
+    // game, and one attribute carrying two meanings means a change to either
+    // silently breaks the other. Passing null clears the marking entirely.
+    function setFocus(indices) {
+        const next = indices == null ? null : new Set(indices);
+        if (next) {
+            for (const i of next) {
+                if (!Number.isInteger(i) || i < 0 || i >= CELLS) {
+                    throw new RangeError(`index out of range: ${i}`);
+                }
+            }
+        }
+        if (focusSet) for (const i of focusSet) cells[i].cell.dataset.focus = "0";
+        focusSet = next;
+        if (focusSet) for (const i of focusSet) cells[i].cell.dataset.focus = "1";
+    }
+
+    // The one cell a mode is asking the player to fill. Separate from both the
+    // selection (which the player moves) and the conflict set (which means
+    // something is wrong): the rush mode used to borrow the conflict channel
+    // for this, which painted the cell as an error and had a screen reader
+    // announce a rule violation on an empty cell nobody had touched.
+    function setTarget(index) {
+        if (index !== null && (!Number.isInteger(index) || index < 0 || index >= CELLS)) {
+            throw new RangeError(`index out of range: ${index}`);
+        }
+        const previous = targetOf;
+        targetOf = index;
+        const conflicts = store.conflicts();
+        if (previous !== null) updateCell(previous, conflicts);
+        if (targetOf !== null) updateCell(targetOf, conflicts);
+    }
+
     function select(i) {
         if (!Number.isInteger(i) || i < 0 || i >= CELLS) {
             throw new RangeError(`index out of range: ${i}`);
@@ -239,6 +277,8 @@ export function mountBoard(root, store, deps = {}) {
         element: grid,
         select,
         setPeerOf,
+        setFocus,
+        setTarget,
         highlightConflicts,
         setCandidateMode,
         applySettings: renderAll,

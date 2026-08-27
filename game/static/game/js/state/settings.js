@@ -1,7 +1,12 @@
 // Settings has a different failure mode than session persistence: a corrupt
 // session bounces the user to a new game, but a corrupt settings blob should
 // just fall back to defaults and continue quietly.
-import { GIVENS_MIN, GIVENS_MAX, GIVENS_DEFAULT } from "../core/claude-mhj_26_08_07_01_givens.js";
+import { GIVENS_MIN, GIVENS_MAX, GIVENS_DEFAULT } from "../core/givens.js";
+import {
+    DEFAULT_DIFFICULTY,
+    DIFFICULTY_IDS,
+    difficultyForGivens,
+} from "../core/difficulty.js";
 
 const KEY = "sudoku:v1:settings";
 
@@ -13,9 +18,11 @@ export const DEFAULTS = Object.freeze({
     touchControls: "auto",
     hintStripSeenCount: 0,
     newGameGivens: GIVENS_DEFAULT,
+    newGameDifficulty: DEFAULT_DIFFICULTY,
 });
 
 const TOUCH_CONTROLS_VALUES = new Set(["auto", "show", "hide"]);
+const DIFFICULTY_VALUES = new Set(DIFFICULTY_IDS);
 
 // Constraints that a matching `typeof` does not already cover. newGameGivens
 // needs one because every out-of-range count -- 0, 500, even 26.5 -- is still
@@ -24,6 +31,7 @@ const TOUCH_CONTROLS_VALUES = new Set(["auto", "show", "hide"]);
 const VALIDATORS = {
     touchControls: (v) => TOUCH_CONTROLS_VALUES.has(v),
     newGameGivens: (v) => Number.isInteger(v) && v >= GIVENS_MIN && v <= GIVENS_MAX,
+    newGameDifficulty: (v) => DIFFICULTY_VALUES.has(v),
 };
 
 function pickValidFields(parsed) {
@@ -48,7 +56,14 @@ export function createSettings(storage) {
         } catch {
             parsed = {};
         }
-        return { ...DEFAULTS, ...pickValidFields(parsed) };
+        const valid = pickValidFields(parsed);
+        // Settings written before named difficulties existed remember only the
+        // exact clue count. Preserve that choice instead of resetting everyone
+        // to medium on their first visit after the upgrade.
+        if (!("newGameDifficulty" in valid) && "newGameGivens" in valid) {
+            valid.newGameDifficulty = difficultyForGivens(valid.newGameGivens).id;
+        }
+        return { ...DEFAULTS, ...valid };
     }
 
     let current = load();

@@ -1,6 +1,6 @@
 // Length has a single threshold: 2,000 is a soft warning that a shared link
 // is getting long.
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 const SCOPES = ["SC1", "SC2"];
 const WARN_LENGTH = 2000;
 

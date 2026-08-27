@@ -1,0 +1,325 @@
+/* Rush-only chrome. The board, the digit bar and every colour token come from
+   the shared stylesheets; this file adds the header stats, the countdown and
+   the end-of-run panel, and nothing else. */
+
+/* Rush is not the classic game wearing a timer.
+   The classic page spends its wide-screen space on a control panel beside the
+   board -- check answer, share, settings -- which a run has no use for. Worse,
+   the rush hosts have none of that grid's area names, so they were placed
+   automatically: the countdown ended up in the bottom-left corner, about as
+   far from the board as the viewport allows. A clock belongs next to what it
+   is counting.
+   So the page is one centred column at every width -- stats, board, countdown,
+   digits -- which is also exactly what the phone layout already was. The
+   column tracks the board's own width so the stat cards line up with the grid
+   edges instead of floating at some unrelated width. */
+.app-shell.rush-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-block-start: 8px;
+}
+
+.app-shell.rush-app > * {
+    inline-size: min(100%, var(--board-width));
+}
+
+/* The column already provides the inset; keeping the hosts' own horizontal
+   padding would push their contents inside the board's edges by 8px and break
+   the alignment the column exists for. */
+.app-shell.rush-app .rush-shell-host,
+.app-shell.rush-app .rush-view-host {
+    padding-inline: 0;
+}
+
+.rush-shell-host {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}
+
+.rush-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* The three numbers share one grid so they line up as a row of equal cards
+   rather than three runs of text at whatever width their digits happen to
+   need -- a score that grows from 0 to 1200 must not shove the combo and the
+   lives sideways as it counts. flex-basis keeps the links beside the stats on
+   a desktop and lets them drop to their own line on a phone. */
+.rush-stats {
+    flex: 1 1 260px;
+    display: grid;
+    /* max-content, not 0, as the minimum: an even third of the row is narrower
+       than the lives card needs ("3 / 3" plus its pips), and a 1fr column with
+       a zero minimum simply clips the overflow. The tracks stay equal whenever
+       there is room and only the widest one grows past its third. */
+    grid-template-columns: repeat(3, minmax(max-content, 1fr));
+    gap: 8px;
+}
+
+/* A card each: the border is what separates one number from the next, so the
+   labels can stay quiet instead of doing that work with size and weight. */
+.rush-stat {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-block-size: 56px;
+    padding: 6px 10px;
+    background: var(--bg-cell);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.rush-stat-label {
+    font-size: 0.6875rem;
+    /* Latin labels read as a caption at this size; the Korean ones are
+       unaffected by either property. */
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    color: var(--fg-candidate);
+}
+
+.rush-stat-value {
+    /* Three cards to a row means a card is roughly a third of the viewport, and
+       the lives card has to fit "3/3" and its pips inside that. clamp lets the
+       number shrink on a narrow phone rather than pushing the row wider, while
+       a desktop still gets the full 22px. */
+    font-size: clamp(1rem, 3.6vw, 1.375rem);
+    font-variant-numeric: tabular-nums; /* the score must not jitter as it counts */
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+    color: var(--fg-given);
+}
+
+/* The number and anything that annotates it -- the lives pips -- sit on one
+   line, so a card is always a label with a single row of content under it. */
+.rush-stat-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* One dot per life. The count beside them is what states the number; these
+   only make it readable at a glance, so they are aria-hidden and never the
+   sole cue. A spent life is hollowed rather than removed, so the total stays
+   visible -- "1 of 3 left" and "1 life" must not look the same. */
+.rush-lives-pips {
+    display: inline-flex;
+    flex: 0 0 auto; /* the dots are never what gets squeezed out of the card */
+    gap: 3px;
+    font-size: 0.625rem;
+    line-height: 1;
+}
+
+.rush-life {
+    color: var(--fg-given);
+}
+
+.rush-life[data-spent="1"] {
+    color: var(--fg-candidate);
+    opacity: 0.45;
+}
+
+/* The last life is worth flagging, but never by colour alone -- the value is
+   already the literal count and the pips already show one dot left, so the
+   tint only reinforces what both already say. Scoped to the lives card:
+   recolouring the header would flag the score as if it were in trouble too. */
+.rush-header[data-lives="1"] .rush-stat-lives,
+.rush-header[data-lives="0"] .rush-stat-lives {
+    background: var(--bg-cell-conflict);
+    border-color: var(--fg-conflict);
+}
+
+.rush-header[data-lives="1"] .rush-stat-lives .rush-stat-value,
+.rush-header[data-lives="0"] .rush-stat-lives .rush-stat-value,
+.rush-header[data-lives="1"] .rush-life:not([data-spent="1"]) {
+    color: var(--fg-conflict);
+}
+
+/* Either both links sit beside the stats or both drop below them; never one
+   each. margin-inline-start pins them to the end of the row whenever the
+   stats do not already fill it. */
+.rush-header-links {
+    display: flex;
+    gap: 8px;
+    margin-inline-start: auto;
+}
+
+/* The swap sits with the links because they share a row and a shape, even
+   though it acts rather than navigates. Disabled between runs: pressing it
+   with no run on would have nothing to swap. */
+.rush-swap:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Matches the classic header's controls so the two pages read as one site. */
+.rush-header .lang-switch,
+.rush-header .game-switch,
+.rush-header .rush-swap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--control-floor);
+    padding: 0 12px;
+    /* A button does not inherit the page font the way an anchor does, and the
+       three controls sit side by side. */
+    font: inherit;
+    cursor: pointer;
+    color: var(--fg-body);
+    text-decoration: none;
+    background: var(--bg-cell);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+
+.rush-header .lang-switch:focus-visible,
+.rush-header .game-switch:focus-visible,
+.rush-header .rush-swap:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.rush-view-host {
+    padding: 0 8px;
+}
+
+.rush-timer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    block-size: var(--control-floor);
+}
+
+.rush-timer-fill {
+    block-size: 10px;
+    flex: 0 0 auto;
+    inline-size: 100%;
+    max-inline-size: calc(100% - 4.5rem); /* leaves room for the readout */
+    background: var(--bg-cell-selected);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: inline-size 100ms linear;
+}
+
+/* visibility, not display: the bar keeps its place in the row, so the readout
+   beside it does not jump left the moment the clock reaches zero. */
+.rush-timer-fill[data-empty="1"] {
+    visibility: hidden;
+}
+
+.rush-timer-fill[data-low="1"] {
+    background: var(--bg-cell-conflict);
+    border-color: var(--fg-conflict);
+}
+
+/* The bar is decoration; this is the part that actually states the time, so it
+   is never hidden and never shortened. */
+.rush-timer-readout {
+    min-inline-size: 4rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-body);
+}
+
+.rush-hint {
+    margin: 0 0 8px;
+    font-size: 0.875rem;
+    color: var(--fg-candidate);
+}
+
+.rush-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.rush-panel button {
+    min-inline-size: var(--control-floor);
+    min-block-size: var(--control-floor);
+    padding: 0 16px;
+    font: inherit;
+    color: var(--fg-body);
+    background: var(--bg-cell);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.rush-panel button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+.rush-summary,
+.rush-record {
+    margin: 0;
+}
+
+.rush-summary {
+    font-weight: 600;
+}
+
+.rush-record {
+    color: var(--fg-candidate);
+}
+
+/* While a run is on there is no panel to show, and an empty flex column would
+   still claim its gap. */
+.rush-view[data-state="playing"] .rush-panel {
+    display: none;
+}
+
+/* The how-to belongs to the moment before a run and the moment after it. Left
+   on screen during play it reads as two lines nobody has time for, and on a
+   short phone those two lines are what push the digit bar past the fold --
+   the one thing a player must be able to reach while the clock runs. */
+.rush-view[data-state="playing"] .rush-hint {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rush-timer-fill {
+        transition-duration: 0ms;
+    }
+}
+
+/* The cell being asked for. An inner ring rather than the conflict tint: the
+   cell is not wrong, it is the question. It sits inside the selection outline
+   the cell already carries, so the two read as one mark instead of competing. */
+.cell[data-target="1"] {
+    box-shadow: inset 0 0 0 3px var(--focus);
+}
+
+/* Focus view.
+
+   A rush step asks for one cell, and the engine reports which units its
+   deduction actually rests on; board-view marks those cells with
+   data-focus="1". Everything else is noise under a countdown, so it is dimmed
+   to the page colour and its digits are hidden.
+
+   Keyed off data-focus rather than data-peer: peers of the selection are the
+   classic game's highlight, and they are the wrong set here -- a hidden single
+   is justified by lines that cross the target's box, not by the target's own
+   row and column.
+
+   visibility, not display or `content: ""`: the cells keep their size (the
+   grid must not reflow between steps) and keep their aria-label, so a screen
+   reader still reads the board as it stands. */
+.board[data-rush-focus="1"] .cell:not([data-focus="1"]):not([tabindex="0"]) {
+    background: var(--bg-page);
+}
+
+.board[data-rush-focus="1"] .cell:not([data-focus="1"]):not([tabindex="0"]) .cell-value,
+.board[data-rush-focus="1"] .cell:not([data-focus="1"]):not([tabindex="0"]) .cell-candidates {
+    visibility: hidden;
+}

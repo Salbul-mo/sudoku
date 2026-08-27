@@ -1,7 +1,7 @@
 // Accessible name assembly, DOM-free so it can be exhaustively unit tested
 // and never drift from what the board actually renders (rendering calls this
 // same function -- see ui/board-view.js updateCell).
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 
 function digitsOf(mask) {
     const out = [];
@@ -10,7 +10,7 @@ function digitsOf(mask) {
 }
 
 export function cellLabel(state) {
-    const { index, given, value, candidates, conflict } = state;
+    const { index, given, value, candidates, conflict, target } = state;
     if (!Number.isInteger(index) || index < 0 || index > 80) {
         throw new RangeError(`index out of range: ${index}`);
     }
@@ -31,5 +31,10 @@ export function cellLabel(state) {
     else parts.push(t("cell.empty"));
     if (candidates) parts.push(t("cell.candidates", { digits: digitsOf(candidates).join(", ") }));
     if (conflict) parts.push(t("cell.conflict"));
+    // The rush mode marks the cell it is asking for. That is a request, not a
+    // fault: saying "breaks a rule" here -- which is what marking it through
+    // the conflict channel used to do -- tells a screen reader the opposite of
+    // what is true.
+    if (target) parts.push(t("cell.target"));
     return parts.join(", ");
 }

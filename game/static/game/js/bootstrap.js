@@ -4,7 +4,7 @@
 // session conflicts) get evaluated, and the only place a failed new-puzzle
 // fetch has to end somewhere other than a blank page (M1).
 import { createStore } from "./core/store.js";
-import { t } from "./i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "./i18n/messages.js";
 
 const NEW_PUZZLE_TIMEOUT_MS = 10_000;
 const RETRY_DELAY_MS = 1000;

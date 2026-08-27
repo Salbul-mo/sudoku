@@ -2,7 +2,7 @@
 // UI-B11's DialogHost, which owns modal presentation -- this module never
 // creates a dialog itself.
 import { getKeymap } from "./keyboard-adapter.js";
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 
 const BOOLEAN_FIELDS = [
     ["autoRemoveCandidates", t("settings.autoRemoveCandidates")],

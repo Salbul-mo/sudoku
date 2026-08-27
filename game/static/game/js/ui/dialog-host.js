@@ -1,7 +1,7 @@
 // The only real modal in the app. Nested dialogs are not supported --
 // restoring inert state in the wrong order would leave the background
 // half-interactive.
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
+import { t } from "../i18n/messages.js";
 export function createDialogHost(root, backgroundEls) {
     let current = null;
 

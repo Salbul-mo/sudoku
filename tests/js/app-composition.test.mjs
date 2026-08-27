@@ -6,7 +6,7 @@ import { installFakeDocument, fakeRoot } from "./helpers/fake-dom.mjs";
 const uninstall = installFakeDocument();
 const { start } = await import("../../game/static/game/js/app.js");
 const { stripFragmentPrefix } = await import("../../game/static/game/js/bootstrap.js");
-const { GIVENS_DEFAULT } = await import("../../game/static/game/js/core/claude-mhj_26_08_07_01_givens.js");
+const { GIVENS_DEFAULT } = await import("../../game/static/game/js/core/givens.js");
 after(uninstall);
 
 const SESSION_KEY = "sudoku:v1:session";
@@ -40,6 +40,7 @@ function env(overrides = {}) {
         setTimeout: (fn) => { fn(); return 1; },
         clearTimeout: () => {},
         now: () => 0,
+        random: () => 0,
         ...overrides,
     };
 }
@@ -172,7 +173,7 @@ test("a failed puzzle fetch still ends somewhere the user can act on (never blan
     assert.ok(root.querySelectorAll("button").length > 0, "a retry control must be reachable");
 });
 
-test("T-B04-06: the puzzle request carries the saved clue count", async () => {
+test("T-B04-06: a legacy saved clue count migrates to a difficulty range", async () => {
     const requested = [];
     const storage = fakeStorage();
     storage.setItem("sudoku:v1:settings", JSON.stringify({ schemaVersion: 1, newGameGivens: 26 }));
@@ -185,12 +186,50 @@ test("T-B04-06: the puzzle request carries the saved clue count", async () => {
     assert.match(requested[0], /\/api\/new-puzzle\/\?givens=26$/);
 });
 
-test("T-B04-06b: with no saved preference the request still names the default count", async () => {
+test("T-B04-06b: with no saved preference medium starts at its lower bound", async () => {
     const requested = [];
     await start(fakeRoot(), env({
         fetch: async (url) => { requested.push(url); return puzzleResponse(); },
     }));
     assert.match(requested[0], new RegExp(`\\?givens=${GIVENS_DEFAULT}$`));
+});
+
+test("a difficulty selection rolls once inside its range and reaches the API", async () => {
+    const root = fakeRoot();
+    const requested = [];
+    await start(root, env({
+        random: () => 1 - Number.EPSILON,
+        fetch: async (url) => { requested.push(url); return puzzleResponse(); },
+    }));
+
+    const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
+    const buttonLabelled = (label) =>
+        root.querySelectorAll("button").find((button) => button.textContent === label);
+
+    buttonLabelled("새 게임").dispatch("click");
+    await flush();
+    buttonLabelled("어려움").dispatch("click");
+    await flush();
+
+    assert.match(requested[0], /\?givens=37$/); // initial Medium upper bound
+    assert.match(requested[1], /\?givens=31$/); // selected Hard upper bound
+});
+
+test("a retry reuses the same random clue count", async () => {
+    const requested = [];
+    let randomCalls = 0;
+    const result = await start(fakeRoot(), env({
+        random: () => { randomCalls++; return 0.5; },
+        fetch: async (url) => {
+            requested.push(url);
+            return { ok: false, status: 500, json: async () => ({}) };
+        },
+    }));
+
+    assert.equal(result.ok, false);
+    assert.equal(randomCalls, 1);
+    assert.equal(requested.length, 2);
+    assert.equal(requested[0], requested[1]);
 });
 
 test("T-B04-07: a board that lands on a different clue count says so", async () => {
@@ -210,8 +249,8 @@ test("T-B04-07: a board that lands on a different clue count says so", async () 
     buttonLabelled("새 게임").dispatch("click");
     await flush();
 
-    const preset = buttonLabelled(`${GIVENS_DEFAULT}개`);
-    assert.ok(preset, "the new-game dialog should offer the default clue count");
+    const preset = buttonLabelled("보통");
+    assert.ok(preset, "the new-game dialog should offer the default difficulty");
     preset.dispatch("click");
     await flush();
 

@@ -2,12 +2,12 @@
 // hint strip. Filled a gap Phase 1's component list originally missed (H1) --
 // "정답 체크", the destructive actions, and the Share/Settings/Help
 // entry points had behavior specified but no owning module until this block.
-import { GIVENS_PRESETS } from "../core/claude-mhj_26_08_07_01_givens.js";
-import { t } from "../i18n/claude-mhj_26_08_07_05_messages.js";
-import { createLangSwitch, createGameSwitch } from "./claude-mhj_26_08_07_22_page-links.js";
+import { DIFFICULTIES, difficultyForId } from "../core/difficulty.js";
+import { t } from "../i18n/messages.js";
+import { createLangSwitch, createGameSwitch } from "./page-links.js";
 
 // "새 게임" is destructive too, but it no longer goes through onDestructive:
-// it asks which clue count to use rather than for a yes/no, and the choice
+// it asks which difficulty to use rather than for a yes/no, and the choice
 // doubles as the confirmation.
 const DESTRUCTIVE_KINDS = ["clearAll"];
 
@@ -100,14 +100,14 @@ export function mountShell(root, store, settings, deps) {
         deps.boardView?.highlightConflicts?.(bad);
     }
 
-    // Picking a clue count both starts the game and confirms discarding the
+    // Picking a difficulty both starts the game and confirms discarding the
     // current one, so there is no separate yes/no step. Anything that is not
     // one of the presets counts as backing out: DialogHost answers "cancel"
     // for both the cancel button and Escape, and treating every unrecognised
     // answer the same way means a future dismissal path cannot accidentally
     // wipe a board in progress.
     async function onNewGame() {
-        const currentGivens = settings.get().newGameGivens;
+        const currentDifficulty = settings.get().newGameDifficulty;
         const body = document.createElement("p");
         body.textContent = t("newGame.body");
         const choice = await deps.dialogs.open({
@@ -115,21 +115,20 @@ export function mountShell(root, store, settings, deps) {
             title: t("action.newGame"),
             body,
             actions: [
-                ...GIVENS_PRESETS.map((n) => ({
-                    id: String(n),
-                    label: t("newGame.preset", { count: n }),
-                    initialFocus: n === currentGivens,
+                ...DIFFICULTIES.map(({ id }) => ({
+                    id,
+                    label: t(`difficulty.${id}`),
+                    initialFocus: id === currentDifficulty,
                 })),
                 { id: "cancel", label: t("dialog.cancel") },
             ],
         });
 
-        const givens = Number(choice);
-        if (!GIVENS_PRESETS.includes(givens)) return; // cancelled, dismissed, or unknown
+        if (difficultyForId(choice) === null) return; // cancelled, dismissed, or unknown
 
-        // Written before starting: the setting is what app.js reads when it
-        // builds the request, so this *is* how the choice reaches the API.
-        settings.set("newGameGivens", givens);
+        // app.js reads this setting, chooses one clue count from its range,
+        // and stores that exact request in newGameGivens before fetching.
+        settings.set("newGameDifficulty", choice);
         deps.startNewGame();
     }
 

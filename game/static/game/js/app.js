@@ -9,6 +9,10 @@
 // is here instead.
 import { bootstrap, createNewSession } from "./bootstrap.js";
 import { createStore } from "./core/store.js";
+import {
+    cryptoRng,
+    randomGivensForDifficulty,
+} from "./core/difficulty.js";
 import { createPersistence } from "./state/persistence.js";
 import { createSettings } from "./state/settings.js";
 import { createAnnouncer } from "./ui/announcer.js";
@@ -21,7 +25,7 @@ import { createTouchAdapter, resolveVisibility } from "./ui/touch-adapter.js";
 import { renderHelp, renderSettings } from "./ui/settings-view.js";
 import { createShareView } from "./ui/share-view.js";
 import { decode, encode } from "./url/codec.js";
-import { t, applyCssStrings } from "./i18n/claude-mhj_26_08_07_05_messages.js";
+import { t, applyCssStrings } from "./i18n/messages.js";
 
 const NEW_PUZZLE_URL = "/api/new-puzzle/";
 const COARSE_POINTER = "(pointer: coarse)";
@@ -82,6 +86,7 @@ export async function start(root, env = {}) {
         setTimeout: schedule = globalThis.setTimeout.bind(globalThis),
         clearTimeout: cancel = globalThis.clearTimeout.bind(globalThis),
         now = Date.now,
+        random = cryptoRng,
         newPuzzleUrl = NEW_PUZZLE_URL,
     } = env;
 
@@ -98,6 +103,16 @@ export async function start(root, env = {}) {
     const announce = (kind, message) => announcer?.announce(kind, message);
 
     const settings = createSettings(storage);
+    function prepareNewPuzzleRequest() {
+        const requested = randomGivensForDifficulty(
+            settings.get().newGameDifficulty,
+            random,
+        );
+        // Keep the established numeric setting as the exact request contract.
+        // Retry calls then reuse the same value instead of silently rerolling.
+        settings.set("newGameGivens", requested);
+        return requested;
+    }
     const persistence = createPersistence({
         storage,
         now,
@@ -339,7 +354,7 @@ export async function start(root, env = {}) {
     }
 
     async function restart() {
-        const requested = settings.get().newGameGivens;
+        const requested = prepareNewPuzzleRequest();
         const session = await createNewSession(bootDeps);
         if (!session) return; // createNewSession already rendered a retry panel
         activeTeardown?.();
@@ -360,6 +375,9 @@ export async function start(root, env = {}) {
 
     let result;
     try {
+        // If bootstrap restores a local/shared session this value is unused;
+        // otherwise it is the one random roll for the initial puzzle request.
+        prepareNewPuzzleRequest();
         result = await bootstrap(bootDeps);
     } catch (cause) {
         return renderFatal(root, cause);

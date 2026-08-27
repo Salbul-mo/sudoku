@@ -150,3 +150,47 @@ test("board-view.js source never uses innerHTML/insertAdjacentHTML/outerHTML", a
     const url = new URL("../../game/static/game/js/ui/board-view.js", import.meta.url);
     assert.doesNotMatch(await readFile(url, "utf8"), /innerHTML|insertAdjacentHTML|outerHTML/);
 });
+
+test("setTarget marks the cell a mode is asking for, without calling it an error", () => {
+    const root = fakeRoot();
+    const store = freshStore();
+    const view = mountBoard(root, store, { settings: fakeSettings() });
+    const cellAt = (index) => root.querySelectorAll('[role="gridcell"]')[index];
+
+    view.setTarget(12);
+    assert.equal(cellAt(12).dataset.target, "1");
+    assert.equal(cellAt(12).dataset.conflict, "0", "a request is not a rule violation");
+    const label = cellAt(12).getAttribute("aria-label");
+    assert.match(label, /채워야 하는 칸|the cell to fill/);
+    assert.doesNotMatch(label, /규칙 위반|breaks a rule/);
+
+    // Moving it clears the old cell rather than accumulating marks.
+    view.setTarget(13);
+    assert.equal(cellAt(12).dataset.target, "0");
+    assert.doesNotMatch(cellAt(12).getAttribute("aria-label"), /채워야 하는 칸|the cell to fill/);
+    assert.equal(cellAt(13).dataset.target, "1");
+
+    view.setTarget(null);
+    assert.equal(cellAt(13).dataset.target, "0");
+    assert.throws(() => view.setTarget(81), RangeError);
+    view.destroy();
+});
+
+test("setFocus paints exactly the given cells and clears what it painted before", () => {
+    const root = fakeRoot();
+    const store = freshStore();
+    const view = mountBoard(root, store, { settings: fakeSettings() });
+    const cells = root.querySelectorAll('[role="gridcell"]');
+    const marked = () => cells.filter((c) => c.dataset.focus === "1").map((c) => Number(c.dataset.index));
+
+    view.setFocus(new Set([0, 1, 2]));
+    assert.deepEqual(marked().sort((a, b) => a - b), [0, 1, 2]);
+
+    view.setFocus(new Set([5]));
+    assert.deepEqual(marked(), [5], "the previous set is cleared, not added to");
+
+    view.setFocus(null);
+    assert.deepEqual(marked(), [], "null shows the whole board again");
+    assert.throws(() => view.setFocus(new Set([81])), RangeError);
+    view.destroy();
+});

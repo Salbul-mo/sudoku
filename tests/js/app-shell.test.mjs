@@ -5,14 +5,21 @@ import { installFakeDocument, fakeRoot } from "./helpers/fake-dom.mjs";
 const uninstall = installFakeDocument();
 const { mountShell } = await import("../../game/static/game/js/ui/app-shell.js");
 const { createStore } = await import("../../game/static/game/js/core/store.js");
-const { GIVENS_PRESETS, GIVENS_DEFAULT } =
-    await import("../../game/static/game/js/core/claude-mhj_26_08_07_01_givens.js");
+const { GIVENS_DEFAULT } =
+    await import("../../game/static/game/js/core/givens.js");
+const { DIFFICULTIES, DEFAULT_DIFFICULTY } =
+    await import("../../game/static/game/js/core/difficulty.js");
 after(uninstall);
 
 // Records what the shell writes, so a test can tell "chose 26" apart from
 // "did nothing".
 function fakeSettings(initial = {}) {
-    const values = { newGameGivens: GIVENS_DEFAULT, hintStripSeenCount: 0, ...initial };
+    const values = {
+        newGameGivens: GIVENS_DEFAULT,
+        newGameDifficulty: DEFAULT_DIFFICULTY,
+        hintStripSeenCount: 0,
+        ...initial,
+    };
     const writes = [];
     return {
         writes,
@@ -140,15 +147,15 @@ test("onCheck without a known solution falls back to a rule-violation check", ()
     assert.deepEqual([...highlighted].sort(), [0, 1]);
 });
 
-test("T-B04-01: choosing a clue count records it and starts the game", async () => {
+test("T-B04-01: choosing a difficulty records it and starts the game", async () => {
     const settings = fakeSettings();
     let started = 0;
     const shell = mountShell(fakeRoot(), createStore(freshSession()), settings, noopDeps({
-        dialogs: { open: async () => "26", confirm: async () => true },
+        dialogs: { open: async () => "hard", confirm: async () => true },
         startNewGame: () => { started++; },
     }));
     await shell.onNewGame();
-    assert.deepEqual(settings.writes, [["newGameGivens", 26]]);
+    assert.deepEqual(settings.writes, [["newGameDifficulty", "hard"]]);
     assert.equal(started, 1);
 });
 
@@ -169,8 +176,8 @@ test("T-B04-02/03: cancelling, dismissing, or any unrecognised answer starts not
     }
 });
 
-test("T-B04-04: the dialog offers every preset plus cancel, and preselects the saved count", async () => {
-    const settings = fakeSettings({ newGameGivens: 40 });
+test("T-B04-04: the dialog offers every difficulty plus cancel, and preselects the saved level", async () => {
+    const settings = fakeSettings({ newGameDifficulty: "easy" });
     let spec = null;
     const shell = mountShell(fakeRoot(), createStore(freshSession()), settings, noopDeps({
         dialogs: { open: async (s) => { spec = s; return "cancel"; }, confirm: async () => true },
@@ -178,10 +185,14 @@ test("T-B04-04: the dialog offers every preset plus cancel, and preselects the s
     await shell.onNewGame();
 
     const ids = spec.actions.map((a) => a.id);
-    assert.deepEqual(ids, [...GIVENS_PRESETS.map(String), "cancel"]);
+    assert.deepEqual(ids, [...DIFFICULTIES.map(({ id }) => id), "cancel"]);
+    assert.deepEqual(
+        spec.actions.slice(0, -1).map((action) => action.label),
+        ["입문", "쉬움", "보통", "어려움", "전문가"],
+    );
     const focused = spec.actions.filter((a) => a.initialFocus);
     assert.equal(focused.length, 1);
-    assert.equal(focused[0].id, "40");
+    assert.equal(focused[0].id, "easy");
 });
 
 test("T-B04-05: the clearAll confirmation still behaves as before", async () => {
