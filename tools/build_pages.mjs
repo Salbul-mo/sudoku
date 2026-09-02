@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { MESSAGES } from '../game/static/game/js/i18n/messages.js';
+import { PAGE_CONTENT, CONTACT_EMAIL } from './page-content.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const templateRoot = path.join(root, 'game', 'templates', 'game');
@@ -36,6 +37,24 @@ const PAGE_KINDS = [
     ogDescription: 'meta.learnOgDescription', heading: 'meta.learnHeading',
     noscript: 'meta.learnNoscript',
   } },
+  { page: 'printable', template: 'printable.html', segment: 'printable-sudoku', keys: {
+    title: 'meta.printableTitle', description: 'meta.printableDescription',
+    ogDescription: 'meta.printableOgDescription', heading: 'meta.printableHeading',
+    noscript: 'meta.printableNoscript',
+  } },
+  // The two text pages. `content` marks them as prose rather than an app: they
+  // share one template, carry no script, and their body is written from
+  // tools/page-content.mjs instead of being mounted at runtime.
+  { page: 'privacy', template: 'content.html', segment: 'privacy', content: true, keys: {
+    title: 'meta.privacyTitle', description: 'meta.privacyDescription',
+    ogDescription: 'meta.privacyOgDescription', heading: 'meta.privacyHeading',
+    noscript: 'meta.privacyNoscript',
+  } },
+  { page: 'business', template: 'content.html', segment: 'business', content: true, keys: {
+    title: 'meta.businessTitle', description: 'meta.businessDescription',
+    ogDescription: 'meta.businessOgDescription', heading: 'meta.businessHeading',
+    noscript: 'meta.businessNoscript',
+  } },
 ];
 
 // Footer order, which is reading order rather than the order pages were built:
@@ -45,12 +64,15 @@ const FOOTER_ROWS = [
   { page: 'classic', label: 'nav.playClassic' },
   { page: 'rush', label: 'nav.playRush' },
   { page: 'learn', label: 'nav.playLearn' },
+  { page: 'printable', label: 'nav.printable' },
+  { page: 'privacy', label: 'nav.privacy' },
+  { page: 'business', label: 'nav.business' },
 ];
 
 const PAGES = PAGE_KINDS.flatMap((kind) => LOCALES.map(({ locale, prefix, ogLocale }) => {
   const parts = [prefix, kind.segment].filter(Boolean);
   return {
-    locale, ogLocale, page: kind.page, keys: kind.keys,
+    locale, ogLocale, page: kind.page, keys: kind.keys, content: kind.content === true,
     template: path.join(templateRoot, kind.template),
     urlPath: `/${parts.map((p) => `${p}/`).join('')}`,
     out: [...parts, 'index.html'],
@@ -101,6 +123,9 @@ const replacements = new Map([
   ["{% static 'favicon.ico' %}", '/favicon.ico'],
   ["{% static 'icon.svg' %}", '/icon.svg'],
   ["{% static 'apple-touch-icon.png' %}", '/apple-touch-icon.png'],
+  ["{% static 'game/css/content.css' %}", '/game/css/content.css'],
+  ["{% static 'game/css/printable.css' %}", '/game/css/printable.css'],
+  ["{% static 'game/js/printable-main.js' %}", '/game/js/printable-main.js'],
   ["{% static 'game/css/learn.css' %}", '/game/css/learn.css'],
   ["{% static 'game/js/learn-main.js' %}", '/game/js/learn-main.js'],
   ["{% static 'game/css/rush.css' %}", '/game/css/rush.css'],
@@ -230,6 +255,35 @@ function footerFor(page) {
 }
 
 /**
+ * The body of a text page, from tools/page-content.mjs.
+ *
+ * Every string is escaped on the way in: the source is a list of blocks rather
+ * than raw HTML precisely so that a stray angle bracket in a policy sentence
+ * cannot become markup.
+ */
+function contentFor(page) {
+  const m = (key) => MESSAGES[page.locale][key];
+  const blocks = PAGE_CONTENT[page.page]?.[page.locale];
+  if (!blocks) throw new Error(`no content for ${page.page} (${page.locale})`);
+
+  const out = ['<main class="content-page">', `        <h1>${escapeText(m(page.keys.heading))}</h1>`];
+  for (const block of blocks) {
+    if (block.h) out.push(`        <h2>${escapeText(block.h)}</h2>`);
+    else if (block.p) out.push(`        <p>${escapeText(block.p)}</p>`);
+    else if (block.ul) {
+      out.push('        <ul>');
+      for (const item of block.ul) out.push(`            <li>${escapeText(item)}</li>`);
+      out.push('        </ul>');
+    } else throw new Error(`unknown content block in ${page.page}: ${JSON.stringify(block)}`);
+  }
+  // A real mailto, last, on both pages. The address lives in one constant so
+  // the policy and the enquiry page can never disagree about where to write.
+  out.push(`        <p class="content-contact"><a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>`);
+  out.push('    </main>');
+  return out.join(String.fromCharCode(10));
+}
+
+/**
  * Structured data for one page.
  *
  * Deliberately absent: `offers`, `aggregateRating`, `review`. The game is in
@@ -255,6 +309,19 @@ function jsonLdFor(page) {
       url: `${ORIGIN}${localeRoot(page.locale)}`,
       inLanguage: page.locale,
     });
+  }
+  // A policy page and an enquiry page are not games, and describing them as
+  // one would be the same kind of untruth as claiming a rating.
+  if (page.content) {
+    blocks.push({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: m(page.keys.heading),
+      url,
+      description: m(page.keys.ogDescription),
+      inLanguage: page.locale,
+    });
+    return blocks;
   }
   blocks.push({
     '@context': 'https://schema.org',
@@ -308,8 +375,15 @@ function build(page) {
   }
   html = replaceExactlyOnce(html, '<html lang="ko">', `<html lang="${page.locale}">`);
   html = replaceRegion(html, 'head', headFor(page).trimStart());
-  html = replaceRegion(html, 'heading', `<h1 class="visually-hidden">${escapeText(m(page.keys.heading))}</h1>`);
-  html = replaceRegion(html, 'noscript', `<noscript>\n        <p>${escapeText(m(page.keys.noscript))}</p>\n    </noscript>`);
+  if (page.content) {
+    // A text page has its heading inside the prose, where it belongs, and
+    // no noscript fallback because there is nothing for script to fall
+    // back from.
+    html = replaceRegion(html, 'content', contentFor(page));
+  } else {
+    html = replaceRegion(html, 'heading', `<h1 class="visually-hidden">${escapeText(m(page.keys.heading))}</h1>`);
+    html = replaceRegion(html, 'noscript', `<noscript>\n        <p>${escapeText(m(page.keys.noscript))}</p>\n    </noscript>`);
+  }
   html = replaceRegion(html, 'footer', footerFor(page));
   if (/{%|%}|{{|}}/.test(html)) throw new Error('leftover Django template markers');
   if (/<!-- i18n:/.test(html)) throw new Error('leftover i18n region marker');

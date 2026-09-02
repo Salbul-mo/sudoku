@@ -1,0 +1,65 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Printable Sudoku | Pick a difficulty and print</title>
+    <meta name="description" content="Choose a difficulty and how many pages, and fresh puzzles are laid out for printing. An answer page comes with them, and your browser's print dialog will save them as a PDF. Free, no sign-up.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/en/printable-sudoku/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/printable-sudoku/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/en/printable-sudoku/">
+    <meta property="og:title" content="Printable Sudoku | Pick a difficulty and print">
+    <meta property="og:description" content="Free printable Sudoku: pick a difficulty and a page count, print, answers included.">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-printable-en.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Printable Sudoku">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-printable-en.png">
+    <link rel="manifest" href="/en/site.webmanifest">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"Printable Sudoku","url":"https://sudoku-bw7.pages.dev/en/printable-sudoku/","description":"Free printable Sudoku: pick a difficulty and a page count, print, answers included.","inLanguage":"en","image":"https://sudoku-bw7.pages.dev/og-printable-en.png","genre":"Puzzle","gamePlatform":"Web browser","applicationCategory":"GameApplication","operatingSystem":"Any","playMode":"SinglePlayer","isAccessibleForFree":true}</script>
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <!-- layout.css for the body rules -- background, colour and the page
+         column. Without it these pages have a transparent body, which reads
+         as white in dark mode while the footer's tokens stay light. -->
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/printable.css">
+</head>
+<body>
+    <h1 class="visually-hidden">Printable Sudoku</h1>
+
+    <main id="app" class="printable-app"></main>
+
+    <noscript>
+        <p>Building printable puzzles needs JavaScript. Please turn it on in your browser.</p>
+    </noscript>
+
+    <footer class="site-footer">
+        <nav aria-label="Other pages">
+            <a href="/en/">Classic</a>
+            <a href="/en/rush/">Rush</a>
+            <a href="/en/learn/">Practice</a>
+            <span aria-current="page">Printable</span>
+            <a href="/en/privacy/">Privacy</a>
+            <a href="/en/business/">For organisations</a>
+        </nav>
+    </footer>
+
+    <script type="module" src="/game/js/printable-main.js"></script>
+</body>
+</html>

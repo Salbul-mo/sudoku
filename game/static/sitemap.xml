@@ -49,4 +49,46 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/learn/"/>
     <changefreq>monthly</changefreq>
   </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/printable-sudoku/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/printable-sudoku/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/printable-sudoku/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/printable-sudoku/"/>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/en/printable-sudoku/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/printable-sudoku/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/printable-sudoku/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/printable-sudoku/"/>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/privacy/"/>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/en/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/privacy/"/>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/business/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/business/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/business/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/business/"/>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/en/business/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/business/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/business/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/business/"/>
+    <changefreq>monthly</changefreq>
+  </url>
 </urlset>

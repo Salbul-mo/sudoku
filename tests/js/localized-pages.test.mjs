@@ -10,8 +10,9 @@ const ROOT = path.resolve(
 const BUILD = path.join(ROOT, "tools", "build_pages.mjs");
 const ORIGIN = "https://sudoku-bw7.pages.dev";
 
-// `group` is what hreflang may link across. The two games are separate content,
-// not translations, so a link between groups is a bug rather than a nicety.
+// `group` is what hreflang may link across. Two different pages are separate
+// content, not translations of each other, so a link between groups is a bug
+// rather than a nicety.
 const PAGES = [
     { group: "classic", locale: "ko", url: `${ORIGIN}/`, file: ["game", "static", "index.html"], heading: "스도쿠" },
     { group: "classic", locale: "en", url: `${ORIGIN}/en/`, file: ["game", "static", "en", "index.html"], heading: "Sudoku" },
@@ -19,6 +20,15 @@ const PAGES = [
     { group: "rush", locale: "en", url: `${ORIGIN}/en/rush/`, file: ["game", "static", "en", "rush", "index.html"], heading: "Sudoku Rush" },
     { group: "learn", locale: "ko", url: `${ORIGIN}/learn/`, file: ["game", "static", "learn", "index.html"], heading: "스도쿠 풀이 연습" },
     { group: "learn", locale: "en", url: `${ORIGIN}/en/learn/`, file: ["game", "static", "en", "learn", "index.html"], heading: "Sudoku Practice" },
+    { group: "printable", locale: "ko", url: `${ORIGIN}/printable-sudoku/`, file: ["game", "static", "printable-sudoku", "index.html"], heading: "인쇄용 스도쿠" },
+    { group: "printable", locale: "en", url: `${ORIGIN}/en/printable-sudoku/`, file: ["game", "static", "en", "printable-sudoku", "index.html"], heading: "Printable Sudoku" },
+    // The two text pages carry their heading inside their own prose rather
+    // than as a visually-hidden h1, so `heading` is null and T-B04-02 skips
+    // that one assertion for them. Everything else applies unchanged.
+    { group: "privacy", locale: "ko", url: `${ORIGIN}/privacy/`, file: ["game", "static", "privacy", "index.html"], heading: null },
+    { group: "privacy", locale: "en", url: `${ORIGIN}/en/privacy/`, file: ["game", "static", "en", "privacy", "index.html"], heading: null },
+    { group: "business", locale: "ko", url: `${ORIGIN}/business/`, file: ["game", "static", "business", "index.html"], heading: null },
+    { group: "business", locale: "en", url: `${ORIGIN}/en/business/`, file: ["game", "static", "en", "business", "index.html"], heading: null },
 ];
 
 const groupOf = (page) => PAGES.filter((p) => p.group === page.group);
@@ -36,6 +46,7 @@ test("T-B04-02: each page declares its own language", async () => {
     for (const page of PAGES) {
         const html = await read(page);
         assert.match(html, new RegExp(`<html lang="${page.locale}">`), page.locale);
+        if (page.heading === null) continue; // a text page's h1 is its own prose
         assert.match(html, new RegExp(`<h1 class="visually-hidden">${page.heading}</h1>`), page.locale);
     }
 });

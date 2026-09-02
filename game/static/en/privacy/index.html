@@ -1,0 +1,85 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Privacy | Sudoku</title>
+    <meta name="description" content="The privacy policy of a Sudoku site with no accounts and no ads. Your progress and records are kept in your own browser, and there are no cookies and no tracking scripts.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/en/privacy/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/privacy/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/privacy/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/privacy/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/en/privacy/">
+    <meta property="og:title" content="Privacy | Sudoku">
+    <meta property="og:description" content="Progress and records stay in your browser. No cookies, no tracking, no ads.">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-privacy-en.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Privacy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-privacy-en.png">
+    <link rel="manifest" href="/en/site.webmanifest">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Privacy","url":"https://sudoku-bw7.pages.dev/en/privacy/","description":"Progress and records stay in your browser. No cookies, no tracking, no ads.","inLanguage":"en"}</script>
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <!-- layout.css for the body rules -- background, colour and the page
+         column. Without it these pages have a transparent body, which reads
+         as white in dark mode while the footer's tokens stay light. -->
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/content.css">
+</head>
+<body>
+    <!-- No #app and no script: this page is text, and the whole point of it is
+         that it is readable with JavaScript off. -->
+    <main class="content-page">
+        <h1>Privacy</h1>
+        <h2>In short</h2>
+        <p>There are no accounts, nothing personal is stored on a server, and there are no ads. Your progress and your records live in your own browser.</p>
+        <h2>What is kept in your browser</h2>
+        <p>The puzzle in progress, your settings and your personal records are stored in your browser's localStorage. None of it leaves your device, and nobody — the site's operator included — can read it.</p>
+        <ul>
+            <li>The puzzle in progress — the board, the digits you entered, your candidate marks, elapsed time, and the cells the answer check found wrong</li>
+            <li>Settings — language is not among them, because each language has its own address</li>
+            <li>Personal records — best time and completion count per difficulty</li>
+            <li>Your best Rush score and combo</li>
+            <li>Practice attempts and completions per technique</li>
+        </ul>
+        <p>Clearing site data in your browser removes all of it at any time. The puzzle in progress and your records go with it, and there is no way to get them back.</p>
+        <h2>Cookies</h2>
+        <p>This site sets no cookies. Unlike a cookie, localStorage is never attached to a request and sent to a server.</p>
+        <h2>What is sent to a server</h2>
+        <p>Building a new puzzle sends a request to the puzzle API. It carries the number of clues you asked for and nothing else — no progress, no records. The server builds a puzzle, returns it, and keeps nothing.</p>
+        <p>Like any web request it passes through the hosting provider's infrastructure (Cloudflare), which may process access logs for its own operations and security. That is not data the site's operator controls or reads.</p>
+        <h2>Analytics and advertising</h2>
+        <p>There is no analytics, no tracking script and no advertising on this site today. This page will be updated before any of that changes.</p>
+        <h2>Share links</h2>
+        <p>Sharing puts the board and your entries in the fragment of a link — the part after the #. A fragment is never sent to a server, but anyone you give the link to can read it. Sharing only ever happens when you ask for it.</p>
+        <h2>Contact</h2>
+        <p>Questions about any of this can go to the address below.</p>
+        <p class="content-contact"><a href="mailto:salbul.mo91@gmail.com">salbul.mo91@gmail.com</a></p>
+    </main>
+
+    <footer class="site-footer">
+        <nav aria-label="Other pages">
+            <a href="/en/">Classic</a>
+            <a href="/en/rush/">Rush</a>
+            <a href="/en/learn/">Practice</a>
+            <a href="/en/printable-sudoku/">Printable</a>
+            <span aria-current="page">Privacy</span>
+            <a href="/en/business/">For organisations</a>
+        </nav>
+    </footer>
+</body>
+</html>

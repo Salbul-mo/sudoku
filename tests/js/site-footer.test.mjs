@@ -1,9 +1,10 @@
 // The footer every page carries, and the header switch it deliberately did not
 // become.
 //
-// This is the only route to /learn/ from anywhere on the site, so "the link is
-// present on all six pages and points at the right locale" is not a cosmetic
-// check -- it is whether the page is reachable at all.
+// The footer is the only route to /learn/, /printable-sudoku/, /privacy/ and
+// /business/ from anywhere on the site, so "the link is present on all twelve
+// pages and points at the right locale" is not a cosmetic check -- it is
+// whether those pages are reachable at all.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -20,16 +21,25 @@ const PAGES = [
     { page: "rush", locale: "en", file: ["en", "rush", "index.html"] },
     { page: "learn", locale: "ko", file: ["learn", "index.html"] },
     { page: "learn", locale: "en", file: ["en", "learn", "index.html"] },
+    { page: "printable", locale: "ko", file: ["printable-sudoku", "index.html"] },
+    { page: "printable", locale: "en", file: ["en", "printable-sudoku", "index.html"] },
+    { page: "privacy", locale: "ko", file: ["privacy", "index.html"] },
+    { page: "privacy", locale: "en", file: ["en", "privacy", "index.html"] },
+    { page: "business", locale: "ko", file: ["business", "index.html"] },
+    { page: "business", locale: "en", file: ["en", "business", "index.html"] },
 ];
 
-const PATHS = { classic: "/", rush: "/rush/", learn: "/learn/" };
+const PATHS = {
+    classic: "/", rush: "/rush/", learn: "/learn/",
+    printable: "/printable-sudoku/", privacy: "/privacy/", business: "/business/",
+};
 const localised = (page, locale) => (locale === "en" ? `/en${PATHS[page]}` : PATHS[page]);
 
 const read = (page) => readFile(path.join(ROOT, "game", "static", ...page.file), "utf8");
 
 const footerOf = (html) => html.match(/<footer class="site-footer">[\s\S]*?<\/footer>/)?.[0] ?? "";
 
-test("T-E07-04: every page carries a footer linking the other two", async () => {
+test("T-E07-04: every page carries a footer linking every other page", async () => {
     for (const page of PAGES) {
         const footer = footerOf(await read(page));
         const where = `${page.page}/${page.locale}`;
@@ -67,7 +77,8 @@ test("T-E07-06: footer links stay inside their own language", async () => {
     for (const page of PAGES) {
         const footer = footerOf(await read(page));
         const hrefs = [...footer.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
-        assert.ok(hrefs.length === 2, `${page.page}/${page.locale}: expected two links`);
+        assert.equal(hrefs.length, Object.keys(PATHS).length - 1,
+            `${page.page}/${page.locale}: one link per other page`);
         for (const href of hrefs) {
             assert.equal(
                 href.startsWith("/en/"), page.locale === "en",
@@ -77,15 +88,14 @@ test("T-E07-06: footer links stay inside their own language", async () => {
     }
 });
 
-test("T-E07-09: the footer sits outside #app, which the entry points empty on boot", async () => {
+test("T-E07-09: the footer sits after the main element, never inside it", async () => {
     for (const page of PAGES) {
         const html = await read(page);
-        const app = html.indexOf('id="app"');
         const footer = html.indexOf('<footer class="site-footer">');
-        assert.ok(app !== -1 && footer !== -1, `${page.page}/${page.locale}`);
+        assert.ok(footer !== -1, `${page.page}/${page.locale}`);
         assert.ok(
             footer > html.indexOf("</main>"),
-            `${page.page}/${page.locale}: the footer must not be inside #app`,
+            `${page.page}/${page.locale}: the footer must not be inside the main element`,
         );
     }
 });

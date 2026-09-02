@@ -43,6 +43,12 @@ const CARDS = [
     { out: 'og-rush-en.png', locale: 'en', heading: 'meta.rushHeading', tagline: 'meta.rushShareTagline' },
     { out: 'og-learn-ko.png', locale: 'ko', heading: 'meta.learnHeading', tagline: 'meta.learnShareTagline' },
     { out: 'og-learn-en.png', locale: 'en', heading: 'meta.learnHeading', tagline: 'meta.learnShareTagline' },
+    { out: 'og-printable-ko.png', locale: 'ko', heading: 'meta.printableHeading', tagline: 'meta.printableShareTagline' },
+    { out: 'og-printable-en.png', locale: 'en', heading: 'meta.printableHeading', tagline: 'meta.printableShareTagline' },
+    { out: 'og-privacy-ko.png', locale: 'ko', heading: 'meta.privacyHeading', tagline: 'meta.privacyShareTagline' },
+    { out: 'og-privacy-en.png', locale: 'en', heading: 'meta.privacyHeading', tagline: 'meta.privacyShareTagline' },
+    { out: 'og-business-ko.png', locale: 'ko', heading: 'meta.businessHeading', tagline: 'meta.businessShareTagline' },
+    { out: 'og-business-en.png', locale: 'en', heading: 'meta.businessHeading', tagline: 'meta.businessShareTagline' },
 ];
 
 function escapeText(value) {

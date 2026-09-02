@@ -1,0 +1,85 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>개인정보처리방침 | 스도쿠</title>
+    <meta name="description" content="계정도 광고도 없는 스도쿠 사이트의 개인정보처리방침. 진행 상황과 기록은 브라우저 안에만 저장되며, 쿠키와 추적 스크립트를 사용하지 않습니다.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/privacy/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/privacy/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/privacy/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/privacy/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/privacy/">
+    <meta property="og:title" content="개인정보처리방침 | 스도쿠">
+    <meta property="og:description" content="진행 상황과 기록은 브라우저 안에만 저장됩니다. 쿠키도 추적도 광고도 없습니다.">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-privacy-ko.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="개인정보처리방침">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-privacy-ko.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"개인정보처리방침","url":"https://sudoku-bw7.pages.dev/privacy/","description":"진행 상황과 기록은 브라우저 안에만 저장됩니다. 쿠키도 추적도 광고도 없습니다.","inLanguage":"ko"}</script>
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <!-- layout.css for the body rules -- background, colour and the page
+         column. Without it these pages have a transparent body, which reads
+         as white in dark mode while the footer's tokens stay light. -->
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/content.css">
+</head>
+<body>
+    <!-- No #app and no script: this page is text, and the whole point of it is
+         that it is readable with JavaScript off. -->
+    <main class="content-page">
+        <h1>개인정보처리방침</h1>
+        <h2>요약</h2>
+        <p>이 사이트는 계정이 없고, 서버에 개인정보를 저장하지 않으며, 광고를 게재하지 않습니다. 게임 진행 상황과 기록은 사용자의 브라우저 안에만 저장됩니다.</p>
+        <h2>브라우저에 저장하는 것</h2>
+        <p>진행 중인 퍼즐과 설정, 개인 기록은 브라우저의 localStorage에 저장됩니다. 이 값은 사용자의 기기를 떠나지 않으며, 사이트 운영자를 포함해 누구도 열람할 수 없습니다.</p>
+        <ul>
+            <li>진행 중인 퍼즐 — 판, 입력한 숫자, 후보 표시, 진행 시간, 정답 체크가 찾아낸 오답 칸</li>
+            <li>설정 — 언어별 페이지 주소로 구분되므로 언어 자체는 저장하지 않습니다</li>
+            <li>개인 기록 — 난이도별 최고 시간과 완주 횟수</li>
+            <li>러시 최고 점수와 최고 콤보</li>
+            <li>풀이 연습의 기법별 시도·완료 횟수</li>
+        </ul>
+        <p>브라우저의 사이트 데이터 삭제 기능으로 언제든 전부 지울 수 있습니다. 지우면 진행 중인 퍼즐과 기록도 함께 사라지며, 복구할 방법은 없습니다.</p>
+        <h2>쿠키</h2>
+        <p>이 사이트는 쿠키를 사용하지 않습니다. localStorage는 쿠키와 달리 요청에 자동으로 실려 서버로 전송되지 않습니다.</p>
+        <h2>서버로 전송되는 것</h2>
+        <p>새 퍼즐을 만들 때 브라우저가 퍼즐 생성 API에 요청을 보냅니다. 이 요청에는 원하는 단서 개수만 담기며, 진행 상황이나 기록은 포함되지 않습니다. 서버는 퍼즐을 만들어 돌려줄 뿐 저장하지 않습니다.</p>
+        <p>모든 웹 요청과 마찬가지로 호스팅 사업자(Cloudflare)의 인프라를 거치며, 사업자는 자체 운영과 보안 목적으로 접속 로그를 처리할 수 있습니다. 이는 사이트 운영자가 통제하거나 열람하는 데이터가 아닙니다.</p>
+        <h2>분석 도구와 광고</h2>
+        <p>현재 분석 도구, 추적 스크립트, 광고를 사용하지 않습니다. 도입하게 되면 이 문서를 먼저 갱신합니다.</p>
+        <h2>공유 링크</h2>
+        <p>공유 기능은 판과 입력 상태를 링크 주소의 fragment(# 뒤)에 담습니다. fragment는 서버로 전송되지 않는 부분이지만, 링크를 받은 사람은 그 내용을 볼 수 있습니다. 공유는 사용자가 직접 실행할 때만 일어납니다.</p>
+        <h2>문의</h2>
+        <p>개인정보 처리에 관한 문의는 아래로 보내주세요.</p>
+        <p class="content-contact"><a href="mailto:salbul.mo91@gmail.com">salbul.mo91@gmail.com</a></p>
+    </main>
+
+    <footer class="site-footer">
+        <nav aria-label="다른 페이지">
+            <a href="/">클래식</a>
+            <a href="/rush/">러시</a>
+            <a href="/learn/">풀이 연습</a>
+            <a href="/printable-sudoku/">인쇄용</a>
+            <span aria-current="page">개인정보처리방침</span>
+            <a href="/business/">기관 문의</a>
+        </nav>
+    </footer>
+</body>
+</html>

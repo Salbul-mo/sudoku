@@ -1,0 +1,186 @@
+/* /printable-sudoku/ -- a page whose real output is paper.
+   Two layouts: one for choosing on screen, one for the printer. */
+
+.printable-app {
+    max-inline-size: 52rem;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.printable-intro {
+    margin: 0 0 16px;
+    max-inline-size: 42rem;
+    line-height: 1.6;
+}
+
+.printable-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin-block-end: 12px;
+}
+
+.printable-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.printable-field-label {
+    color: var(--fg-candidate);
+    font-size: 0.8125rem;
+}
+
+.printable-controls select,
+.printable-controls button {
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-cell);
+    color: var(--fg-body);
+    font: inherit;
+}
+
+.printable-controls button {
+    cursor: pointer;
+}
+
+.printable-controls button:focus-visible,
+.printable-controls select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.printable-print {
+    border-color: var(--focus) !important;
+    border-width: 2px !important;
+}
+
+.printable-status {
+    margin: 0 0 16px;
+    min-block-size: 1.4em; /* reserved, so the sheet does not jump as it fills */
+    color: var(--fg-candidate);
+}
+
+/* Two across on screen; the print rules below take over for paper. */
+.printable-sheet,
+.printable-answers {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 20px;
+}
+
+.printable-answers-heading {
+    grid-column: 1 / -1;
+    margin: 24px 0 0;
+}
+
+.printable-puzzle,
+.printable-answer {
+    margin: 0;
+}
+
+.printable-puzzle figcaption,
+.printable-answer figcaption {
+    margin-block-start: 4px;
+    color: var(--fg-candidate);
+    font-size: 0.8125rem;
+}
+
+/* border-collapse so the box rules below are single lines rather than two
+   adjacent cell borders, which print as a visibly thicker smudge. */
+.printable-grid {
+    inline-size: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    aspect-ratio: 1;
+}
+
+.printable-grid td {
+    border: 1px solid var(--line);
+    text-align: center;
+    vertical-align: middle;
+    font-size: clamp(0.75rem, 3.2cqi, 1.25rem);
+    /* Square cells without measuring: a 1/9 padding-top on a fixed table gives
+       each cell the same height as its width at any page size. */
+    aspect-ratio: 1;
+}
+
+/* The 3x3 structure. Set from data attributes rather than nth-child so the
+   rule reads the same as the code that writes it. */
+.printable-grid td[data-box-left="1"] { border-inline-start-width: 2.5px; }
+.printable-grid td[data-box-top="1"] { border-block-start-width: 2.5px; }
+
+.printable-grid-answer td {
+    font-size: clamp(0.625rem, 2.6cqi, 1rem);
+    color: var(--fg-candidate);
+}
+
+/* ------------------------------------------------------------------ print */
+
+@page {
+    size: A4 portrait;
+    margin: 12mm;
+}
+
+@media print {
+    /* Paper is white and ink is black whatever the screen theme is. Printing a
+       dark theme wastes a cartridge and produces a grid nobody can write on. */
+    :root {
+        --bg-page: #FFFFFF;
+        --bg-cell: #FFFFFF;
+        --fg-body: #000000;
+        --fg-candidate: #333333;
+        --line: #000000;
+    }
+
+    body {
+        background: #FFFFFF;
+        color: #000000;
+    }
+
+    /* Everything that exists to make a choice on screen. The sheet is what the
+       printer is for. */
+    .printable-controls,
+    .printable-intro,
+    .printable-status,
+    .site-footer {
+        display: none !important;
+    }
+
+    .printable-app {
+        max-inline-size: none;
+        padding: 0;
+    }
+
+    /* Two across, three down: six puzzles to an A4 sheet at a size that still
+       leaves room to write a digit in a cell. */
+    .printable-sheet,
+    .printable-answers {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10mm;
+    }
+
+    /* A puzzle split across a page break is a wasted sheet. */
+    .printable-puzzle,
+    .printable-answer {
+        break-inside: avoid;
+    }
+
+    /* The answers start their own sheet rather than sharing one with the last
+       two puzzles -- otherwise the solution to a puzzle sits beside it. */
+    .printable-answers-heading {
+        break-before: page;
+    }
+
+    .printable-grid td {
+        border-color: #000000;
+        font-size: 11pt;
+    }
+
+    .printable-grid-answer td {
+        font-size: 8pt;
+        color: #000000;
+    }
+}

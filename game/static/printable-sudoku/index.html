@@ -1,0 +1,65 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>인쇄용 스도쿠 | 난이도를 골라 바로 출력</title>
+    <meta name="description" content="난이도와 장수를 고르면 새 퍼즐을 만들어 인쇄용으로 배치합니다. 정답 페이지가 함께 나오며, 브라우저 인쇄로 PDF 저장도 됩니다. 무료이고 가입이 필요 없습니다.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/printable-sudoku/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <meta property="og:title" content="인쇄용 스도쿠 | 난이도를 골라 바로 출력">
+    <meta property="og:description" content="난이도와 장수를 골라 바로 출력하는 무료 인쇄용 스도쿠. 정답 페이지 포함.">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-printable-ko.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="인쇄용 스도쿠">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-printable-ko.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"인쇄용 스도쿠","url":"https://sudoku-bw7.pages.dev/printable-sudoku/","description":"난이도와 장수를 골라 바로 출력하는 무료 인쇄용 스도쿠. 정답 페이지 포함.","inLanguage":"ko","image":"https://sudoku-bw7.pages.dev/og-printable-ko.png","genre":"Puzzle","gamePlatform":"Web browser","applicationCategory":"GameApplication","operatingSystem":"Any","playMode":"SinglePlayer","isAccessibleForFree":true}</script>
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <!-- layout.css for the body rules -- background, colour and the page
+         column. Without it these pages have a transparent body, which reads
+         as white in dark mode while the footer's tokens stay light. -->
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/printable.css">
+</head>
+<body>
+    <h1 class="visually-hidden">인쇄용 스도쿠</h1>
+
+    <main id="app" class="printable-app"></main>
+
+    <noscript>
+        <p>인쇄용 퍼즐 생성은 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를 켜주세요.</p>
+    </noscript>
+
+    <footer class="site-footer">
+        <nav aria-label="다른 페이지">
+            <a href="/">클래식</a>
+            <a href="/rush/">러시</a>
+            <a href="/learn/">풀이 연습</a>
+            <span aria-current="page">인쇄용</span>
+            <a href="/privacy/">개인정보처리방침</a>
+            <a href="/business/">기관 문의</a>
+        </nav>
+    </footer>
+
+    <script type="module" src="/game/js/printable-main.js"></script>
+</body>
+</html>

@@ -25,6 +25,13 @@ const PAGES = [
     { group: "rush", locale: "en", url: `${ORIGIN}/en/rush/`, file: ["en", "rush", "index.html"], manifest: "/en/site.webmanifest" },
     { group: "learn", locale: "ko", url: `${ORIGIN}/learn/`, file: ["learn", "index.html"], manifest: "/site.webmanifest" },
     { group: "learn", locale: "en", url: `${ORIGIN}/en/learn/`, file: ["en", "learn", "index.html"], manifest: "/en/site.webmanifest" },
+    { group: "printable", locale: "ko", url: `${ORIGIN}/printable-sudoku/`, file: ["printable-sudoku", "index.html"], manifest: "/site.webmanifest" },
+    { group: "printable", locale: "en", url: `${ORIGIN}/en/printable-sudoku/`, file: ["en", "printable-sudoku", "index.html"], manifest: "/en/site.webmanifest" },
+    // Text pages, which declare WebPage rather than VideoGame.
+    { group: "privacy", locale: "ko", url: `${ORIGIN}/privacy/`, file: ["privacy", "index.html"], manifest: "/site.webmanifest", text: true },
+    { group: "privacy", locale: "en", url: `${ORIGIN}/en/privacy/`, file: ["en", "privacy", "index.html"], manifest: "/en/site.webmanifest", text: true },
+    { group: "business", locale: "ko", url: `${ORIGIN}/business/`, file: ["business", "index.html"], manifest: "/site.webmanifest", text: true },
+    { group: "business", locale: "en", url: `${ORIGIN}/en/business/`, file: ["en", "business", "index.html"], manifest: "/en/site.webmanifest", text: true },
 ];
 
 const read = (page) => readFile(path.join(STATIC, ...page.file), "utf8");
@@ -138,12 +145,15 @@ test("T-BA-08: structured data parses and describes this page", async () => {
         const where = `${page.group}/${page.locale}`;
         const blocks = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)]
             .map((m) => JSON.parse(m[1]));
-        const game = blocks.find((b) => b["@type"] === "VideoGame");
-        assert.ok(game, `${where} has no VideoGame`);
+        const wantedType = page.text ? "WebPage" : "VideoGame";
+        const game = blocks.find((b) => b["@type"] === wantedType);
+        assert.ok(game, `${where} has no ${wantedType}`);
         assert.equal(game.url, page.url, where);
         assert.equal(game.inLanguage, page.locale, where);
-        assert.equal(game.image, `${ORIGIN}/og-${page.group}-${page.locale}.png`, where);
-        assert.equal(game.isAccessibleForFree, true, where);
+        if (!page.text) {
+            assert.equal(game.image, `${ORIGIN}/og-${page.group}-${page.locale}.png`, where);
+            assert.equal(game.isAccessibleForFree, true, where);
+        }
 
         // WebSite belongs on the locale roots only. Naming /rush/ as the
         // website would simply be false.

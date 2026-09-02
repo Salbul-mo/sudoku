@@ -1,0 +1,61 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- i18n:head:start -->
+    <!-- Everything inside an i18n region is regenerated per language by
+         tools/build_pages.mjs, this comment included.
+         The Korean below is not a placeholder: Django serves this template
+         as-is for local development, so it has to stand on its own. -->
+    <title>인쇄용 스도쿠 | 난이도를 골라 바로 출력</title>
+    <meta name="description" content="난이도와 장수를 고르면 새 퍼즐을 만들어 인쇄용으로 배치합니다. 정답 페이지가 함께 나오며, 브라우저 인쇄로 PDF 저장도 됩니다.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/printable-sudoku/">
+    <meta property="og:title" content="인쇄용 스도쿠 | 난이도를 골라 바로 출력">
+    <meta property="og:locale" content="ko_KR">
+    <!-- i18n:head:end -->
+
+    <link rel="icon" href="{% static 'favicon.ico' %}" sizes="48x48">
+    <link rel="icon" href="{% static 'icon.svg' %}" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="{% static 'apple-touch-icon.png' %}">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="{% static 'game/css/tokens.css' %}">
+    <!-- layout.css for the body rules -- background, colour and the page
+         column. Without it these pages have a transparent body, which reads
+         as white in dark mode while the footer's tokens stay light. -->
+    <link rel="stylesheet" href="{% static 'game/css/layout.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/chrome.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/printable.css' %}">
+</head>
+<body>
+    <!-- i18n:heading:start -->
+    <h1 class="visually-hidden">인쇄용 스도쿠</h1>
+    <!-- i18n:heading:end -->
+
+    <main id="app" class="printable-app"></main>
+
+    <!-- i18n:noscript:start -->
+    <noscript>
+        <p>인쇄용 퍼즐 생성은 자바스크립트로 동작합니다. 브라우저에서
+        자바스크립트를 켜주세요.</p>
+    </noscript>
+    <!-- i18n:noscript:end -->
+
+    <!-- i18n:footer:start -->
+    <footer class="site-footer">
+        <nav aria-label="다른 페이지">
+            <a href="/">클래식</a>
+        </nav>
+    </footer>
+    <!-- i18n:footer:end -->
+
+    <script type="module" src="{% static 'game/js/printable-main.js' %}"></script>
+</body>
+</html>

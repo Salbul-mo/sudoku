@@ -1,0 +1,87 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>기관·기업 문의 | 접근성 스도쿠 임베드와 화이트라벨</title>
+    <meta name="description" content="키보드와 스크린리더로 완결되는 스도쿠를 기관·교육·사내 서비스에 임베드하거나 화이트라벨로 제공합니다. 구현된 범위와 아직 없는 것을 그대로 적었습니다.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/business/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/business/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/business/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/business/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/business/">
+    <meta property="og:title" content="기관·기업 문의 | 접근성 스도쿠 임베드와 화이트라벨">
+    <meta property="og:description" content="접근성을 요구사항으로 만든 스도쿠의 임베드·화이트라벨·퍼즐 공급 문의.">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-business-ko.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="기관·기업 문의">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-business-ko.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"기관·기업 문의","url":"https://sudoku-bw7.pages.dev/business/","description":"접근성을 요구사항으로 만든 스도쿠의 임베드·화이트라벨·퍼즐 공급 문의.","inLanguage":"ko"}</script>
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <!-- layout.css for the body rules -- background, colour and the page
+         column. Without it these pages have a transparent body, which reads
+         as white in dark mode while the footer's tokens stay light. -->
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/content.css">
+</head>
+<body>
+    <!-- No #app and no script: this page is text, and the whole point of it is
+         that it is readable with JavaScript off. -->
+    <main class="content-page">
+        <h1>기관·기업 문의</h1>
+        <h2>무엇을 제공하나요</h2>
+        <p>이 사이트의 스도쿠를 기관·교육·사내 서비스에 임베드하거나, 화이트라벨로 제공하는 것을 논의할 수 있습니다. 접근성이 핵심 요구사항인 곳을 염두에 두고 만들었습니다.</p>
+        <h2>현재 구현된 것</h2>
+        <ul>
+            <li>한국어·영어 지원, 언어별 고유 주소</li>
+            <li>키보드만으로 완결되는 조작 — 방향키 이동, 숫자 입력, 후보 표시, 실행 취소</li>
+            <li>스크린리더를 고려한 격자 구조와 안내 문구</li>
+            <li>색상 단독에 의존하지 않는 상태 표시 (충돌, 완료, 근거 강조)</li>
+            <li>WCAG 대비 기준을 자동 검사로 유지 (텍스트 4.5:1, 비텍스트 3:1)</li>
+            <li>요청마다 새로 생성되며 정답이 하나뿐인 것이 검증된 퍼즐</li>
+            <li>난이도 5단계, 타임어택 모드, 풀이 기법 연습 모드</li>
+            <li>계정·서버 저장 없이 동작 — 개인정보 수집 표면이 작습니다</li>
+        </ul>
+        <h2>가능한 형태</h2>
+        <ul>
+            <li>임베드 — 기존 사이트나 앱 안에 게임 화면을 넣는 형태</li>
+            <li>화이트라벨 — 색상·문구·언어를 요구에 맞춰 조정한 별도 배포</li>
+            <li>퍼즐 공급 — 생성 API 또는 인쇄·출판용 퍼즐 묶음</li>
+            <li>접근성 검토 — 기존 퍼즐 서비스의 키보드·스크린리더 대응 점검</li>
+        </ul>
+        <h2>아직 없는 것</h2>
+        <p>계정, 서버 저장 진행 상황, 결제, 다중 사용자 기능은 구현되어 있지 않습니다. 필요하다면 요구사항을 먼저 확인한 뒤 논의합니다.</p>
+        <p>난이도는 단서 개수 구간을 기준으로 하며, 인간이 체감하는 난이도와 정확히 일치한다고 보증하지 않습니다. 정밀한 난이도 등급이 필요한 출판 용도라면 별도 분석이 필요합니다.</p>
+        <h2>문의</h2>
+        <p>필요한 범위와 일정을 적어 아래로 보내주세요.</p>
+        <p class="content-contact"><a href="mailto:salbul.mo91@gmail.com">salbul.mo91@gmail.com</a></p>
+    </main>
+
+    <footer class="site-footer">
+        <nav aria-label="다른 페이지">
+            <a href="/">클래식</a>
+            <a href="/rush/">러시</a>
+            <a href="/learn/">풀이 연습</a>
+            <a href="/printable-sudoku/">인쇄용</a>
+            <a href="/privacy/">개인정보처리방침</a>
+            <span aria-current="page">기관 문의</span>
+        </nav>
+    </footer>
+</body>
+</html>

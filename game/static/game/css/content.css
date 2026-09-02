@@ -1,0 +1,59 @@
+/* The text pages: /privacy/ and /business/.
+   No board, no app shell, no script -- just a measure to read at. */
+
+.content-page {
+    /* 60-70 characters is the readable measure for prose; ch is the right unit
+       for it because it follows the font rather than assuming one. */
+    max-inline-size: 42rem;
+    margin: 0 auto;
+    padding: 24px 20px 8px;
+    line-height: 1.65;
+}
+
+.content-page h1 {
+    margin: 0 0 24px;
+    font-size: 1.625rem;
+    line-height: 1.25;
+}
+
+.content-page h2 {
+    margin: 32px 0 8px;
+    font-size: 1.0625rem;
+    /* Sits closer to the paragraph it introduces than to the one it follows,
+       so the sections group by eye without needing rules between them. */
+    line-height: 1.4;
+}
+
+.content-page p {
+    margin: 0 0 12px;
+}
+
+.content-page ul {
+    margin: 0 0 12px;
+    padding-inline-start: 1.25rem;
+}
+
+.content-page li {
+    margin-block-end: 6px;
+}
+
+.content-contact {
+    margin-block-start: 8px;
+    font-size: 1.0625rem;
+}
+
+.content-page a {
+    color: var(--fg-user);
+}
+
+.content-page a:hover,
+.content-page a:focus-visible {
+    color: var(--fg-body);
+}
+
+/* A single column of prose is the whole page, so it should sit under the
+   viewport height rather than being stretched to it -- the footer follows the
+   text instead of being pinned to the bottom of a mostly empty screen. */
+.content-page + .site-footer {
+    margin-block-start: 16px;
+}
