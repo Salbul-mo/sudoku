@@ -40,12 +40,53 @@ const PAGES = PAGE_KINDS.flatMap((kind) => LOCALES.map(({ locale, prefix, ogLoca
     template: path.join(templateRoot, kind.template),
     urlPath: `/${parts.map((p) => `${p}/`).join('')}`,
     out: [...parts, 'index.html'],
+    // Written by tools/build_og.mjs, one card per (game, language) so a shared
+    // link previews in the language of the page that was shared.
+    ogImage: `/og-${kind.page}-${locale}.png`,
+    // One manifest per language: the file has a single `name` and `start_url`,
+    // so it cannot describe both locales at once.
+    manifest: prefix ? `/${prefix}/site.webmanifest` : '/site.webmanifest',
   };
 }));
 
+const localeRoot = (locale) => (locale === 'ko' ? '/' : `/${locale}/`);
+
+// Must match the card size tools/build_og.mjs renders at. Declaring the
+// dimensions lets a scraper reserve the right box before the image loads.
+const OG_WIDTH = 1200;
+const OG_HEIGHT = 630;
+
+// --bg-page of the light theme (game/static/game/css/tokens.css). A manifest
+// has one background_color and no media query, so this is the light value on
+// purpose, matching the favicon's reasoning.
+const PAGE_BACKGROUND = '#E8E7E3';
+
+// Written by tools/build_icons.mjs. Everything it emits is listed here except
+// apple-touch-icon.png, which the pages reference through its own <link> -- so
+// no generated file goes unreferenced by anything.
+//
+// `maskable` is not claimed: the mark runs to the edge of the square, so an
+// Android mask would crop the grid. Declaring it maskable anyway is what
+// produces the icons with their corners sliced off.
+const MANIFEST_ICONS = [
+  { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+  { src: '/icon-48.png', sizes: '48x48', type: 'image/png' },
+  { src: '/icon-96.png', sizes: '96x96', type: 'image/png' },
+  { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+  { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+];
+
 // Asset URLs are site-absolute, so /en/index.html loads exactly the same files
 // as / without any depth-relative rewriting.
+//
+// The brand assets go through the same table for a second reason: they live at
+// the site root in production (game/static IS the deployed root), but Django
+// serves that directory under /static/, so writing "/favicon.ico" literally in
+// the template 404s every time the app is run locally.
 const replacements = new Map([
+  ["{% static 'favicon.ico' %}", '/favicon.ico'],
+  ["{% static 'icon.svg' %}", '/icon.svg'],
+  ["{% static 'apple-touch-icon.png' %}", '/apple-touch-icon.png'],
   ["{% static 'game/css/rush.css' %}", '/game/css/rush.css'],
   ["{% static 'game/js/rush-main.js' %}", '/game/js/rush-main.js'],
   ["{% static 'game/css/tokens.css' %}", '/game/css/tokens.css'],
@@ -123,8 +164,90 @@ function headFor(page) {
     `    <meta property="og:title" content="${escapeAttr(m(page.keys.title))}">`,
     `    <meta property="og:description" content="${escapeAttr(m(page.keys.ogDescription))}">`,
     `    <meta property="og:locale" content="${page.ogLocale}">`,
-    '    <meta name="twitter:card" content="summary">',
+    `    <meta property="og:image" content="${ORIGIN}${page.ogImage}">`,
+    `    <meta property="og:image:width" content="${OG_WIDTH}">`,
+    `    <meta property="og:image:height" content="${OG_HEIGHT}">`,
+    `    <meta property="og:image:alt" content="${escapeAttr(m(page.keys.heading))}">`,
+    // summary_large_image only earns its name once there is an image to be
+    // large: with no og:image Twitter falls back to a bare link, which is
+    // strictly worse than the small card. The two changed together.
+    '    <meta name="twitter:card" content="summary_large_image">',
+    `    <meta name="twitter:image" content="${ORIGIN}${page.ogImage}">`,
+    `    <link rel="manifest" href="${page.manifest}">`,
+    ...jsonLdFor(page).map((block) => (
+      `    <script type="application/ld+json">${JSON.stringify(block)}</script>`
+    )),
   ].join('\n');
+}
+
+/**
+ * Structured data for one page.
+ *
+ * Deliberately absent: `offers`, `aggregateRating`, `review`. The game is in
+ * fact free and has no ratings, and describing things the site does not
+ * actually provide is the structured-data mistake that gets rich results
+ * revoked. `isAccessibleForFree` states the free part without inventing a
+ * price object.
+ *
+ * `WebSite` is emitted only on the two classic pages. They are the roots of
+ * their language; naming /rush/ as the website would be false, and repeating
+ * the same WebSite node at four URLs under four different names is worse than
+ * stating it once per locale.
+ */
+function jsonLdFor(page) {
+  const m = (key) => MESSAGES[page.locale][key];
+  const url = `${ORIGIN}${page.urlPath}`;
+  const blocks = [];
+  if (page.page === 'classic') {
+    blocks.push({
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: m('meta.heading'),
+      url: `${ORIGIN}${localeRoot(page.locale)}`,
+      inLanguage: page.locale,
+    });
+  }
+  blocks.push({
+    '@context': 'https://schema.org',
+    '@type': 'VideoGame',
+    name: m(page.keys.heading),
+    url,
+    description: m(page.keys.ogDescription),
+    inLanguage: page.locale,
+    image: `${ORIGIN}${page.ogImage}`,
+    genre: 'Puzzle',
+    gamePlatform: 'Web browser',
+    applicationCategory: 'GameApplication',
+    operatingSystem: 'Any',
+    playMode: 'SinglePlayer',
+    isAccessibleForFree: true,
+  });
+  return blocks;
+}
+
+/**
+ * The install manifest for one language.
+ *
+ * `id` is pinned to the locale root rather than left to default from
+ * `start_url`: it is the identity a browser matches an already-installed app
+ * against, and letting it drift with start_url would make a later start_url
+ * change register as a second, unrelated app.
+ */
+function manifestFor(locale) {
+  const m = (key) => MESSAGES[locale][key];
+  return `${JSON.stringify({
+    id: localeRoot(locale),
+    name: m('meta.title'),
+    short_name: m('meta.heading'),
+    description: m('meta.ogDescription'),
+    lang: locale,
+    start_url: localeRoot(locale),
+    scope: '/',
+    display: 'standalone',
+    background_color: PAGE_BACKGROUND,
+    theme_color: PAGE_BACKGROUND,
+    icons: MANIFEST_ICONS,
+  }, null, 2)}\n`;
 }
 
 function build(page) {
@@ -147,7 +270,7 @@ function writeAtomic(target, content) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const temporary = path.join(
     path.dirname(target),
-    `build_pages_${process.pid}_tmp_index.html`,
+    `build_pages_${process.pid}_tmp_${path.basename(target)}`,
   );
   try {
     fs.writeFileSync(temporary, content, 'utf8');
@@ -161,11 +284,20 @@ const mode = process.argv.slice(2);
 if (mode.length !== 1 || !['--write', '--check'].includes(mode[0])) {
   throw new Error('usage: node tools/build_pages.mjs --write|--check');
 }
-for (const page of PAGES) {
-  const target = path.join(staticRoot, ...page.out);
-  const expected = build(page);
-  if (mode[0] === '--write') writeAtomic(target, expected);
-  else if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8') !== expected) {
-    throw new Error(`static page is missing or stale: ${page.urlPath}`);
+const outputs = [
+  ...PAGES.map((page) => ({
+    out: page.out, label: page.urlPath, content: build(page),
+  })),
+  ...LOCALES.map(({ locale, prefix }) => ({
+    out: [prefix, 'site.webmanifest'].filter(Boolean),
+    label: `${localeRoot(locale)}site.webmanifest`,
+    content: manifestFor(locale),
+  })),
+];
+for (const { out, label, content } of outputs) {
+  const target = path.join(staticRoot, ...out);
+  if (mode[0] === '--write') writeAtomic(target, content);
+  else if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8') !== content) {
+    throw new Error(`generated file is missing or stale: ${label}`);
   }
 }

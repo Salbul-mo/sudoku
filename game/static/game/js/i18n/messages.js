@@ -31,6 +31,7 @@ export const MESSAGES = Object.freeze({
         "meta.description": "난이도를 골라 새 퍼즐을 만드는 무료 온라인 스도쿠. 매번 새로 생성되며 정답이 하나뿐인 것이 보장됩니다. 설치 없이 브라우저에서 바로, 키보드와 터치 모두 지원합니다.",
         "meta.ogDescription": "난이도를 골라 새 퍼즐을 만드는 무료 온라인 스도쿠. 정답이 하나뿐인 것이 보장됩니다.",
         "meta.heading": "스도쿠",
+        "meta.shareTagline": "난이도를 고르면 매번 새 퍼즐",
         "meta.noscript": "이 스도쿠는 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를 켜면 퍼즐이 나타납니다.",
 
         "css.candidateBadge": "후보",
@@ -149,6 +150,7 @@ export const MESSAGES = Object.freeze({
         "meta.rushDescription": "제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠. 시간이 갈수록 짧아지는 제한시간과 콤보로 점수를 겨룹니다. 설치 없이 브라우저에서 바로 즐기세요.",
         "meta.rushOgDescription": "제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠. 콤보를 이어 최고 점수에 도전하세요.",
         "meta.rushHeading": "스도쿠 러시",
+        "meta.rushShareTagline": "제한시간 안에 한 칸씩",
         "meta.rushNoscript": "스도쿠 러시는 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를 켜면 게임이 나타납니다.",
 
         "rush.start": "시작",
@@ -177,6 +179,7 @@ export const MESSAGES = Object.freeze({
         "meta.description": "A free online Sudoku that builds a new puzzle on every request. Choose a difficulty; every puzzle is guaranteed to have exactly one solution. No install, keyboard and touch alike.",
         "meta.ogDescription": "A free online Sudoku that builds a new puzzle every time. Choose a difficulty; every puzzle has exactly one solution.",
         "meta.heading": "Sudoku",
+        "meta.shareTagline": "A new puzzle every time",
         "meta.noscript": "This Sudoku runs on JavaScript. Turn it on in your browser and the puzzle will appear.",
 
         "css.candidateBadge": "note",
@@ -295,6 +298,7 @@ export const MESSAGES = Object.freeze({
         "meta.rushDescription": "A speed Sudoku where you find the cell that has only one possible digit and fill it before time runs out. The limit shrinks as you go, and a combo multiplies your score. No install, playable straight from the browser.",
         "meta.rushOgDescription": "A speed Sudoku: find the cell with only one possible digit before time runs out, and keep the combo going.",
         "meta.rushHeading": "Sudoku Rush",
+        "meta.rushShareTagline": "One cell at a time, against the clock",
         "meta.rushNoscript": "Sudoku Rush runs on JavaScript. Turn it on in your browser and the game will appear.",
 
         "rush.start": "Start",
