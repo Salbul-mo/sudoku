@@ -23,6 +23,8 @@ const PAGES = [
     { group: "classic", locale: "en", url: `${ORIGIN}/en/`, file: ["en", "index.html"], manifest: "/en/site.webmanifest" },
     { group: "rush", locale: "ko", url: `${ORIGIN}/rush/`, file: ["rush", "index.html"], manifest: "/site.webmanifest" },
     { group: "rush", locale: "en", url: `${ORIGIN}/en/rush/`, file: ["en", "rush", "index.html"], manifest: "/en/site.webmanifest" },
+    { group: "learn", locale: "ko", url: `${ORIGIN}/learn/`, file: ["learn", "index.html"], manifest: "/site.webmanifest" },
+    { group: "learn", locale: "en", url: `${ORIGIN}/en/learn/`, file: ["en", "learn", "index.html"], manifest: "/en/site.webmanifest" },
 ];
 
 const read = (page) => readFile(path.join(STATIC, ...page.file), "utf8");

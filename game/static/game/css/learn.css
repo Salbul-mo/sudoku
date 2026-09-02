@@ -1,0 +1,196 @@
+/* The practice page. Reuses the board, its tokens and the shared control
+   floor; everything here is the chrome around it.
+
+   The one genuinely new visual is a marked candidate. It cannot be a colour
+   change alone -- a marked candidate says "I claim this can be ruled out",
+   which is the answer being composed, so it has to be legible without colour
+   vision. A strike-through carries the meaning (this digit is going), a box
+   carries the selection, and the colour is the third signal rather than the
+   only one. */
+
+.learn-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+}
+
+.learn-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    inline-size: min(100%, var(--board-width));
+}
+
+.learn-picker-label {
+    margin: 0;
+    color: var(--fg-candidate);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-transform: none;
+}
+
+/* Wraps rather than scrolls: seven buttons on a narrow phone become three
+   rows, and a horizontal scroller would hide the techniques at the end behind
+   a gesture nobody is told about. */
+.learn-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.learn-technique {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-cell);
+    color: var(--fg-body);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.learn-technique:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+/* The active technique carries a thicker border and a filled ground, not just
+   a tint: aria-pressed tells a screen reader, and these tell everyone else. */
+.learn-technique[aria-pressed="true"] {
+    border-width: 2px;
+    border-color: var(--focus);
+    background: var(--bg-cell-selected);
+    font-weight: 600;
+}
+
+.learn-technique[disabled] {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.learn-technique-score {
+    color: var(--fg-candidate);
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.learn-header-links {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.learn-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    inline-size: min(100%, var(--board-width));
+}
+
+.learn-prompt {
+    margin: 0;
+    font-size: 0.9375rem;
+}
+
+.learn-tally,
+.learn-explanation {
+    margin: 0;
+    color: var(--fg-candidate);
+    font-size: 0.8125rem;
+}
+
+.learn-result {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+/* Prefixed with a mark as well as coloured, for the same reason the board never
+   signals a conflict with colour alone. */
+.learn-result[data-state="correct"] { color: var(--fg-user); }
+.learn-result[data-state="retry"] { color: var(--fg-conflict); }
+
+.learn-result[data-state="correct"]::before { content: "\2713\00a0"; }
+.learn-result[data-state="retry"]::before { content: "\00d7\00a0"; }
+
+.learn-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.learn-actions button {
+    padding: 8px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-cell);
+    color: var(--fg-body);
+    font: inherit;
+    cursor: pointer;
+}
+
+.learn-actions button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.learn-next {
+    border-color: var(--focus) !important;
+    border-width: 2px !important;
+}
+
+/* A candidate the player has marked for elimination. Three signals, of which
+   colour is only one: the strike says the digit is going, the outline says the
+   press landed here, and the ground separates it from its eight neighbours. */
+.candidate[data-marked="1"] {
+    color: var(--fg-conflict);
+    background: var(--bg-cell-conflict);
+    outline: 1px solid var(--fg-conflict);
+    text-decoration: line-through;
+    border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .candidate { transition: background-color 120ms, color 120ms; }
+}
+
+/* The focus view, which is the whole point of the page: the board shows what
+   the deduction rests on and nothing else.
+
+   The rules mirror rush.css's focus view -- same selectors, same reasoning --
+   but keyed off data-learn-focus rather than data-rush-focus. Sharing the
+   attribute would tie two pages' board rendering together through a name that
+   belongs to one of them, and the practice page loads no rush stylesheet.
+
+   visibility, not display or an emptied string: the cells keep their size, so
+   the grid never reflows between exercises, and they keep their aria-label, so
+   a screen reader still reads the board as it actually stands. */
+.board[data-learn-focus="1"] .cell:not([data-focus="1"]):not([tabindex="0"]) {
+    background: var(--bg-page);
+}
+
+.board[data-learn-focus="1"] .cell:not([data-focus="1"]):not([tabindex="0"]) .cell-value,
+.board[data-learn-focus="1"] .cell:not([data-focus="1"]):not([tabindex="0"]) .cell-candidates {
+    visibility: hidden;
+}
+
+/* The cell being asked for. An inner ring rather than a tint: the cell is not
+   wrong, it is the question, and it sits inside the selection outline the cell
+   already carries so the two read as one mark. */
+.cell[data-target="1"] {
+    box-shadow: inset 0 0 0 3px var(--focus);
+}
+
+/* A placement exercise hides the target's own candidate list, because that
+   list *is* the answer -- for a naked single it is literally the single digit
+   being asked for. The evidence around it is what the deduction is supposed to
+   be read from. Pruning exercises keep every candidate: there the marks are
+   what the player is composing. */
+.board[data-learn-focus="1"] .cell[data-target="1"] .cell-candidates {
+    visibility: hidden;
+}

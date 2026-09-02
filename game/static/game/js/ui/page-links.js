@@ -11,7 +11,13 @@
 // tests do not have.
 import { t, resolveLocale } from "../i18n/messages.js";
 
-export const PAGE_PATHS = Object.freeze({ classic: "/", rush: "/rush/" });
+export const PAGE_PATHS = Object.freeze({ classic: "/", rush: "/rush/", learn: "/learn/" });
+
+// The two pages the header's game switch toggles between. Deliberately not
+// Object.keys(PAGE_PATHS): the practice page is reached from the footer, and a
+// two-way toggle has no meaning once a third page exists -- asking it about
+// "learn" is a caller bug, so it throws rather than guessing a direction.
+const GAME_PAGES = Object.freeze(["classic", "rush"]);
 
 function currentLocale() {
     return resolveLocale(globalThis.document?.documentElement?.lang);
@@ -24,6 +30,12 @@ function withLocale(path, locale) {
 function assertPage(page) {
     if (!Object.hasOwn(PAGE_PATHS, page)) {
         throw new RangeError(`unknown page: ${page}`);
+    }
+}
+
+function assertGamePage(page) {
+    if (!GAME_PAGES.includes(page)) {
+        throw new RangeError(`not a game page: ${page}`);
     }
 }
 
@@ -54,7 +66,7 @@ export function createLangSwitch(page) {
  * otherwise would have it treat one as a duplicate of the other and drop it.
  */
 export function createGameSwitch(page) {
-    assertPage(page);
+    assertGamePage(page);
     const target = page === "rush" ? "classic" : "rush";
     const label = target === "rush" ? "nav.playRush" : "nav.playClassic";
     return anchor("game-switch", withLocale(PAGE_PATHS[target], currentLocale()), t(label));

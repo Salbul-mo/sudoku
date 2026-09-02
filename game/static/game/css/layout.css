@@ -35,9 +35,15 @@
     box-sizing: border-box;
 }
 
+/* The page column. body owns the full viewport height and the shell takes
+   whatever is left over, so the footer lands directly under the shell instead
+   of one whole viewport below it -- which is where a shell with its own
+   min-height: 100dvh had been putting it. */
 body {
     margin: 0;
     min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
     background: var(--bg-page);
     color: var(--fg-body);
 }
@@ -74,7 +80,10 @@ body {
 .app-shell {
     display: flex;
     flex-direction: column;
-    min-height: 100dvh;
+    /* Was min-height: 100dvh. Same rendering when the page is short -- the
+       shell still fills the viewport -- but as a flex item it stops *at* the
+       viewport instead of claiming it and pushing the footer out of sight. */
+    flex: 1;
 }
 
 /* wide: board can shrink but never overlays. A 2x2 grid -- not a 3-item

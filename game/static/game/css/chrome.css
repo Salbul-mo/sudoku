@@ -264,3 +264,48 @@
 [data-state="skeleton"] {
     min-block-size: 50dvh;
 }
+
+/* The site footer: the only path from a game to the practice page, and the
+   only navigation that names all three. Kept quiet on purpose -- the board is
+   what the page is for, and a prominent nav bar under it would compete with
+   the game for attention that belongs to the puzzle.
+
+   The whole strip is centred and text-sized rather than laid out as buttons:
+   these are links a reader follows once, not controls used during play, so the
+   48px control floor that governs the digit bar does not apply. They are still
+   given generous padding, because a link that is hard to hit is a link that
+   does not work on a phone. */
+.site-footer {
+    display: flex;
+    justify-content: center;
+    padding: 12px 16px 20px;
+    font-size: 0.875rem;
+}
+
+.site-footer nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 20px;
+}
+
+.site-footer a,
+.site-footer [aria-current="page"] {
+    padding: 8px 4px;
+    color: var(--fg-candidate);
+    text-decoration: none;
+}
+
+.site-footer a:hover,
+.site-footer a:focus-visible {
+    color: var(--fg-body);
+    text-decoration: underline;
+}
+
+/* The current page is not a link, so it must not look like one. Weight and
+   color carry it rather than an underline, which would read as a link that
+   simply refuses to work. */
+.site-footer [aria-current="page"] {
+    color: var(--fg-body);
+    font-weight: 600;
+}

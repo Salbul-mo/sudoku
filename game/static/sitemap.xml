@@ -35,4 +35,18 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/rush/"/>
     <changefreq>monthly</changefreq>
   </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/learn/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/learn/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/learn/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/learn/"/>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://sudoku-bw7.pages.dev/en/learn/</loc>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/learn/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/learn/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/learn/"/>
+    <changefreq>monthly</changefreq>
+  </url>
 </urlset>

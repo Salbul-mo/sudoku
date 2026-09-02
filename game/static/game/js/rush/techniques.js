@@ -250,13 +250,25 @@ export function assistUnits(candidate, assist) {
     throw new RangeError(`unknown assist: ${assist}`);
 }
 
+// The cells a deduction is *about*, which are shown whatever the units say.
+// For a placement that is the one cell being asked for. For a pruning it is the
+// cells the reasoning rests on plus the ones it prunes -- both are normally
+// inside the evidence units already, but stating it here means a narrower
+// assist level can never hide the cells the answer is composed from.
+function subjectCells(candidate) {
+    if (candidate.kind === "elimination") {
+        return [...candidate.subject, ...candidate.eliminations.map((e) => e.index)];
+    }
+    return [candidate.index];
+}
+
 /** The cells an assist level puts on screen, or null for "the whole board". */
 export function assistCells(candidate, assist) {
     const units = assistUnits(candidate, assist);
     if (units === null) return null;
     const cells = new Set();
     for (const unit of units) for (const cell of UNITS[unit]) cells.add(cell);
-    cells.add(candidate.index);
+    for (const cell of subjectCells(candidate)) cells.add(cell);
     return cells;
 }
 

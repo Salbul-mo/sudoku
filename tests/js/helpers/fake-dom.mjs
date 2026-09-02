@@ -82,7 +82,18 @@ class FakeElement extends FakeNode {
     }
 
     getAttribute(name) {
-        return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
+        if (Object.prototype.hasOwnProperty.call(this.attributes, name)) return this.attributes[name];
+        // Real elements expose dataset writes as data-* attributes, and
+        // selectors rely on that: board-view sets cell.dataset.index and reads
+        // it back through [data-index]. Without this the two halves of the same
+        // element disagree here in a way they never could in a browser.
+        if (name.startsWith("data-")) {
+            const key = name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+            if (Object.prototype.hasOwnProperty.call(this.dataset, key)) {
+                return String(this.dataset[key]);
+            }
+        }
+        return null;
     }
 
     appendChild(child) {

@@ -41,6 +41,8 @@ const CARDS = [
     { out: 'og-classic-en.png', locale: 'en', heading: 'meta.heading', tagline: 'meta.shareTagline' },
     { out: 'og-rush-ko.png', locale: 'ko', heading: 'meta.rushHeading', tagline: 'meta.rushShareTagline' },
     { out: 'og-rush-en.png', locale: 'en', heading: 'meta.rushHeading', tagline: 'meta.rushShareTagline' },
+    { out: 'og-learn-ko.png', locale: 'ko', heading: 'meta.learnHeading', tagline: 'meta.learnShareTagline' },
+    { out: 'og-learn-en.png', locale: 'en', heading: 'meta.learnHeading', tagline: 'meta.learnShareTagline' },
 ];
 
 function escapeText(value) {

@@ -5,6 +5,11 @@
 const KINDS = new Set([
     "sticky-mode", "undo-redo", "given-rejected",
     "completion", "link-copied", "session", "storage-warning",
+    // The practice page. "learn-mark" fires on every candidate press, which is
+    // the one place this policy is deliberately relaxed: marking a candidate is
+    // the answer being composed, not incidental input, and without it a screen
+    // reader user gets no confirmation that a press landed.
+    "learn-mark", "learn-result",
 ]);
 
 export function createAnnouncer(container) {

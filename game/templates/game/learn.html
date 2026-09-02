@@ -10,23 +10,23 @@
          tools/build_pages.mjs, this comment included.
          The Korean below is not a placeholder: Django serves this template
          as-is for local development, so it has to stand on its own. -->
-    <title>스도쿠 러시 - 제한시간 안에 한 칸씩</title>
-    <meta name="description" content="제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠. 시간이 갈수록 짧아지는 제한시간과 콤보로 점수를 겨룹니다.">
-    <link rel="canonical" href="https://sudoku-bw7.pages.dev/rush/">
-    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/rush/">
-    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/rush/">
-    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/rush/">
+    <title>스도쿠 풀이 연습 - 기법별로 하나씩</title>
+    <meta name="description" content="스도쿠 풀이 기법을 하나씩 연습합니다. 숫자를 확정하는 기법과 후보를 지우는 기법을 모두 다루며, 맞힌 뒤에는 그 판단이 어떤 근거에 기대고 있는지 보여줍니다.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/learn/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/learn/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/learn/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/learn/">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://sudoku-bw7.pages.dev/rush/">
-    <meta property="og:title" content="스도쿠 러시 - 제한시간 안에 한 칸씩">
-    <meta property="og:description" content="제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠.">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/learn/">
+    <meta property="og:title" content="스도쿠 풀이 연습 - 기법별로 하나씩">
+    <meta property="og:description" content="스도쿠 풀이 기법을 하나씩 연습합니다. 맞힌 뒤에는 그 판단의 근거를 보여줍니다.">
     <meta property="og:locale" content="ko_KR">
-    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-rush-ko.png">
+    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-learn-ko.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="스도쿠 러시">
+    <meta property="og:image:alt" content="스도쿠 풀이 연습">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-rush-ko.png">
+    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-learn-ko.png">
     <!-- i18n:head:end -->
 
     <link rel="icon" href="{% static 'favicon.ico' %}" sizes="48x48">
@@ -40,21 +40,21 @@
     <link rel="stylesheet" href="{% static 'game/css/layout.css' %}">
     <link rel="stylesheet" href="{% static 'game/css/board.css' %}">
     <link rel="stylesheet" href="{% static 'game/css/chrome.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/rush.css' %}">
+    <link rel="stylesheet" href="{% static 'game/css/learn.css' %}">
 </head>
 <body>
     <!-- Outside #app on purpose: the entry point empties that element on boot,
          so a heading placed inside it would be destroyed. -->
     <!-- i18n:heading:start -->
-    <h1 class="visually-hidden">스도쿠 러시</h1>
+    <h1 class="visually-hidden">스도쿠 풀이 연습</h1>
     <!-- i18n:heading:end -->
 
-    <main id="app" class="app-shell rush-app"></main>
+    <main id="app" class="app-shell learn-app"></main>
 
     <!-- i18n:noscript:start -->
     <noscript>
-        <p>스도쿠 러시는 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를
-        켜면 게임이 나타납니다.</p>
+        <p>풀이 연습은 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를
+        켜면 연습이 나타납니다.</p>
     </noscript>
     <!-- i18n:noscript:end -->
 
@@ -62,12 +62,12 @@
     <footer class="site-footer">
         <nav aria-label="다른 페이지">
             <a href="/">클래식</a>
-            <span aria-current="page">러시</span>
-            <a href="/learn/">풀이 연습</a>
+            <a href="/rush/">러시</a>
+            <span aria-current="page">풀이 연습</span>
         </nav>
     </footer>
     <!-- i18n:footer:end -->
 
-    <script type="module" src="{% static 'game/js/rush-main.js' %}"></script>
+    <script type="module" src="{% static 'game/js/learn-main.js' %}"></script>
 </body>
 </html>

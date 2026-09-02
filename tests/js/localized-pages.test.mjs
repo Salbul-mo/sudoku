@@ -17,6 +17,8 @@ const PAGES = [
     { group: "classic", locale: "en", url: `${ORIGIN}/en/`, file: ["game", "static", "en", "index.html"], heading: "Sudoku" },
     { group: "rush", locale: "ko", url: `${ORIGIN}/rush/`, file: ["game", "static", "rush", "index.html"], heading: "스도쿠 러시" },
     { group: "rush", locale: "en", url: `${ORIGIN}/en/rush/`, file: ["game", "static", "en", "rush", "index.html"], heading: "Sudoku Rush" },
+    { group: "learn", locale: "ko", url: `${ORIGIN}/learn/`, file: ["game", "static", "learn", "index.html"], heading: "스도쿠 풀이 연습" },
+    { group: "learn", locale: "en", url: `${ORIGIN}/en/learn/`, file: ["game", "static", "en", "learn", "index.html"], heading: "Sudoku Practice" },
 ];
 
 const groupOf = (page) => PAGES.filter((p) => p.group === page.group);
@@ -99,7 +101,7 @@ test("T-B04-07: the sitemap lists both languages with their alternates", async (
     for (const page of PAGES) {
         assert.match(xml, new RegExp(`<loc>${page.url}</loc>`), page.locale);
     }
-    // Four <url> entries, each naming ko + en + x-default of its own group.
+    // One <url> entry per page, each naming ko + en + x-default of its own group.
     assert.equal((xml.match(/<xhtml:link /g) ?? []).length, PAGES.length * 3);
     for (const page of PAGES) {
         for (const stranger of PAGES.filter((p) => p.group !== page.group)) {

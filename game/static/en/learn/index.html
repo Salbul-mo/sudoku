@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Sudoku Practice - one technique at a time</title>
+    <meta name="description" content="Practise Sudoku solving techniques one at a time. Covers both the techniques that settle a digit and the ones that rule candidates out, and once you have it right, shows you what the deduction actually rested on. No clock.">
+    <link rel="canonical" href="https://sudoku-bw7.pages.dev/en/learn/">
+    <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/learn/">
+    <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/learn/">
+    <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/learn/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sudoku-bw7.pages.dev/en/learn/">
+    <meta property="og:title" content="Sudoku Practice - one technique at a time">
+    <meta property="og:description" content="Practise Sudoku solving techniques one at a time, and see what each deduction actually rests on.">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-learn-en.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Sudoku Practice">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-learn-en.png">
+    <link rel="manifest" href="/en/site.webmanifest">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"Sudoku Practice","url":"https://sudoku-bw7.pages.dev/en/learn/","description":"Practise Sudoku solving techniques one at a time, and see what each deduction actually rests on.","inLanguage":"en","image":"https://sudoku-bw7.pages.dev/og-learn-en.png","genre":"Puzzle","gamePlatform":"Web browser","applicationCategory":"GameApplication","operatingSystem":"Any","playMode":"SinglePlayer","isAccessibleForFree":true}</script>
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/board.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/learn.css">
+</head>
+<body>
+    <!-- Outside #app on purpose: the entry point empties that element on boot,
+         so a heading placed inside it would be destroyed. -->
+    <h1 class="visually-hidden">Sudoku Practice</h1>
+
+    <main id="app" class="app-shell learn-app"></main>
+
+    <noscript>
+        <p>The practice page runs on JavaScript. Turn it on in your browser and the exercises will appear.</p>
+    </noscript>
+
+    <footer class="site-footer">
+        <nav aria-label="Other pages">
+            <a href="/en/">Classic</a>
+            <a href="/en/rush/">Rush</a>
+            <span aria-current="page">Practice</span>
+        </nav>
+    </footer>
+
+    <script type="module" src="/game/js/learn-main.js"></script>
+</body>
+</html>

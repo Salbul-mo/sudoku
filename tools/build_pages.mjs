@@ -31,6 +31,20 @@ const PAGE_KINDS = [
     ogDescription: 'meta.rushOgDescription', heading: 'meta.rushHeading',
     noscript: 'meta.rushNoscript',
   } },
+  { page: 'learn', template: 'learn.html', segment: 'learn', keys: {
+    title: 'meta.learnTitle', description: 'meta.learnDescription',
+    ogDescription: 'meta.learnOgDescription', heading: 'meta.learnHeading',
+    noscript: 'meta.learnNoscript',
+  } },
+];
+
+// Footer order, which is reading order rather than the order pages were built:
+// the two games first, then the practice page. `label` is the message key the
+// row is named by.
+const FOOTER_ROWS = [
+  { page: 'classic', label: 'nav.playClassic' },
+  { page: 'rush', label: 'nav.playRush' },
+  { page: 'learn', label: 'nav.playLearn' },
 ];
 
 const PAGES = PAGE_KINDS.flatMap((kind) => LOCALES.map(({ locale, prefix, ogLocale }) => {
@@ -87,6 +101,8 @@ const replacements = new Map([
   ["{% static 'favicon.ico' %}", '/favicon.ico'],
   ["{% static 'icon.svg' %}", '/icon.svg'],
   ["{% static 'apple-touch-icon.png' %}", '/apple-touch-icon.png'],
+  ["{% static 'game/css/learn.css' %}", '/game/css/learn.css'],
+  ["{% static 'game/js/learn-main.js' %}", '/game/js/learn-main.js'],
   ["{% static 'game/css/rush.css' %}", '/game/css/rush.css'],
   ["{% static 'game/js/rush-main.js' %}", '/game/js/rush-main.js'],
   ["{% static 'game/css/tokens.css' %}", '/game/css/tokens.css'],
@@ -181,6 +197,39 @@ function headFor(page) {
 }
 
 /**
+ * The one place every page links to every other.
+ *
+ * Real anchors in the HTML rather than a script that builds them: this is how
+ * /learn/ is discovered at all, by a crawler that may or may not run the page's
+ * JavaScript and by a reader who wants to middle-click. It also sits outside
+ * #app, which the entry points empty on boot.
+ *
+ * The current page is a <span>, not a link to itself. A self-link is a dead
+ * control to anyone tabbing through, and aria-current is what actually tells a
+ * screen reader where it already is.
+ */
+function footerFor(page) {
+  const m = (key) => {
+    const value = MESSAGES[page.locale][key];
+    if (value === undefined) throw new Error(`unknown message key: ${key} (${page.locale})`);
+    return value;
+  };
+  const rows = FOOTER_ROWS.map(({ page: target, label }) => {
+    const text = escapeText(m(label));
+    if (target === page.page) return `            <span aria-current="page">${text}</span>`;
+    const path = PAGES.find((p) => p.page === target && p.locale === page.locale).urlPath;
+    return `            <a href="${path}">${text}</a>`;
+  });
+  return [
+    '<footer class="site-footer">',
+    `        <nav aria-label="${escapeAttr(m('nav.footerLabel'))}">`,
+    ...rows,
+    '        </nav>',
+    '    </footer>',
+  ].join('\n');
+}
+
+/**
  * Structured data for one page.
  *
  * Deliberately absent: `offers`, `aggregateRating`, `review`. The game is in
@@ -261,6 +310,7 @@ function build(page) {
   html = replaceRegion(html, 'head', headFor(page).trimStart());
   html = replaceRegion(html, 'heading', `<h1 class="visually-hidden">${escapeText(m(page.keys.heading))}</h1>`);
   html = replaceRegion(html, 'noscript', `<noscript>\n        <p>${escapeText(m(page.keys.noscript))}</p>\n    </noscript>`);
+  html = replaceRegion(html, 'footer', footerFor(page));
   if (/{%|%}|{{|}}/.test(html)) throw new Error('leftover Django template markers');
   if (/<!-- i18n:/.test(html)) throw new Error('leftover i18n region marker');
   return html;
