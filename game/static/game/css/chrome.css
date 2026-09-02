@@ -309,3 +309,53 @@
     color: var(--fg-body);
     font-weight: 600;
 }
+
+/* ------------------------------------------------------- completion card */
+
+/* Four labelled rows inside the dialog host, which already supplies the panel,
+   the focus trap and the buttons. Laid out as label-left / value-right rows
+   rather than a table: there is no second column of data to align across rows,
+   and a table would have a screen reader announce grid coordinates for what is
+   really a short list of facts. */
+.completion-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-inline-size: 15rem;
+}
+
+.completion-heading {
+    margin: 0 0 6px;
+    font-size: 1.0625rem;
+    font-weight: 600;
+}
+
+.completion-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0;
+    border-block-end: 1px solid var(--bg-cell-given);
+}
+
+.completion-label {
+    color: var(--fg-candidate);
+}
+
+.completion-value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+/* The row that just changed. Weight and colour together, never colour alone --
+   and the heading above already says "a new best time" in words, so this is
+   the second reading of something already stated rather than the only one. */
+.completion-row-best .completion-value {
+    color: var(--fg-user);
+}
+
+.completion-note {
+    margin: 6px 0 0;
+    color: var(--fg-candidate);
+    font-size: 0.8125rem;
+}

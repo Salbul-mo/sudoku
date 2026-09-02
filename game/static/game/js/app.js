@@ -11,10 +11,13 @@ import { bootstrap, createNewSession } from "./bootstrap.js";
 import { createStore } from "./core/store.js";
 import {
     cryptoRng,
+    difficultyForGivens,
     randomGivensForDifficulty,
 } from "./core/difficulty.js";
 import { createPersistence } from "./state/persistence.js";
 import { createSettings } from "./state/settings.js";
+import { createRecords } from "./state/records.js";
+import { createPlayTimer } from "./state/play-timer.js";
 import { createAnnouncer } from "./ui/announcer.js";
 import { createDialogHost } from "./ui/dialog-host.js";
 import { mountShell } from "./ui/app-shell.js";
@@ -103,6 +106,36 @@ export async function start(root, env = {}) {
     const announce = (kind, message) => announcer?.announce(kind, message);
 
     const settings = createSettings(storage);
+    const records = createRecords(storage);
+
+    // Everything the completion card reports, gathered at the moment the board
+    // is finished.
+    //
+    // The difficulty comes from the board itself rather than from settings:
+    // settings hold what the *next* puzzle will be, and someone who changes it
+    // mid-game would otherwise file this solve under the wrong heading.
+    function summariseCompletion(store, timer) {
+        timer.stop();
+        store.session.elapsedMs = timer.elapsed();
+
+        let clues = 0;
+        for (const given of store.session.givens) if (given) clues++;
+        const difficulty = difficultyForGivens(clues).id;
+
+        const outcome = records.record(difficulty, store.session.elapsedMs);
+        return {
+            difficulty,
+            elapsedMs: store.session.elapsedMs,
+            mistakes: store.session.mistakeCells?.size ?? 0,
+            bestMs: outcome.bestMs,
+            isBest: outcome.isBest,
+            solved: outcome.solved,
+            // storage is a memoryStorage() stand-in when the real one throws,
+            // so a record written there is gone on reload and must not be
+            // presented as a saved best.
+            persisted: storage === globalThis.localStorage,
+        };
+    }
     function prepareNewPuzzleRequest() {
         const requested = randomGivensForDifficulty(
             settings.get().newGameDifficulty,
@@ -250,6 +283,29 @@ export async function start(root, env = {}) {
     function enableAdapters(store) {
         const disposers = [];
 
+        // Play time, not wall time: a board left open in a background tab must
+        // not accumulate hours. Started here and stopped whenever the tab goes
+        // away or the puzzle is finished.
+        const timer = createPlayTimer(store.session.elapsedMs ?? 0);
+        timer.start();
+        const persistElapsed = () => {
+            store.session.elapsedMs = timer.elapsed();
+        };
+        const onTimerVisibility = () => {
+            if (document.visibilityState === "hidden") {
+                timer.stop();
+                persistElapsed();
+            } else if (!store.isSolved()) {
+                timer.start();
+            }
+        };
+        document.addEventListener("visibilitychange", onTimerVisibility);
+        disposers.push(() => {
+            document.removeEventListener("visibilitychange", onTimerVisibility);
+            timer.stop();
+            persistElapsed();
+        });
+
         const shareView = createShareView({
             location: loc,
             session: store.session,
@@ -300,6 +356,7 @@ export async function start(root, env = {}) {
             dialogs,
             announcer,
             boardView,
+            onCompletion: () => summariseCompletion(store, timer),
             startNewGame: () => { void restart(); },
             openShare: () => { void openShare(shareView); },
             openSettings: () => { void openSettings(); },

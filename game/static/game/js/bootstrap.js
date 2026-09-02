@@ -4,6 +4,7 @@
 // session conflicts) get evaluated, and the only place a failed new-puzzle
 // fetch has to end somewhere other than a blank page (M1).
 import { createStore } from "./core/store.js";
+import { CURRENT_SCHEMA_VERSION } from "./state/serialize.js";
 import { t } from "./i18n/messages.js";
 
 const NEW_PUZZLE_TIMEOUT_MS = 10_000;
@@ -23,7 +24,7 @@ function isValidGrid(grid) {
 function sessionFromPuzzle(puzzle, solution) {
     const givens = Uint8Array.from(puzzle);
     return {
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         puzzleId: String(Date.now()),
         dim: 9,
         givens,
@@ -32,6 +33,8 @@ function sessionFromPuzzle(puzzle, solution) {
         solution: isValidGrid(solution) ? Uint8Array.from(solution) : null,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        elapsedMs: 0,
+        mistakeCells: new Set(),
     };
 }
 
@@ -59,7 +62,7 @@ function differentCore(urlState, localSession) {
 // solution: null -- "정답 체크" falls back to a rule-violation check for it.
 function sessionFromDecoded(state) {
     return {
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         puzzleId: "shared",
         dim: 9,
         givens: Uint8Array.from(state.givens),
@@ -68,6 +71,10 @@ function sessionFromDecoded(state) {
         solution: null,
         createdAt: Date.now(),
         updatedAt: state.savedAt ?? Date.now(),
+        // A shared link carries no play time and no check history -- the URL
+        // codec has no such fields -- so an adopted board starts its own.
+        elapsedMs: 0,
+        mistakeCells: new Set(),
     };
 }
 

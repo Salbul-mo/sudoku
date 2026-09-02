@@ -5,6 +5,7 @@
 import { DIFFICULTIES, difficultyForId } from "../core/difficulty.js";
 import { t } from "../i18n/messages.js";
 import { createLangSwitch, createGameSwitch } from "./page-links.js";
+import { showCompletionCard } from "./completion-card.js";
 
 // "새 게임" is destructive too, but it no longer goes through onDestructive:
 // it asks which difficulty to use rather than for a yes/no, and the choice
@@ -71,17 +72,49 @@ export function mountShell(root, store, settings, deps) {
     actions.clearAll.addEventListener("click", () => onDestructive("clearAll"));
 
     let wasSolved = false;
+    // Guards against a second card for the same finish: the store notifies on
+    // undo and redo too, and toggling the last digit off and on again is a
+    // perfectly ordinary thing to do while looking at a solved board.
+    let cardShownFor = null;
     const unsubscribe = store.subscribe(() => {
         const solved = store.isSolved();
-        if (solved && !wasSolved) deps.announcer.announce("completion", t("check.solved"));
+        if (solved && !wasSolved) {
+            deps.announcer.announce("completion", t("check.solved"));
+            if (cardShownFor !== store.session.puzzleId) {
+                cardShownFor = store.session.puzzleId;
+                void onSolved();
+            }
+        }
         root.dataset.state = solved ? "solved" : "playing";
         wasSolved = solved;
     });
+
+    // Everything the card needs is either on the session or in the records
+    // store, so the shell asks its composition for the two things it cannot
+    // know: how long this took, and where to write the result.
+    async function onSolved() {
+        if (!deps.onCompletion) return;
+        const summary = deps.onCompletion();
+        if (!summary) return;
+        const answer = await showCompletionCard(deps.dialogs, summary);
+        if (answer === "newGame") await onNewGame();
+    }
+
+    // Distinct cells, not a running total: pressing check twice on the same
+    // wrong 5 is one mistake. This is also the only thing in the classic game
+    // that ever judges an entry, which is what makes "mistakes" mean "what the
+    // check caught" rather than "every wrong digit you ever typed".
+    function recordMistakes(wrong) {
+        const seen = store.session.mistakeCells;
+        if (!(seen instanceof Set)) return;
+        for (const index of wrong) seen.add(index);
+    }
 
     function onCheck() {
         const done = store.isSolved();
         const wrong = store.checkAnswer();
         if (wrong) {
+            recordMistakes(wrong);
             const msg = wrong.size ? t("check.wrongCount", { count: wrong.size })
                 : done ? t("check.solved")
                     : t("check.allCorrect");

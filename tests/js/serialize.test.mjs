@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-    serializeSession, deserializeSession, migrate,
+    serializeSession, deserializeSession, migrate, CURRENT_SCHEMA_VERSION,
     _registerMigrationStepForTests, _clearMigrationStepsForTests,
 } from "../../game/static/game/js/state/serialize.js";
 
@@ -111,8 +111,10 @@ test("registered migration steps apply in order up to CURRENT", () => {
     _registerMigrationStepForTests(-1, (obj) => ({ ...obj, schemaVersion: 0, migratedFromMinusOne: true }));
     _registerMigrationStepForTests(0, (obj) => ({ ...obj, schemaVersion: 1 }));
     try {
+        // Runs the fake steps and then the real ones, landing on CURRENT
+        // rather than on whatever the last fake step happened to produce.
         const result = migrate({ schemaVersion: -1 });
-        assert.equal(result.schemaVersion, 1);
+        assert.equal(result.schemaVersion, CURRENT_SCHEMA_VERSION);
         assert.equal(result.migratedFromMinusOne, true);
     } finally {
         _clearMigrationStepsForTests();

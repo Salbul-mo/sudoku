@@ -1,11 +1,22 @@
 // GameSession <-> plain-JSON conversion, with a validating decoder for the
 // untrusted input localStorage really is: users can and do edit it by hand.
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 // Registered migration steps, keyed by the version they migrate *from*.
-// Empty today (schema version 1 is the only one that has ever existed) but
-// the ladder exists now so a future version 2 does not need an ad hoc path.
-const STEPS = new Map();
+//
+// Held separately from the live map so the test helpers below can add a step
+// and put things back: before there were any real steps, "clear" could mean
+// "empty", and now it has to mean "restore".
+const BUILT_IN_STEPS = Object.freeze([
+    // 1 -> 2 added the two fields the completion card reports on. A save
+    // written before them is a game already in progress, and there is no way
+    // to recover how long it has been running or what was checked -- so it
+    // starts from zero rather than guessing. The result is a first completion
+    // that under-reports; inventing a number would be worse.
+    [1, (obj) => ({ ...obj, schemaVersion: 2, elapsedMs: 0, mistakeCells: [] })],
+]);
+
+const STEPS = new Map(BUILT_IN_STEPS);
 
 export function migrate(obj) {
     let cur = obj;
@@ -28,6 +39,10 @@ export function serializeSession(session) {
         solution: session.solution ? Array.from(session.solution) : null,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
+        elapsedMs: session.elapsedMs ?? 0,
+        // Cells, not a count: pressing check twice must not report the same
+        // wrong cell as two separate mistakes.
+        mistakeCells: Array.from(session.mistakeCells ?? []),
     };
 }
 
@@ -70,6 +85,13 @@ export function deserializeSession(raw) {
     if (obj.solution != null && !isByteArray(obj.solution, 81, 9)) {
         return fail("corrupt", "invalid solution");
     }
+    if (!Number.isFinite(obj.elapsedMs) || obj.elapsedMs < 0) {
+        return fail("corrupt", "invalid elapsedMs");
+    }
+    if (!Array.isArray(obj.mistakeCells)
+        || !obj.mistakeCells.every((i) => Number.isInteger(i) && i >= 0 && i < 81)) {
+        return fail("corrupt", "invalid mistakeCells");
+    }
 
     return {
         ok: true,
@@ -83,6 +105,8 @@ export function deserializeSession(raw) {
             solution: obj.solution != null ? Uint8Array.from(obj.solution) : null,
             createdAt: obj.createdAt,
             updatedAt: obj.updatedAt,
+            elapsedMs: obj.elapsedMs,
+            mistakeCells: new Set(obj.mistakeCells),
         },
     };
 }
@@ -95,4 +119,5 @@ export function _registerMigrationStepForTests(fromVersion, step) {
 
 export function _clearMigrationStepsForTests() {
     STEPS.clear();
+    for (const [from, step] of BUILT_IN_STEPS) STEPS.set(from, step);
 }
