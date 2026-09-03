@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Deep audit of the paths tools/browser-smoke.mjs does not reach: undo/redo,
-// sticky candidate mode, the note editor, the settings dialog, 규칙 확인,
+// sticky candidate mode, the settings dialog, 정답 체크,
 // a full share-link round trip through the URL codec and bootstrap, a corrupt
 // fragment, 새 게임 (remount), and 전체 지우기.
 //
@@ -164,22 +164,6 @@ check("only the selected cell shows the candidate-mode badge", markedCells, 1);
 await key("Space", " ", 32); // back to value mode
 await key("Delete", "Delete", 46);
 
-// ------------------------------------------------------------------- notes
-await key("KeyN", "n", 78);
-await wait(300);
-check("N opens the note editor", await ev(`!!document.querySelector('.note-editor textarea')`), true);
-await ev(`(() => { const t = document.querySelector('.note-editor textarea');
-    t.value = "여기는 7 아니면 3"; })()`);
-await click(".note-editor button");
-await wait(300);
-check("saving a note closes the editor",
-    await ev(`!document.querySelector('.note-editor')`), true);
-check("the cell shows a note marker", await ev(`document.querySelector('[data-index="${cell}"]').dataset.note`), "1");
-check("the note reaches the accessible name",
-    await ev(`document.querySelector('[data-index="${cell}"]').getAttribute("aria-label").includes("메모 있음")`), true);
-check("the note text is stored as text, never markup",
-    await ev(`JSON.parse(localStorage.getItem("sudoku:v1:session")).cellNotes["${cell}"]`), "여기는 7 아니면 3");
-
 // ---------------------------------------------------------------- settings
 await click('[data-action="settings"]');
 check("settings dialog opens", await ev(`!!document.querySelector('.settings-form')`), true);
@@ -194,26 +178,47 @@ check("showConflicts persists to storage",
 await key("Escape", "Escape", 27);
 await wait(300);
 
-// make a conflict and confirm the cue is suppressed but 규칙 확인 still finds it
+// make a conflict and confirm the cue is suppressed but 정답 체크 still finds it
+//
+// The digit is chosen to be wrong for `other` rather than hardcoded. 정답 체크
+// judges against the solution when there is one, so it highlights cells that
+// disagree with it -- and a hardcoded 9 that happened to be the right digit for
+// this cell would be a correct entry the check has no reason to flag. That is a
+// one-in-nine failure of the test, not of the app.
 const other = await firstEmpty();
+const wrongDigit = await ev(`(() => {
+    const raw = JSON.parse(localStorage.getItem("sudoku:v1:session"));
+    const truth = raw.solution[${other}];
+    return truth === 9 ? 8 : 9; })()`);
+const typeWrong = () => key(`Digit${wrongDigit}`, String(wrongDigit), 48 + wrongDigit);
+
 await clickCell(other); // the settings dialog returned focus to the header button
-await key("Digit9", "9", 57);
+await typeWrong();
+// A second cell in the same row with the same digit, so the pair is also a
+// plain rule violation -- which is what the accessible-name check reads.
 const rowMate = await ev(`(() => { const r = Math.floor(${other} / 9);
     for (let c = 0; c < 9; c++) { const i = r * 9 + c;
         const el = document.querySelector('[data-index="'+i+'"]');
         if (i !== ${other} && el.dataset.given === "0" && el.querySelector('.cell-value').textContent === "") return i; }
     return -1; })()`);
 await clickCell(rowMate);
-await key("Digit9", "9", 57);
+await typeWrong();
 check("with showConflicts off the cue stays hidden",
     await ev(`document.querySelector('[data-index="${other}"]').dataset.conflict`), "0");
 check("but the violation is still in the accessible name",
     await ev(`document.querySelector('[data-index="${other}"]').getAttribute("aria-label").includes("규칙 위반")`), true);
 await click('[data-action="check"]');
-check("규칙 확인 forces the cue on despite the setting",
+check("정답 체크 forces the cue on despite the setting",
     await ev(`document.querySelector('[data-index="${other}"]').dataset.conflict`), "1");
-check("규칙 확인 announces the count",
-    await ev(`document.querySelector('[aria-live]').textContent.includes("규칙 위반")`), true);
+// ui/app-shell.js::onCheck has two branches: it judges against the solution
+// when the session has one, and falls back to a rule-violation count when it
+// does not (a session adopted from a shared link). This board came from the
+// API, so it has a solution and the announcement is the solution-based one --
+// "규칙 위반" is the fallback's wording and would mean the solution went
+// missing. The fallback itself is covered in tests/js/app-shell.test.mjs
+// ("onCheck without a known solution falls back to a rule-violation check").
+check("정답 체크 announces how many cells differ from the solution",
+    await ev(`document.querySelector('[aria-live]').textContent.includes("정답과 다른 칸")`), true);
 
 // ------------------------------------------------------------ share round trip
 await wait(700); // let the 300ms persistence debounce land before reading storage
@@ -222,9 +227,8 @@ check("the conflicting values reached storage before encoding",
 const link = await ev(`(async () => {
     const { encode } = await import("/static/game/js/url/codec.js");
     const raw = JSON.parse(localStorage.getItem("sudoku:v1:session"));
-    const session = { givens: raw.givens, values: raw.values, candidates: raw.candidates,
-                      cellNotes: raw.cellNotes, regionNotes: raw.regionNotes };
-    const fragment = await encode(session, "SC3", raw.updatedAt);
+    const session = { givens: raw.givens, values: raw.values, candidates: raw.candidates };
+    const fragment = await encode(session, "SC2", raw.updatedAt);
     return location.origin + location.pathname + "#s=" + fragment;
 })()`);
 check("a share link was produced", typeof link === "string" && link.includes("#s="), true);
@@ -233,9 +237,8 @@ await wait(500);
 await clearOriginStorage(); // the recipient of a shared link has no saved session
 await hardNavigate(link);
 check("the shared link restores the entered values",
-    await ev(`document.querySelector('[data-index="${other}"] .cell-value').textContent`), "9");
-check("the shared link restores notes (SC3)",
-    await ev(`document.querySelector('[data-index="${cell}"]').dataset.note`), "1");
+    await ev(`document.querySelector('[data-index="${other}"] .cell-value').textContent`),
+    String(wrongDigit));
 check("the fragment is stripped from the address bar after adoption",
     await ev(`location.hash`), "");
 check("no retry panel after adopting a link", await ev(`!document.querySelector('.retry-panel')`), true);
@@ -258,8 +261,13 @@ await hardNavigate(APP);
 const beforeGivens = await ev(`[...document.querySelectorAll('.cell')].map(c => c.dataset.given).join("")`);
 await click('[data-action="newGame"]');
 await wait(300);
-check("새 게임 asks for confirmation first", await ev(`!!document.querySelector('[role="dialog"]')`), true);
-await ev(`[...document.querySelectorAll('[role="dialog"] button')].find(b => b.textContent === "계속").click()`);
+check("새 게임 asks which difficulty first", await ev(`!!document.querySelector('[role="dialog"]')`), true);
+// Picking a difficulty is itself the confirmation -- there is no separate
+// yes/no step -- so the five difficulties plus 취소 are what this dialog offers.
+check("the difficulty dialog offers all five plus cancel",
+    await ev(`[...document.querySelectorAll('[role="dialog"] button')].map(b => b.textContent).join(",")`),
+    "입문,쉬움,보통,어려움,전문가,취소");
+await ev(`[...document.querySelectorAll('[role="dialog"] button')].find(b => b.textContent === "어려움").click()`);
 await wait(3000);
 const afterGivens = await ev(`[...document.querySelectorAll('.cell')].map(c => c.dataset.given).join("")`);
 check("새 게임 replaces the puzzle", beforeGivens !== afterGivens, true);
