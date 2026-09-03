@@ -11,6 +11,7 @@
 // marked cell is already selected when the step begins, so the natural action
 // is simply to press a digit.
 import { createStore } from "../core/store.js";
+import { CURRENT_SCHEMA_VERSION } from "../state/serialize.js";
 import { mountBoard } from "../ui/board-view.js";
 import { mountTouchControls } from "../ui/touch-controls.js";
 import { createTouchAdapter, resolveVisibility } from "../ui/touch-adapter.js";
@@ -26,7 +27,7 @@ const TICK_MS = 100;
 
 function sessionFrom(puzzle, solution) {
     return {
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         puzzleId: `rush-${Date.now()}`,
         dim: 9,
         givens: Uint8Array.from(puzzle),

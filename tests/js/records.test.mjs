@@ -11,9 +11,17 @@ function fakeClock(start = 0) {
     return { now: () => now, advance: (ms) => { now += ms; } };
 }
 
+// Keyed, like the real thing. A single-value double would let a module that
+// wrote to the wrong key -- or, as here, a probe that shares a key with the
+// data -- pass a test it should fail.
 function fakeStorage(initial = null) {
-    let value = initial;
-    return { getItem: () => value, setItem: (_k, v) => { value = v; } };
+    const map = new Map();
+    if (initial !== null) map.set("sudoku.classic.records", initial);
+    return {
+        getItem: (k) => (map.has(k) ? map.get(k) : null),
+        setItem: (k, v) => { map.set(k, String(v)); },
+        removeItem: (k) => { map.delete(k); },
+    };
 }
 
 // ------------------------------------------------------------ play timer
@@ -152,6 +160,17 @@ test("T-C02-06: a storage that throws is survivable, and unknown ids are rejecte
 
     assert.throws(() => records.record("impossible", 1), RangeError);
     assert.throws(() => records.get("impossible"), RangeError);
+});
+
+// The card says "this browser is not saving records" from this flag, so it has
+// to be the storage's own answer rather than the caller comparing objects.
+test("T-C02-08: persisted reports whether a write actually lands", () => {
+    assert.equal(createRecords(fakeStorage()).persisted, true);
+    assert.equal(createRecords(null).persisted, false);
+    assert.equal(createRecords({
+        getItem: () => null,
+        setItem() { throw new Error("quota"); },
+    }).persisted, false);
 });
 
 test("T-C02-07: all() and get() hand out copies", () => {

@@ -14,6 +14,23 @@ const isDuration = (n) => Number.isFinite(n) && n > 0;
 
 export function createRecords(storage) {
     let byDifficulty = load();
+    // Asked once, here, rather than inferred by the caller comparing its
+    // storage object against localStorage: this module is the one that knows
+    // whether a write lands, and a caller guessing would start lying the day
+    // the storage it was handed is wrapped rather than passed through.
+    const persisted = probe();
+
+    function probe() {
+        if (!storage) return false;
+        try {
+            const key = "sudoku.classic.records.probe";
+            storage.setItem(key, "1");
+            storage.removeItem?.(key);
+            return true;
+        } catch {
+            return false;
+        }
+    }
 
     function load() {
         let raw = null;
@@ -55,6 +72,11 @@ export function createRecords(storage) {
     }
 
     return {
+        // Whether a best time written here will still be here tomorrow. The
+        // completion card says so rather than showing a record that is about
+        // to evaporate.
+        persisted,
+
         /**
          * Records one completion.
          *

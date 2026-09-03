@@ -136,3 +136,26 @@ test("T-B03-07: an out-of-range clue count is caught before any request", () => 
 test("T-B03-07b: a missing fetch is a programming error, not a runtime surprise", () => {
     assert.throws(() => createPuzzleSource({ fetch: null, givens: GIVENS }), TypeError);
 });
+
+// A caller that takes one board and drops the source -- building a sheet of
+// printable puzzles asks for a different clue count each time, so it needs a
+// source each time -- must not be charged for a board it will never see.
+test("T-B03-09: prefetch: false costs exactly one request per board", async () => {
+    const eagerFetch = fakeFetch([ok()]);
+    const eager = createPuzzleSource({ fetch: eagerFetch.fn, givens: GIVENS, ...noDelay });
+    await eager.take();
+    await Promise.resolve();
+    assert.equal(eagerFetch.calls.length, 2, "the default primes the next board");
+
+    const lazyFetch = fakeFetch([ok()]);
+    const lazy = createPuzzleSource({
+        fetch: lazyFetch.fn, givens: GIVENS, prefetch: false, ...noDelay,
+    });
+    await lazy.take();
+    await Promise.resolve();
+    assert.equal(lazyFetch.calls.length, 1, "prefetch: false must not prime anything");
+
+    // Still usable more than once; it just fetches in the foreground each time.
+    await lazy.take();
+    assert.equal(lazyFetch.calls.length, 2);
+});

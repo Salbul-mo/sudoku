@@ -130,7 +130,10 @@ export function start(root) {
                 // so a sheet of six is not six puzzles with identical density.
                 const givens = band.minGivens
                     + Math.floor(cryptoRng() * (band.maxGivens - band.minGivens + 1));
-                const source = createPuzzleSource({ givens });
+                // prefetch off: a source is built per puzzle because the clue
+                // count changes each time, and one that primed a next board
+                // would spend a second request on a board this loop discards.
+                const source = createPuzzleSource({ givens, prefetch: false });
                 const board = await source.take();
 
                 const figure = element("figure", "printable-puzzle");

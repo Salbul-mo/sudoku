@@ -50,6 +50,13 @@ export function createPuzzleSource(deps = {}) {
         retryDelayMs = DEFAULT_RETRY_DELAY_MS,
         isOnline = () => globalThis.navigator?.onLine !== false,
         delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        // Both games want the next board fetched while the current one is being
+        // played. A caller that takes a board and then throws the source away
+        // -- building a sheet of printable puzzles asks for a different clue
+        // count each time, so it needs a source each time -- would otherwise
+        // spend a request on a board nobody will ever see, doubling the cost of
+        // every batch.
+        prefetch = true,
     } = deps;
 
     if (typeof fetchImpl !== "function") {
@@ -97,7 +104,7 @@ export function createPuzzleSource(deps = {}) {
     let pending = null;
 
     function primeNext() {
-        if (pending !== null) return;
+        if (!prefetch || pending !== null) return;
         pending = fetchOne().catch(() => {
             // A failed prefetch must not surface here: nothing is waiting on it,
             // and the next take() will retry in the foreground where the UI can

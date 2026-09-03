@@ -195,12 +195,15 @@ test("T-E04-11: out-of-range marks and malformed deductions are rejected", () =>
 
 // ------------------------------------------------------------ B-05
 
+// Keyed, like the real thing. A single-value double would let a module that
+// wrote to the wrong key pass a test it should fail.
 function fakeStorage(initial = null) {
-    let value = initial;
+    const map = new Map();
+    if (initial !== null) map.set("sudoku.learn.progress", initial);
     return {
-        getItem: () => value,
-        setItem: (_key, next) => { value = next; },
-        get value() { return value; },
+        getItem: (key) => (map.has(key) ? map.get(key) : null),
+        setItem: (key, next) => { map.set(key, String(next)); },
+        removeItem: (key) => { map.delete(key); },
     };
 }
 

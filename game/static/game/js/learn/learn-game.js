@@ -14,6 +14,7 @@
 // live hit targets. Every press is therefore checked against the candidate
 // mask in the store, never against what the DOM happens to be showing.
 import { createStore } from "../core/store.js";
+import { CURRENT_SCHEMA_VERSION } from "../state/serialize.js";
 import { mountBoard } from "../ui/board-view.js";
 import { CELLS, DIM } from "../core/spec.js";
 import { TECHNIQUES, assistCells, buildCandidates } from "../rush/techniques.js";
@@ -27,7 +28,7 @@ const bit = (digit) => 1 << (digit - 1);
 
 function sessionFrom(values, solution) {
     return {
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         puzzleId: `learn-${Date.now()}`,
         dim: DIM,
         // Every filled cell is a given: nothing on this board was entered by
@@ -152,18 +153,21 @@ export function createLearnGame(deps) {
         };
     }
 
-    async function start(nextTechnique) {
-        technique = nextTechnique;
-        deps.shell.setActive(technique);
-        deps.shell.setBusy(true);
+    /**
+     * Puts one exercise on screen.
+     *
+     * Split from start() so the busy state can be released in a finally
+     * without indenting the whole body: a throw anywhere in here would
+     * otherwise leave every technique button disabled with no way to retry.
+     */
+    async function mountExercise(nextTechnique) {
         deps.view.showLoading();
         teardownBoard();
 
         let position = null;
         try {
-            position = await deps.positionSource.take(technique);
+            position = await deps.positionSource.take(nextTechnique);
         } catch (error) {
-            deps.shell.setBusy(false);
             if (error instanceof LearnSourceError) return deps.view.showExhausted();
             if (error instanceof PuzzleSourceError) return deps.view.showError(error.cause);
             throw error;
@@ -196,8 +200,18 @@ export function createLearnGame(deps) {
         }
 
         deps.view.showPrompt(lesson);
-        deps.shell.setBusy(false);
         paintMarks();
+    }
+
+    async function start(nextTechnique) {
+        technique = nextTechnique;
+        deps.shell.setActive(technique);
+        deps.shell.setBusy(true);
+        try {
+            await mountExercise(nextTechnique);
+        } finally {
+            deps.shell.setBusy(false);
+        }
     }
 
     return {

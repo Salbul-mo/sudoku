@@ -130,10 +130,7 @@ export async function start(root, env = {}) {
             bestMs: outcome.bestMs,
             isBest: outcome.isBest,
             solved: outcome.solved,
-            // storage is a memoryStorage() stand-in when the real one throws,
-            // so a record written there is gone on reload and must not be
-            // presented as a saved best.
-            persisted: storage === globalThis.localStorage,
+            persisted: records.persisted,
         };
     }
     function prepareNewPuzzleRequest() {
