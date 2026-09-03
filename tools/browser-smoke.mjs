@@ -197,8 +197,37 @@ check("a duplicate in the same row marks both cells",
 // Delete clears pair.a (the current selection); pair.b must stop being marked
 // even though the store only reports pair.a as changed.
 await key("Delete", "Delete", 46);
-check("clearing one duplicate clears the other cell's conflict cue too",
-    await evaluate(`document.querySelector('[data-index="${pair.b}"]').dataset.conflict`), "0");
+const afterDelete = await evaluate(`document.querySelector('[data-index="${pair.b}"]').dataset.conflict`);
+// This check has failed intermittently and has not been reproducible on demand
+// -- 12 consecutive runs and 25 board-state probes came back clean. Rather than
+// guess at a cause, the state is dumped the moment it goes wrong, so the next
+// occurrence answers the question instead of raising it again. The two things
+// worth knowing are whether Delete actually emptied pair.a (if it did not, the
+// conflict is real and the input was lost) and, if it did, which cell pair.b is
+// still clashing with.
+if (afterDelete !== "0") {
+    const why = await evaluate(`(() => {
+        const text = (i) => document.querySelector('[data-index="'+i+'"] .cell-value').textContent;
+        const given = (i) => document.querySelector('[data-index="'+i+'"]').dataset.given === "1";
+        const r = Math.floor(${pair.b} / 9), c = ${pair.b} % 9;
+        const b = Math.floor(r / 3) * 3 + Math.floor(c / 3);
+        const peers = new Set();
+        for (let k = 0; k < 9; k++) { peers.add(r * 9 + k); peers.add(k * 9 + c);
+            peers.add((Math.floor(b / 3) * 3 + Math.floor(k / 3)) * 9 + (b % 3) * 3 + k % 3); }
+        peers.delete(${pair.b});
+        return {
+            pair: { a: ${pair.a}, b: ${pair.b}, digit: ${pair.digit} },
+            aStillHolds: text(${pair.a}),
+            bHolds: text(${pair.b}),
+            clashingPeers: [...peers].filter((i) => text(i) === String(${pair.digit}))
+                .map((i) => ({ index: i, given: given(i) })),
+            allUserValues: [...Array(81).keys()].filter((i) => !given(i) && text(i))
+                .map((i) => ({ index: i, value: text(i) })),
+        };
+    })()`);
+    console.log("DIAGNOSTIC conflict-clear failed:", JSON.stringify(why));
+}
+check("clearing one duplicate clears the other cell's conflict cue too", afterDelete, "0");
 
 console.log("\n=== interaction checks ===");
 for (const c of checks) {
