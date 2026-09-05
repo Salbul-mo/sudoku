@@ -145,18 +145,20 @@
 
 .learn-digit-pad {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
-    inline-size: min(100%, 360px);
+    grid-template-columns: repeat(3, minmax(48px, 1fr));
+    gap: 8px;
+    inline-size: min(100%, 240px);
 }
 
 .learn-digit {
+    aspect-ratio: 1;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--bg-cell);
     color: var(--fg-body);
     font: inherit;
     font-size: 1rem;
+    padding: 0;
     cursor: pointer;
 }
 
