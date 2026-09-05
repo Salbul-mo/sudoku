@@ -4,7 +4,7 @@
 // entry points had behavior specified but no owning module until this block.
 import { DIFFICULTIES, difficultyForId } from "../core/difficulty.js";
 import { t } from "../i18n/messages.js";
-import { createLangSwitch, createGameSwitch } from "./page-links.js";
+import { createLangSwitch } from "./page-links.js";
 import { showCompletionCard } from "./completion-card.js";
 
 // "새 게임" is destructive too, but it no longer goes through onDestructive:
@@ -58,11 +58,10 @@ export function mountShell(root, store, settings, deps) {
         actions[id] = button;
     }
 
-    // Both are <a href> and not buttons: each target is an indexed URL, so a
-    // crawler has to be able to follow it and a reader to bookmark it. The
-    // in-progress game survives either navigation because it lives in
-    // localStorage, not in this page's memory.
-    header.append(createGameSwitch("classic"), createLangSwitch("classic"));
+    // The language link is an <a href>, so a crawler can follow it and a reader
+    // can bookmark or middle-click it. Game modes are linked from the footer,
+    // so only the language switch is kept in the header.
+    header.append(createLangSwitch("classic"));
 
     actions.check.addEventListener("click", () => onCheck());
     actions.share.addEventListener("click", () => deps.openShare());

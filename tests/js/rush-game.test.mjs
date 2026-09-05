@@ -6,7 +6,7 @@ const uninstall = installFakeDocument();
 const { createRushGame } = await import("../../game/static/game/js/rush/rush-game.js");
 const { mountRushShell } = await import("../../game/static/game/js/rush/rush-shell.js");
 const { mountRushView } = await import("../../game/static/game/js/rush/rush-view.js");
-const { RUSH, pointsFor } = await import("../../game/static/game/js/rush/config.js");
+const { RUSH, RUSH_MODES, pointsFor } = await import("../../game/static/game/js/rush/config.js");
 const { generatePuzzle } = await import("../../functions/_lib/sudoku/generator.js");
 after(uninstall);
 
@@ -34,6 +34,9 @@ function harness(overrides = {}) {
     const root = fakeRoot();
     const shell = mountRushShell(root, {});
     const view = mountRushView(root, { onRestart() {} });
+    const ticks = [];
+    const tick = view.tick;
+    view.tick = (remaining, limit) => { ticks.push({ remaining, limit }); tick(remaining, limit); };
 
     const game = createRushGame({
         source,
@@ -57,7 +60,7 @@ function harness(overrides = {}) {
     });
 
     return {
-        game, shell, view, announced, failures, boards, root,
+        game, shell, view, announced, failures, boards, root, ticks,
         advance(ms) {
             now += ms;
             for (const [id, timer] of [...timeouts]) {
@@ -91,6 +94,16 @@ test("T-B04-01: the right digit in the marked cell scores, a wrong one costs a l
     assert.equal(h2.game.state().lives, RUSH.LIVES - 1, "a wrong digit costs a life");
     assert.equal(h2.game.state().combo, 0, "and breaks the combo");
     h2.game.destroy();
+});
+
+test("T-B10-02: starting a run with a mode uses that mode's opening limit", async () => {
+    for (const { id, limitMs } of RUSH_MODES) {
+        const h = harness();
+        await h.game.start(id);
+        assert.equal(h.ticks.at(-1).limit, limitMs, `${id} opening limit`);
+        assert.equal(h.game.mode, id);
+        h.game.destroy();
+    }
 });
 
 test("T-B04-02: running out of time costs a life and moves on", async () => {

@@ -24,7 +24,15 @@ export function mountLearnShell(root, deps = {}) {
     const header = document.createElement("div");
     header.className = "learn-header";
 
-    const label = document.createElement("h2");
+    const title = document.createElement("h2");
+    title.className = "learn-page-title";
+    title.textContent = t("learn.pageTitle");
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "learn-page-subtitle";
+    subtitle.textContent = t("learn.pageSubtitle");
+
+    const label = document.createElement("h3");
     label.className = "learn-picker-label";
     label.textContent = t("learn.pickTechnique");
 
@@ -64,7 +72,7 @@ export function mountLearnShell(root, deps = {}) {
     links.className = "learn-header-links";
     links.appendChild(createLangSwitch("learn"));
 
-    header.append(label, picker, links);
+    header.append(title, subtitle, label, picker, links);
     root.appendChild(header);
 
     return {

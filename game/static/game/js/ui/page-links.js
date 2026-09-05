@@ -1,5 +1,5 @@
-// The two header links every page carries: the same page in the other
-// language, and the other game in the same language.
+// Shared page-link helpers. Language switches live in page headers; game-mode
+// navigation is rendered by the footer.
 //
 // Both are real anchors rather than buttons with click handlers. Each target is
 // an indexed URL, so a crawler has to be able to follow it and a reader has to

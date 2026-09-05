@@ -20,7 +20,12 @@ import { CELLS } from "../core/spec.js";
 import { nextTarget } from "./engine.js";
 import { createClock, limitFor } from "./clock.js";
 import { createScore } from "./score.js";
-import { RUSH, difficultyFor } from "./config.js";
+import {
+    DEFAULT_RUSH_MODE,
+    RUSH,
+    difficultyFor,
+    rushModeForId,
+} from "./config.js";
 import { assistCells } from "./techniques.js";
 
 const TICK_MS = 100;
@@ -79,6 +84,7 @@ export function createRushGame(deps) {
     let running = false;
     let applying = false; // true while the engine's giveaways are being written
     let swapping = false; // true while a swapped-in board is being fetched
+    let rushMode = DEFAULT_RUSH_MODE;
     // The step's time allowance depends on the deduction, so it cannot be
     // recomputed from the step number alone -- resume() and the repaint loop
     // have to use the value the step actually started with or the bar jumps.
@@ -169,7 +175,7 @@ export function createRushGame(deps) {
         // more -- give the whole board back before the result panel appears.
         setFocusView(false);
         deps.view.tick(0, 1);
-        deps.view.showResult(state);
+        deps.view.showResult(state, rushMode);
         deps.announcer.announce("completion", t("rush.gameOver", {
             score: state.score, combo: state.bestCombo,
         }));
@@ -225,7 +231,12 @@ export function createRushGame(deps) {
         applyAssist(target, assist);
         deps.announcer.announce("session", t("rush.technique." + target.technique));
 
-        currentLimit = limitFor(score.state().step, target.technique, target.units.length);
+        currentLimit = limitFor(
+            score.state().step,
+            target.technique,
+            target.units.length,
+            rushMode,
+        );
         clock.start(currentLimit);
         stopTicking();
         deps.view.tick(currentLimit, currentLimit);
@@ -263,7 +274,11 @@ export function createRushGame(deps) {
         deps.onFailure?.(error);
     }
 
-    async function start() {
+    async function start(modeId = DEFAULT_RUSH_MODE) {
+        const mode = rushModeForId(modeId);
+        if (mode === null) throw new RangeError(`unknown rush mode: ${modeId}`);
+        rushMode = mode.id;
+        deps.view.setMode?.(rushMode);
         score.reset();
         deps.shell.setStats(score.state());
         deps.view.clearPanel();
@@ -346,6 +361,7 @@ export function createRushGame(deps) {
         start, pause, resume, destroy, swapBoard,
         get running() { return running; },
         get target() { return target; },
+        get mode() { return rushMode; },
         get swapFree() { return swapIsFree(); },
         state: () => score.state(),
         timings: () => timings.slice(),

@@ -60,6 +60,16 @@ test("all 6 header actions are rendered", () => {
     assert.equal(Object.keys(shell.actions).length, 6);
 });
 
+test("the classic header keeps language navigation but no game-mode switch", () => {
+    const root = fakeRoot();
+    mountShell(root, createStore(freshSession()), { get: () => ({}) }, noopDeps());
+    const header = root.children[0];
+    const gameSwitches = header.children.filter((child) => child.className === "game-switch");
+    const languageSwitches = header.children.filter((child) => child.className === "lang-switch");
+    assert.equal(gameSwitches.length, 0);
+    assert.equal(languageSwitches.length, 1);
+});
+
 test("an unknown destructive action throws RangeError", async () => {
     const store = createStore(freshSession());
     const shell = mountShell(fakeRoot(), store, { get: () => ({}) }, noopDeps());

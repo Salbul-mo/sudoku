@@ -2,7 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createClock, limitFor } from "../../game/static/game/js/rush/clock.js";
 import { createScore } from "../../game/static/game/js/rush/score.js";
-import { RUSH, RUSH_STORAGE_KEY, difficultyFor, pointsFor } from "../../game/static/game/js/rush/config.js";
+import {
+    DEFAULT_RUSH_MODE,
+    RUSH,
+    RUSH_MODES,
+    RUSH_STORAGE_KEY,
+    difficultyFor,
+    pointsFor,
+    rushModeForId,
+} from "../../game/static/game/js/rush/config.js";
 
 // A clock the test drives by hand, so timing assertions are exact instead of
 // racing a real timer.
@@ -44,6 +52,26 @@ test("T-B02-01: the step limit decays to the floor and never below it", () => {
     }
     assert.throws(() => limitFor(-1), RangeError);
     assert.throws(() => limitFor(1.5), RangeError);
+});
+
+test("T-B10-01: Rush modes expose the requested opening limits", () => {
+    assert.deepEqual(
+        RUSH_MODES.map(({ id, limitMs }) => [id, limitMs]),
+        [
+            ["beginner", 20_000],
+            ["intermediate", 15_000],
+            ["advanced", 10_000],
+            ["challenge", 7_000],
+        ],
+    );
+    for (const { id, limitMs } of RUSH_MODES) {
+        assert.equal(limitFor(0, null, 1, id), limitMs, `${id} opening limit`);
+        assert.equal(limitFor(0, "naked-single", 1, id), limitMs, `${id} first target`);
+    }
+    assert.equal(DEFAULT_RUSH_MODE, "advanced", "existing ten-second behavior stays the default");
+    assert.equal(rushModeForId("challenge").limitMs, 7_000);
+    assert.equal(rushModeForId("unknown"), null);
+    assert.throws(() => limitFor(0, null, 1, "unknown"), RangeError);
 });
 
 test("T-B02-02: pausing preserves the remaining time instead of burning a life", () => {

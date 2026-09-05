@@ -4,7 +4,7 @@
 // check answer, new game, clear all, share, settings, help -- and none of it
 // applies to a run against a clock.
 import { t } from "../i18n/messages.js";
-import { createLangSwitch, createGameSwitch } from "../ui/page-links.js";
+import { createLangSwitch } from "../ui/page-links.js";
 import { RUSH } from "./config.js";
 
 // A card: a quiet label over the number. `extra` rides on the same line as the
@@ -66,9 +66,9 @@ export function mountRushShell(root, deps = {}) {
     stats.className = "rush-stats";
     stats.append(score.wrap, combo.wrap, lives.wrap);
 
-    // The two links travel as a pair. Appended straight to the header they wrap
-    // one at a time, so a phone put the game switch beside the stats and left
-    // the language switch alone on a line of its own.
+    // Header navigation only carries the language switch. Game modes are
+    // linked from the footer, so the game switch is intentionally not mounted
+    // here.
     const links = document.createElement("div");
     links.className = "rush-header-links";
 
@@ -86,7 +86,7 @@ export function mountRushShell(root, deps = {}) {
         links.appendChild(swap);
     }
 
-    links.append(createGameSwitch("rush"), createLangSwitch("rush"));
+    links.append(createLangSwitch("rush"));
 
     header.append(stats, links);
     root.appendChild(header);

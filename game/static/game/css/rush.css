@@ -243,6 +243,35 @@
     align-items: flex-start;
 }
 
+.rush-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.rush-mode-current,
+.rush-mode-result,
+.rush-mode-title {
+    margin: 0;
+}
+
+.rush-mode-current,
+.rush-mode-result {
+    color: var(--fg-candidate);
+}
+
+.rush-mode-options {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    inline-size: 100%;
+}
+
+.rush-mode-option[aria-pressed="true"] {
+    background: var(--bg-cell-selected);
+    border-color: var(--focus);
+}
+
 .rush-panel button {
     min-inline-size: var(--control-floor);
     min-block-size: var(--control-floor);
@@ -258,6 +287,12 @@
 .rush-panel button:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+    .rush-mode-options {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .rush-summary,

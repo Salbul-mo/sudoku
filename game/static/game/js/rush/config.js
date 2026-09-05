@@ -1,14 +1,26 @@
 // Every number that decides how the game feels, in one place, because these
 // are the values that get changed after playing on a real phone rather than
 // reasoned out from the code.
+export const RUSH_MODES = Object.freeze([
+    Object.freeze({ id: "beginner", limitMs: 20_000 }),
+    Object.freeze({ id: "intermediate", limitMs: 15_000 }),
+    Object.freeze({ id: "advanced", limitMs: 10_000 }),
+    Object.freeze({ id: "challenge", limitMs: 7_000 }),
+]);
+
+// The existing rush mode started at ten seconds, so keep that behavior as the
+// default until the player explicitly chooses another mode.
+export const DEFAULT_RUSH_MODE = "advanced";
+
+export function rushModeForId(id) {
+    return RUSH_MODES.find((mode) => mode.id === id) ?? null;
+}
+
 export const RUSH = Object.freeze({
     LIVES: 3,
 
-    // The step limit decays from INITIAL toward FLOOR, DECAY per step. The
-    // first version (5000 -> 1800 by step 32) was too tight to read the row,
-    // the column and the box before answering, so a step now starts at ten
-    // seconds and never drops below four; the floor arrives at step 50, i.e.
-    // after the first board rather than in the middle of it.
+    // The selected mode supplies the opening limit. It then decays toward
+    // FLOOR by DECAY per step, preserving the existing rush pacing.
     LIMIT_INITIAL_MS: 10000,
     LIMIT_FLOOR_MS: 4000,
     LIMIT_DECAY_MS: 120,

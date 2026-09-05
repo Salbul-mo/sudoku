@@ -216,6 +216,7 @@ export function createLearnGame(deps) {
 
     return {
         start,
+        answerDigit,
         submit() {
             if (lesson === null || lesson.kind !== "elimination") return;
             if (lesson.state() === "correct") return;
@@ -224,8 +225,8 @@ export function createLearnGame(deps) {
         next() {
             if (technique !== null) void start(technique);
         },
-        // Exposed for the composition's keyboard wiring and for tests; the view
-        // never reaches into the lesson itself.
+        // The view routes its digit pad through this same entry point as the
+        // keyboard; the view never reaches into the lesson itself.
         get lesson() { return lesson; },
         destroy() {
             teardownBoard();

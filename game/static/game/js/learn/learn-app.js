@@ -45,9 +45,8 @@ export function start(root) {
     root.replaceChildren();
 
     const shellHost = section("learn-shell-host");
-    const boardHost = section("board-area");
     const viewHost = section("learn-view-host");
-    root.append(shellHost, boardHost, viewHost);
+    root.append(shellHost, viewHost);
 
     const settings = createSettings(safeStorage());
     const progress = createProgress(safeStorage());
@@ -63,12 +62,13 @@ export function start(root) {
         onSelectTechnique: (technique) => { void game.start(technique); },
     });
     const view = mountLearnView(viewHost, {
+        onDigit: (digit) => game.answerDigit(digit),
         onSubmit: () => game.submit(),
         onNext: () => game.next(),
     });
 
     const game = createLearnGame({
-        positionSource, shell, view, boardHost, announcer, settings, progress,
+        positionSource, shell, view, boardHost: view.boardHost, announcer, settings, progress,
     });
 
     shell.setProgress(progress.all());

@@ -3,7 +3,7 @@
 // Time comes in through deps rather than off the global, so a test can run a
 // whole game in a millisecond and assert on exact boundaries instead of
 // sleeping and hoping.
-import { RUSH } from "./config.js";
+import { DEFAULT_RUSH_MODE, RUSH, rushModeForId } from "./config.js";
 
 // How long the player gets on a given step. Clamped at the floor, so the game
 // stops getting harder rather than becoming impossible.
@@ -20,19 +20,24 @@ import { RUSH } from "./config.js";
 // than the first one.
 //
 // Called with a step alone -- the whole game did until techniques arrived --
-// it returns exactly what it always returned.
-export function limitFor(step, technique = null, units = 1) {
+// it returns exactly what it always returned: the advanced mode's ten-second
+// opening limit.
+export function limitFor(step, technique = null, units = 1, modeId = DEFAULT_RUSH_MODE) {
     if (!Number.isInteger(step) || step < 0) {
         throw new RangeError(`step must be a non-negative integer, got ${step}`);
     }
-    const base = Math.max(RUSH.LIMIT_FLOOR_MS, RUSH.LIMIT_INITIAL_MS - step * RUSH.LIMIT_DECAY_MS);
+    const mode = rushModeForId(modeId);
+    if (mode === null) throw new RangeError(`unknown rush mode: ${modeId}`);
+    const initial = mode.limitMs;
+    const floor = Math.min(RUSH.LIMIT_FLOOR_MS, initial);
+    const base = Math.max(floor, initial - step * RUSH.LIMIT_DECAY_MS);
     if (technique == null) return base;
 
     const bonus = RUSH.TIME_BONUS_MS[technique];
     if (bonus === undefined) throw new RangeError(`unknown technique: ${technique}`);
     const rank = Number.isInteger(units) && units >= 1 ? units : 1;
     const allowance = bonus + RUSH.EVIDENCE_TIME_BONUS_MS * (rank - 1);
-    return Math.min(RUSH.LIMIT_INITIAL_MS, base + allowance);
+    return Math.min(initial, base + allowance);
 }
 
 export function createClock(deps) {

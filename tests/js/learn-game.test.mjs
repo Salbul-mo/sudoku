@@ -10,6 +10,8 @@ import { installFakeDocument, fakeRoot } from "./helpers/fake-dom.mjs";
 
 const uninstall = installFakeDocument();
 const { createLearnGame } = await import("../../game/static/game/js/learn/learn-game.js");
+const { mountLearnShell } = await import("../../game/static/game/js/learn/learn-shell.js");
+const { mountLearnView } = await import("../../game/static/game/js/learn/learn-view.js");
 const { createProgress } = await import("../../game/static/game/js/learn/progress.js");
 const { buildCandidates, findEliminations, findAll } =
     await import("../../game/static/game/js/rush/techniques.js");
@@ -90,6 +92,128 @@ function candidateSpan(host, index, digit) {
 function pressCandidate(host, index, digit) {
     host.children[0].dispatch("pointerup", { target: candidateSpan(host, index, digit) });
 }
+
+function viewParts(root) {
+    const wrap = root.children[0];
+    return {
+        wrap,
+        instruction: wrap.children[0],
+        boardHost: wrap.children[1],
+        controls: wrap.children[2],
+        feedback: wrap.children[3],
+    };
+}
+
+test("T-E08-16: practice view puts instructions, board, controls and feedback in order", () => {
+    const root = fakeRoot();
+    const digits = [];
+    const view = mountLearnView(root, {
+        onDigit: (digit) => digits.push(digit),
+        onSubmit() {},
+        onNext() {},
+    });
+    const { wrap, instruction, boardHost, controls, feedback } = viewParts(root);
+
+    assert.deepEqual(wrap.children, [instruction, boardHost, controls, feedback]);
+    assert.equal(instruction.className, "learn-instruction");
+    assert.equal(boardHost.className, "board-area learn-board-area");
+    assert.equal(controls.className, "learn-controls");
+    assert.equal(feedback.className, "learn-feedback");
+    view.destroy();
+});
+
+test("T-E08-17: placement digit pad is touch-ready and delegates every digit", () => {
+    const root = fakeRoot();
+    const digits = [];
+    let nextCalls = 0;
+    const view = mountLearnView(root, {
+        onDigit: (digit) => digits.push(digit),
+        onSubmit() {},
+        onNext: () => { nextCalls++; },
+    });
+    const { instruction, controls, feedback } = viewParts(root);
+    const prompt = instruction.children[0];
+    const digitPrompt = controls.children[0];
+    const digitPad = controls.children[1];
+    const submit = controls.children[3];
+    const result = feedback.children[0];
+    const explanation = feedback.children[1];
+    const next = feedback.children[2].children[0];
+    const lesson = { kind: "placement", deduction: { technique: "naked-single" } };
+
+    view.showPrompt(lesson);
+    assert.equal(prompt.textContent, "강조된 칸에 들어갈 숫자를 아래에서 선택하세요.");
+    assert.equal(digitPrompt.textContent, "숫자를 선택하세요.");
+    assert.equal(digitPad.hidden, false);
+    assert.equal(digitPad.children.length, 9);
+    assert.ok(digitPad.children.every((button) => button.type === "button"));
+    assert.equal(submit.hidden, true);
+
+    digitPad.children[4].dispatch("click");
+    assert.deepEqual(digits, [5]);
+
+    view.showResult(false, lesson);
+    assert.equal(result.hidden, false);
+    assert.match(result.textContent, /아직 아닙니다/);
+    assert.equal(digitPad.hidden, false);
+    assert.ok(digitPad.children.every((button) => button.disabled !== true));
+
+    view.showResult(true, lesson);
+    assert.equal(digitPad.hidden, true);
+    assert.ok(digitPad.children.every((button) => button.disabled === true));
+    assert.equal(explanation.hidden, false);
+    assert.equal(next.hidden, false);
+    next.dispatch("click");
+    assert.equal(nextCalls, 1);
+    view.destroy();
+});
+
+test("T-E08-18: elimination keeps candidate controls and hides the digit pad", () => {
+    const root = fakeRoot();
+    let digitCalls = 0;
+    let submitCalls = 0;
+    const view = mountLearnView(root, {
+        onDigit: () => { digitCalls++; },
+        onSubmit: () => { submitCalls++; },
+        onNext() {},
+    });
+    const { controls, feedback } = viewParts(root);
+    const digitPad = controls.children[1];
+    const tally = controls.children[2];
+    const submit = controls.children[3];
+    const next = feedback.children[2].children[0];
+    const lesson = { kind: "elimination", deduction: { technique: "pointing" } };
+
+    view.showPrompt(lesson);
+    assert.equal(digitPad.hidden, true);
+    assert.equal(submit.hidden, false);
+    assert.equal(tally.hidden, false);
+    assert.equal(digitCalls, 0);
+
+    view.showMarkCount(2);
+    assert.equal(tally.textContent, "선택한 후보 2개");
+    submit.dispatch("click");
+    assert.equal(submitCalls, 1);
+
+    view.showResult(false, lesson);
+    assert.equal(submit.hidden, false);
+    assert.equal(next.hidden, true);
+    view.showResult(true, lesson);
+    assert.equal(submit.hidden, true);
+    assert.equal(next.hidden, false);
+    view.destroy();
+});
+
+test("T-E08-19: the practice shell has one visible page purpose before technique choices", () => {
+    const root = fakeRoot();
+    const shell = mountLearnShell(root, { onSelectTechnique() {} });
+    const header = root.children[0];
+    assert.equal(header.children[0].tagName, "h2");
+    assert.equal(header.children[0].textContent, "풀이 연습");
+    assert.equal(header.children[1].textContent, "기법별로 한 문제씩 풀어보세요.");
+    assert.equal(header.children[2].tagName, "h3");
+    shell.destroy();
+});
 
 test("T-E08-10: the board shows exactly the cells the deduction rests on", async () => {
     const host = fakeRoot();
@@ -228,6 +352,23 @@ test("T-E08-12: a placement is judged on the digit, with no submit step", async 
     game.lesson.answer(wrong);
     game.lesson.answer(position.deduction.digit);
     assert.equal(game.lesson.state(), "correct");
+});
+
+test("T-E08-20: the public answerDigit path retries wrong placement answers and locks after correct", async () => {
+    const { game, position, viewCalls } = harness("naked-single");
+    await game.start("naked-single");
+    assert.equal(typeof game.answerDigit, "function");
+
+    const wrong = position.deduction.digit === 9 ? 1 : position.deduction.digit + 1;
+    game.answerDigit(wrong);
+    assert.equal(viewCalls.results.at(-1), false);
+
+    game.answerDigit(position.deduction.digit);
+    assert.equal(viewCalls.results.at(-1), true);
+    const judgements = viewCalls.results.length;
+
+    game.answerDigit(wrong);
+    assert.equal(viewCalls.results.length, judgements, "a correct lesson ignores later input");
 });
 
 test("T-E08-13: missing dependencies are named, not discovered later", () => {

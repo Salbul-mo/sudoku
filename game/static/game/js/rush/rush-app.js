@@ -53,7 +53,7 @@ export function start(root) {
     const coarsePointer = globalThis.matchMedia?.("(pointer: coarse)")?.matches ?? false;
     const source = createPuzzleSource({ givens: RUSH.BOARD_GIVENS });
 
-    const view = mountRushView(viewHost, { onRestart: () => { void game.start(); } });
+    const view = mountRushView(viewHost, { onRestart: (mode) => { void game.start(mode); } });
 
     const game = createRushGame({
         source, shell, view, boardHost, controlsHost, announcer, settings,
@@ -92,7 +92,7 @@ export function start(root) {
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = t("retry.button");
-        button.addEventListener("click", () => { panel.remove(); void game.start(); });
+        button.addEventListener("click", () => { panel.remove(); void game.start(view.mode()); });
         panel.append(message, button);
         viewHost.appendChild(panel);
         button.focus();

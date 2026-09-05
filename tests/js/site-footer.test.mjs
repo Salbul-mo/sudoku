@@ -1,5 +1,4 @@
-// The footer every page carries, and the header switch it deliberately did not
-// become.
+// The footer every page carries, including the complete game-mode navigation.
 //
 // The footer is the only route to /learn/, /printable-sudoku/, /privacy/ and
 // /business/ from anywhere on the site, so "the link is present on all twelve

@@ -23,8 +23,23 @@
     inline-size: min(100%, var(--board-width));
 }
 
+.learn-page-title,
+.learn-page-subtitle,
 .learn-picker-label {
     margin: 0;
+}
+
+.learn-page-title {
+    font-size: 1.5rem;
+    line-height: 1.2;
+}
+
+.learn-page-subtitle {
+    color: var(--fg-candidate);
+    font-size: 0.9375rem;
+}
+
+.learn-picker-label {
     color: var(--fg-candidate);
     font-size: 0.8125rem;
     font-weight: 500;
@@ -89,8 +104,22 @@
 .learn-view {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     inline-size: min(100%, var(--board-width));
+}
+
+.learn-instruction,
+.learn-controls,
+.learn-feedback {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.learn-board-area {
+    display: flex;
+    justify-content: center;
+    inline-size: 100%;
 }
 
 .learn-prompt {
@@ -98,11 +127,47 @@
     font-size: 0.9375rem;
 }
 
+.learn-controls {
+    align-items: center;
+}
+
+.learn-digit-prompt,
 .learn-tally,
 .learn-explanation {
     margin: 0;
     color: var(--fg-candidate);
     font-size: 0.8125rem;
+}
+
+.learn-digit-prompt {
+    align-self: stretch;
+}
+
+.learn-digit-pad {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+    inline-size: min(100%, 360px);
+}
+
+.learn-digit {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-cell);
+    color: var(--fg-body);
+    font: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.learn-digit:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.learn-digit[disabled] {
+    opacity: 0.55;
+    cursor: default;
 }
 
 .learn-result {
@@ -124,6 +189,7 @@
     gap: 8px;
 }
 
+.learn-submit,
 .learn-actions button {
     padding: 8px 16px;
     border: 1px solid var(--line);
@@ -134,6 +200,7 @@
     cursor: pointer;
 }
 
+.learn-submit:focus-visible,
 .learn-actions button:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 1px;
