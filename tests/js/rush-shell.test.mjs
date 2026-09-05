@@ -82,7 +82,7 @@ test("T-B10-03: restart keeps the selected mode and mode change is a separate ac
     const options = panel.children[1];
     const pickerActions = panel.children[2];
     assert.equal(options.children.length, 4);
-    assert.equal(options.children.map((option) => option.textContent).join(" / "), "초급 (20초) / 중급 (15초) / 상급 (10초) / 도전 (7초)");
+    assert.equal(options.children.map((option) => option.textContent).join(" / "), "초급 (20초 · 점수 0.5배) / 중급 (15초 · 점수 0.75배) / 상급 (10초 · 점수 1배) / 도전 (7초 · 점수 1.5배)");
     options.children[3].dispatch("click");
     assert.equal(options.children[3].getAttribute("aria-pressed"), "true");
     assert.deepEqual(started, [], "choosing a draft mode does not restart until applied");

@@ -5,7 +5,7 @@
 // just without a saved best. state().persisted says which world we are in, so
 // the UI can decline to promise a record it cannot keep. This mirrors
 // state/settings.js, where a corrupt blob falls back to defaults quietly.
-import { RUSH, RUSH_STORAGE_KEY, pointsFor } from "./config.js";
+import { RUSH, RUSH_STORAGE_KEY, modePointsFor } from "./config.js";
 
 const SCHEMA_VERSION = 1;
 
@@ -52,15 +52,14 @@ export function createScore(deps = {}) {
         };
     }
 
-    // The technique and its evidence count price the cell; the combo
-    // multiplies it. Called with no arguments -- a step whose technique is not
-    // known, such as one the engine had to give away -- it scores exactly what
-    // it scored before techniques existed.
-    function hit(technique = null, units = 1) {
+    // The mode and technique price the cell; the combo multiplies it. Called
+    // with no arguments -- a step whose technique is not known, such as one
+    // the engine had to give away -- it uses the default mode's base price.
+    function hit(technique = null, units = 1, modeId) {
         step++;
         combo++;
         if (combo > bestCombo) bestCombo = combo;
-        score += pointsFor(technique, units) * Math.min(combo, RUSH.COMBO_CAP);
+        score += modePointsFor(technique, units, modeId) * Math.min(combo, RUSH.COMBO_CAP);
         return state();
     }
 

@@ -2,10 +2,10 @@
 // are the values that get changed after playing on a real phone rather than
 // reasoned out from the code.
 export const RUSH_MODES = Object.freeze([
-    Object.freeze({ id: "beginner", limitMs: 20_000 }),
-    Object.freeze({ id: "intermediate", limitMs: 15_000 }),
-    Object.freeze({ id: "advanced", limitMs: 10_000 }),
-    Object.freeze({ id: "challenge", limitMs: 7_000 }),
+    Object.freeze({ id: "beginner", limitMs: 20_000, scoreMultiplier: 0.5 }),
+    Object.freeze({ id: "intermediate", limitMs: 15_000, scoreMultiplier: 0.75 }),
+    Object.freeze({ id: "advanced", limitMs: 10_000, scoreMultiplier: 1 }),
+    Object.freeze({ id: "challenge", limitMs: 7_000, scoreMultiplier: 1.5 }),
 ]);
 
 // The existing rush mode started at ten seconds, so keep that behavior as the
@@ -112,13 +112,20 @@ export function difficultyFor(step) {
     return { allow: [...row.allow], assist: row.assist };
 }
 
-/** Points for one correct cell, before the combo multiplier. */
+/** Points for one correct cell, before the mode and combo multipliers. */
 export function pointsFor(technique, units = 1) {
     if (technique == null) return RUSH.POINTS_PER_HIT;
     const row = RUSH.TECHNIQUE_POINTS[technique];
     if (row === undefined) throw new RangeError(`unknown technique: ${technique}`);
     const rank = Number.isInteger(units) && units >= 1 ? units : 1;
     return row[Math.min(rank, row.length) - 1];
+}
+
+/** Integer points for one correct cell after the selected mode's multiplier. */
+export function modePointsFor(technique, units = 1, modeId = DEFAULT_RUSH_MODE) {
+    const mode = rushModeForId(modeId);
+    if (mode === null) throw new RangeError(`unknown rush mode: ${modeId}`);
+    return Math.round(pointsFor(technique, units) * mode.scoreMultiplier);
 }
 
 export const RUSH_STORAGE_KEY = "sudoku:v1:rush";

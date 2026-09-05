@@ -157,7 +157,7 @@ export function createRushGame(deps) {
         if (!correct && index !== null) store.clearCell(index);
         if (correct && target !== null) recordTiming(remaining);
         const state = correct
-            ? score.hit(target?.technique ?? null, target?.units?.length ?? 1)
+            ? score.hit(target?.technique ?? null, target?.units?.length ?? 1, rushMode)
             : score.miss();
         deps.shell.setStats(state);
         if (state.over) return gameOver();

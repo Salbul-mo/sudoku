@@ -52,6 +52,7 @@ export function mountRushView(root, deps = {}) {
         return t("rush.modeValue", {
             mode: t(`rush.mode.${mode.id}`),
             seconds: mode.limitMs / 1000,
+            multiplier: mode.scoreMultiplier,
         });
     }
 
@@ -114,6 +115,7 @@ export function mountRushView(root, deps = {}) {
             option.textContent = t("rush.modeOption", {
                 mode: t(`rush.mode.${mode.id}`),
                 seconds: mode.limitMs / 1000,
+                multiplier: mode.scoreMultiplier,
             });
             option.addEventListener("click", () => {
                 draftMode = mode.id;

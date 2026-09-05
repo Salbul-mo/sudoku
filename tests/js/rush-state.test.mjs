@@ -8,6 +8,7 @@ import {
     RUSH_MODES,
     RUSH_STORAGE_KEY,
     difficultyFor,
+    modePointsFor,
     pointsFor,
     rushModeForId,
 } from "../../game/static/game/js/rush/config.js";
@@ -56,12 +57,12 @@ test("T-B02-01: the step limit decays to the floor and never below it", () => {
 
 test("T-B10-01: Rush modes expose the requested opening limits", () => {
     assert.deepEqual(
-        RUSH_MODES.map(({ id, limitMs }) => [id, limitMs]),
+        RUSH_MODES.map(({ id, limitMs, scoreMultiplier }) => [id, limitMs, scoreMultiplier]),
         [
-            ["beginner", 20_000],
-            ["intermediate", 15_000],
-            ["advanced", 10_000],
-            ["challenge", 7_000],
+            ["beginner", 20_000, 0.5],
+            ["intermediate", 15_000, 0.75],
+            ["advanced", 10_000, 1],
+            ["challenge", 7_000, 1.5],
         ],
     );
     for (const { id, limitMs } of RUSH_MODES) {
@@ -285,6 +286,25 @@ test("T-B02-05: a cell is priced by its technique and by how far its evidence sp
     // a rare six-unit deduction is worth the most, not nothing.
     assert.equal(pointsFor("naked-single", 9), pointsFor("naked-single", 3));
     assert.throws(() => pointsFor("x-wing", 1), RangeError);
+});
+
+test("T-B10-05: Rush modes award different integer point values", () => {
+    const base = pointsFor("naked-single", 1);
+    const earned = RUSH_MODES.map(({ id }) => {
+        const score = createScore({ storage: null });
+        const state = score.hit("naked-single", 1, id);
+        assert.equal(state.score, modePointsFor("naked-single", 1, id), `${id} uses its mode rate`);
+        assert.equal(Number.isInteger(state.score), true, `${id} keeps scores integral`);
+        return state.score;
+    });
+
+    assert.deepEqual(earned, [
+        Math.round(base * 0.5),
+        Math.round(base * 0.75),
+        base,
+        Math.round(base * 1.5),
+    ]);
+    assert.ok(earned[0] < earned[1] && earned[1] < earned[2] && earned[2] < earned[3]);
 });
 
 test("T-B02-06: hit() with no arguments scores what it always scored", () => {

@@ -6,7 +6,7 @@ const uninstall = installFakeDocument();
 const { createRushGame } = await import("../../game/static/game/js/rush/rush-game.js");
 const { mountRushShell } = await import("../../game/static/game/js/rush/rush-shell.js");
 const { mountRushView } = await import("../../game/static/game/js/rush/rush-view.js");
-const { RUSH, RUSH_MODES, pointsFor } = await import("../../game/static/game/js/rush/config.js");
+const { RUSH, RUSH_MODES, modePointsFor } = await import("../../game/static/game/js/rush/config.js");
 const { generatePuzzle } = await import("../../functions/_lib/sudoku/generator.js");
 after(uninstall);
 
@@ -83,7 +83,7 @@ test("T-B04-01: the right digit in the marked cell scores, a wrong one costs a l
     // Priced by the deduction, not by a flat rate: a naked single backed by
     // two units is worth more than one backed by one, so the expectation has
     // to come from the same table the game scores against.
-    const expected = pointsFor(first.technique, first.units.length);
+    const expected = modePointsFor(first.technique, first.units.length, h2.game.mode);
     handle.store.setValue(first.index, first.digit);
     assert.equal(h2.game.state().score, expected, "a correct digit scores its technique's points");
     assert.equal(h2.game.state().lives, RUSH.LIVES);
@@ -94,6 +94,22 @@ test("T-B04-01: the right digit in the marked cell scores, a wrong one costs a l
     assert.equal(h2.game.state().lives, RUSH.LIVES - 1, "a wrong digit costs a life");
     assert.equal(h2.game.state().combo, 0, "and breaks the combo");
     h2.game.destroy();
+});
+
+test("T-B10-05: the selected Rush mode changes the points earned by a correct hit", async () => {
+    for (const mode of RUSH_MODES) {
+        let handle = null;
+        const h = harness({ game: { onBoardMounted: (parts) => { handle = parts; } } });
+        await h.game.start(mode.id);
+        const target = h.game.target;
+        handle.store.setValue(target.index, target.digit);
+        assert.equal(
+            h.game.state().score,
+            modePointsFor(target.technique, target.units.length, mode.id),
+            `${mode.id} applies its score multiplier`,
+        );
+        h.game.destroy();
+    }
 });
 
 test("T-B10-02: starting a run with a mode uses that mode's opening limit", async () => {
