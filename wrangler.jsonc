@@ -1,5 +1,5 @@
 {
-  "name": "sudoku-django-pages",
+  "name": "sudoku-pages",
   "pages_build_output_dir": "./game/static",
   "compatibility_date": "2026-08-02",
   // /api/new-puzzle/ now runs a real Dancing Links generation+digging pass

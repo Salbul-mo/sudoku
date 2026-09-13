@@ -4,7 +4,7 @@ import { MESSAGES } from '../game/static/game/js/i18n/messages.js';
 import { PAGE_CONTENT, CONTACT_EMAIL } from './page-content.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const templateRoot = path.join(root, 'game', 'templates', 'game');
+const templateRoot = path.join(root, 'tools', 'templates');
 const staticRoot = path.join(root, 'game', 'static');
 
 // The address Google indexes. Canonical and hreflang have to be absolute, so
@@ -112,31 +112,6 @@ const MANIFEST_ICONS = [
   { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
 ];
 
-// Asset URLs are site-absolute, so /en/index.html loads exactly the same files
-// as / without any depth-relative rewriting.
-//
-// The brand assets go through the same table for a second reason: they live at
-// the site root in production (game/static IS the deployed root), but Django
-// serves that directory under /static/, so writing "/favicon.ico" literally in
-// the template 404s every time the app is run locally.
-const replacements = new Map([
-  ["{% static 'favicon.ico' %}", '/favicon.ico'],
-  ["{% static 'icon.svg' %}", '/icon.svg'],
-  ["{% static 'apple-touch-icon.png' %}", '/apple-touch-icon.png'],
-  ["{% static 'game/css/content.css' %}", '/game/css/content.css'],
-  ["{% static 'game/css/printable.css' %}", '/game/css/printable.css'],
-  ["{% static 'game/js/printable-main.js' %}", '/game/js/printable-main.js'],
-  ["{% static 'game/css/learn.css' %}", '/game/css/learn.css'],
-  ["{% static 'game/js/learn-main.js' %}", '/game/js/learn-main.js'],
-  ["{% static 'game/css/rush.css' %}", '/game/css/rush.css'],
-  ["{% static 'game/js/rush-main.js' %}", '/game/js/rush-main.js'],
-  ["{% static 'game/css/tokens.css' %}", '/game/css/tokens.css'],
-  ["{% static 'game/css/layout.css' %}", '/game/css/layout.css'],
-  ["{% static 'game/css/board.css' %}", '/game/css/board.css'],
-  ["{% static 'game/css/chrome.css' %}", '/game/css/chrome.css'],
-  ["{% static 'game/js/main.js' %}", '/game/js/main.js'],
-]);
-
 function replaceExactlyOnce(source, marker, replacement) {
   const first = source.indexOf(marker);
   const second = first === -1 ? -1 : source.indexOf(marker, first + marker.length);
@@ -144,16 +119,6 @@ function replaceExactlyOnce(source, marker, replacement) {
     throw new Error(`expected exactly one template marker: ${marker}`);
   }
   return source.slice(0, first) + replacement + source.slice(first + marker.length);
-}
-
-// The asset table covers every template, and no template uses all of it -- the
-// classic page has no rush stylesheet and the rush page has no main.js. An
-// absent marker is therefore normal; a repeated one still is not. Anything that
-// should have been substituted and was not is caught by the leftover-Django
-// check at the end of build().
-function replaceAtMostOnce(source, marker, replacement) {
-  if (!source.includes(marker)) return source;
-  return replaceExactlyOnce(source, marker, replacement);
 }
 
 // Replaces the whole `<!-- i18n:name:start -->…<!-- i18n:name:end -->` span,
@@ -369,10 +334,6 @@ function manifestFor(locale) {
 function build(page) {
   const m = (key) => MESSAGES[page.locale][key];
   let html = fs.readFileSync(page.template, 'utf8');
-  html = replaceExactlyOnce(html, '{% load static %}', '');
-  for (const [marker, value] of replacements) {
-    html = replaceAtMostOnce(html, marker, value);
-  }
   html = replaceExactlyOnce(html, '<html lang="ko">', `<html lang="${page.locale}">`);
   html = replaceRegion(html, 'head', headFor(page).trimStart());
   if (page.content) {
@@ -385,7 +346,7 @@ function build(page) {
     html = replaceRegion(html, 'noscript', `<noscript>\n        <p>${escapeText(m(page.keys.noscript))}</p>\n    </noscript>`);
   }
   html = replaceRegion(html, 'footer', footerFor(page));
-  if (/{%|%}|{{|}}/.test(html)) throw new Error('leftover Django template markers');
+  if (/{%|%}|{{|}}/.test(html)) throw new Error('leftover template markers');
   if (/<!-- i18n:/.test(html)) throw new Error('leftover i18n region marker');
   return html;
 }

@@ -1,5 +1,5 @@
 // Puzzle generation: a random full grid, then holes dug while uniqueness
-// holds. Ported from game/sudoku/generator.py.
+// holds. This is the canonical production puzzle generator.
 import { CELLS, DIM } from "./spec.js";
 import { buildMatrix, search, DEFAULT_BUDGET } from "./dlx.js";
 import { rowsToBoard, alternativeExists, hasUniqueSolution } from "./solver.js";

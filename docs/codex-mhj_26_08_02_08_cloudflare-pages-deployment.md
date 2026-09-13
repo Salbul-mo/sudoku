@@ -4,11 +4,8 @@ This repository deploys `game/static` as a Cloudflare Pages site and exposes
 `functions/api/new-puzzle.js` as its only Pages Function. Every request runs a
 real Dancing Links (Algorithm X) generation-and-digging pass in the Worker
 itself -- there is no precomputed puzzle pool. The DLX engine, solver, and
-generator live under `functions/_lib/sudoku/` (`claude-mhj_26_08_05_01_spec.js`
-through `_04_generator.js`), ported from the Python reference implementation in
-`game/sudoku/`. Django source and `requirements.txt` remain in the repository
-as a rollback reference and as the app's local-development puzzle API; they
-are not required for the Cloudflare deployment.
+generator live under `functions/_lib/sudoku/`. This JavaScript implementation
+is the canonical runtime implementation for puzzle generation.
 
 ## Requirements
 
@@ -26,10 +23,9 @@ pathological search trees, not because generation is expected to approach it.
 Run from the repository root:
 
 ```powershell
-.\venv\Scripts\python.exe manage.py test
 node --test "tests/js/*.test.mjs"
-node tools/codex-mhj_26_08_02_05_build_pages.mjs --write
-node tools/codex-mhj_26_08_02_05_build_pages.mjs --check
+node tools/build_pages.mjs --write
+node tools/build_pages.mjs --check
 ```
 
 `node --test` covers the ported DLX engine (matrix pristine-state invariants),
@@ -51,7 +47,7 @@ local dependencies. Pages commands require the tool-mandated project-root
 
 ```powershell
 npx --yes wrangler@4.118.0 pages functions build functions --outfile .wrangler/codex-mhj_26_08_02_worker.js --metafile .wrangler/codex-mhj_26_08_02_metafile.json --minify
-npx --yes wrangler@4.118.0 pages dev --port 8788
+npx --yes wrangler@4.118.0 pages dev game/static --port 8788
 ```
 
 With local development running, verify both accepted URL forms, the method
@@ -83,14 +79,6 @@ so they cannot be fixed by editing code:
   not know this is a Pages project without the `pages` subcommand.
 - **Build command**: leave empty. `game/static` is already the final output;
   there is no build step to run.
-- **Environment variable `SKIP_DEPENDENCY_INSTALL=1`**: Cloudflare's build
-  image auto-detects `requirements.txt` at the repo root and runs
-  `pip install -r requirements.txt` before the deploy command, even though
-  Python is never invoked at request time (see above). This variable is
-  Cloudflare's documented way to skip that automatic dependency-install step
-  regardless of which language it detected. `requirements.txt` itself stays
-  in the repo (Django remains the local-dev/rollback path); this only stops
-  the Cloudflare build from installing it.
 
 ## Optional authenticated deployment
 
@@ -99,9 +87,8 @@ Wrangler session, on an account with the Workers Paid plan enabled. After local
 validation and deployment approval, run:
 
 ```powershell
-npx --yes wrangler@4.118.0 pages deploy game/static --project-name sudoku-django-pages
+npx --yes wrangler@4.118.0 pages deploy game/static --project-name sudoku-pages
 ```
 
 No D1, KV, R2, or upstream API is required. Runtime computation now happens
-entirely in JavaScript inside the Worker -- Python is not invoked at request
-time; it remains only as the local Django development server's puzzle source.
+entirely in JavaScript inside the Worker.

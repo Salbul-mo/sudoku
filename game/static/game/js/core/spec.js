@@ -1,5 +1,5 @@
 // dim=9 coordinate tables for the client. This is not a port of the server's
-// game/sudoku/spec.py (DV-04) -- the client only ever handles dim=9 and needs
+// The client only ever handles dim=9 and needs
 // no exact-cover constraint columns, just peer/unit lookups for rule checks.
 
 export const DIM = 9;

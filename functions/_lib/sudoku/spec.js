@@ -1,5 +1,5 @@
 // 9x9 Sudoku geometry: cell/box/candidate index math shared by the DLX
-// matrix builder, solver, and generator. Ported from game/sudoku/spec.py's
+// matrix builder, solver, and generator. This is the canonical geometry spec.
 // SudokuSpec(9, 3, 3) -- this module only needs the 9x9 case (the frontend
 // is hardcoded to dim=9 via game/static/game/js/core/spec.js), so the
 // general box_w/box_h parameterization from the Python version is not

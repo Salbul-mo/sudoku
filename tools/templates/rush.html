@@ -1,4 +1,4 @@
-{% load static %}
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -8,66 +8,64 @@
     <!-- i18n:head:start -->
     <!-- Everything inside an i18n region is regenerated per language by
          tools/build_pages.mjs, this comment included.
-         The Korean below is not a placeholder: Django serves this template
-         as-is for local development, so it has to stand on its own. -->
-    <title>스도쿠 러시 - 제한시간 안에 한 칸씩</title>
-    <meta name="description" content="제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠. 시간이 갈수록 짧아지는 제한시간과 콤보로 점수를 겨룹니다.">
+         The Korean below is the canonical source text for the default locale. -->
+    <title>?ㅻ룄荑??ъ떆 - ?쒗븳?쒓컙 ?덉뿉 ??移몄뵫</title>
+    <meta name="description" content="?쒗븳?쒓컙 ?덉뿉 ?뺤젙??移몄쓣 李얠븘 梨꾩슦???ㅽ뵾???ㅻ룄荑? ?쒓컙??媛덉닔濡?吏㏃븘吏???쒗븳?쒓컙怨?肄ㅻ낫濡??먯닔瑜?寃⑤９?덈떎.">
     <link rel="canonical" href="https://sudoku-bw7.pages.dev/rush/">
     <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/rush/">
     <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/rush/">
     <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/rush/">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sudoku-bw7.pages.dev/rush/">
-    <meta property="og:title" content="스도쿠 러시 - 제한시간 안에 한 칸씩">
-    <meta property="og:description" content="제한시간 안에 확정된 칸을 찾아 채우는 스피드 스도쿠.">
+    <meta property="og:title" content="?ㅻ룄荑??ъ떆 - ?쒗븳?쒓컙 ?덉뿉 ??移몄뵫">
+    <meta property="og:description" content="?쒗븳?쒓컙 ?덉뿉 ?뺤젙??移몄쓣 李얠븘 梨꾩슦???ㅽ뵾???ㅻ룄荑?">
     <meta property="og:locale" content="ko_KR">
     <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-rush-ko.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="스도쿠 러시">
+    <meta property="og:image:alt" content="?ㅻ룄荑??ъ떆">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-rush-ko.png">
     <!-- i18n:head:end -->
 
-    <link rel="icon" href="{% static 'favicon.ico' %}" sizes="48x48">
-    <link rel="icon" href="{% static 'icon.svg' %}" type="image/svg+xml" sizes="any">
-    <link rel="apple-touch-icon" href="{% static 'apple-touch-icon.png' %}">
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
 
-    <link rel="stylesheet" href="{% static 'game/css/tokens.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/layout.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/board.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/chrome.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/rush.css' %}">
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/board.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
+    <link rel="stylesheet" href="/game/css/rush.css">
 </head>
 <body>
     <!-- Outside #app on purpose: the entry point empties that element on boot,
          so a heading placed inside it would be destroyed. -->
     <!-- i18n:heading:start -->
-    <h1 class="visually-hidden">스도쿠 러시</h1>
+    <h1 class="visually-hidden">?ㅻ룄荑??ъ떆</h1>
     <!-- i18n:heading:end -->
 
     <main id="app" class="app-shell rush-app"></main>
 
     <!-- i18n:noscript:start -->
     <noscript>
-        <p>스도쿠 러시는 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를
-        켜면 게임이 나타납니다.</p>
+        <p>?ㅻ룄荑??ъ떆???먮컮?ㅽ겕由쏀듃濡??숈옉?⑸땲?? 釉뚮씪?곗??먯꽌 ?먮컮?ㅽ겕由쏀듃瑜?        耳쒕㈃ 寃뚯엫???섑??⑸땲??</p>
     </noscript>
     <!-- i18n:noscript:end -->
 
     <!-- i18n:footer:start -->
     <footer class="site-footer">
-        <nav aria-label="다른 페이지">
-            <a href="/">클래식</a>
-            <span aria-current="page">러시</span>
-            <a href="/learn/">풀이 연습</a>
+        <nav aria-label="?ㅻⅨ ?섏씠吏">
+            <a href="/">?대옒??/a>
+            <span aria-current="page">?ъ떆</span>
+            <a href="/learn/">????곗뒿</a>
         </nav>
     </footer>
     <!-- i18n:footer:end -->
 
-    <script type="module" src="{% static 'game/js/rush-main.js' %}"></script>
+    <script type="module" src="/game/js/rush-main.js"></script>
 </body>
 </html>

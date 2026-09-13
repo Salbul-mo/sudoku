@@ -1,5 +1,5 @@
 // Dancing Links (Algorithm X) over flat integer arrays, searched
-// iteratively. Ported from game/sudoku/dlx.py::DancingLinks -- same node
+// iteratively. Uses the same node-array representation as the original engine
 // layout (root + column headers + four body nodes per candidate row), same
 // cover/uncover primitives, same three-state (DESCEND/ADVANCE/BACKTRACK)
 // iterative search over an explicit stack. See that module's docstring for
@@ -8,7 +8,7 @@
 import { DIM, CELLS, CANDIDATE_COUNT, CONSTRAINT_COUNT, candidateIndex, columnsForPlacement } from "./spec.js";
 
 // Safety valve against pathological search trees, not a tuning knob --
-// mirrors game/sudoku/dlx.py::default_budget's 9x9 entry (200,000
+// The 9x9 default is 200,000
 // iterations bounds a single check to ~0.2s at the profiled throughput).
 export const DEFAULT_BUDGET = 200_000;
 
@@ -179,7 +179,7 @@ function unwind(matrix, stackCol, stackNode, depth) {
 
 // Explore the matrix iteratively, stopping after `limit` solutions.
 // Mirrors DancingLinks.search's three-state machine (DESCEND/ADVANCE/
-// BACKTRACK) over an explicit stack -- see game/sudoku/dlx.py for the full
+// BACKTRACK) over an explicit stack.
 // rationale. The matrix is always returned to its entry state, on every
 // exit path.
 export function search(matrix, options = {}) {

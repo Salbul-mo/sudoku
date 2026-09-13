@@ -18,7 +18,5 @@ dependency such as jsdom. What it cannot express (layout, computed style, real
 focus and pointer behavior) is verified against a real browser separately and
 reported as such; it is never silently assumed.
 
-This directory is served by nothing: `STATICFILES_DIRS` is not configured at
-all, and Django's app-directories finder only exposes `game/static/`. It is
-unrelated to `game/tests/` (the Django/Python test package, collected
-separately by `manage.py test`); the similar name is coincidental.
+This directory is test-only and is not part of the Cloudflare Pages output.
+The deployed site root remains `game/static/`.

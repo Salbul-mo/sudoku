@@ -7,7 +7,7 @@
 //
 // Prerequisites (two background processes, then this script):
 //
-//   python manage.py runserver 8731 --noreload
+//   npx wrangler pages dev game/static --port 8731
 //   chrome --headless=new --disable-gpu --remote-debugging-port=9222 \
 //          --user-data-dir=<scratch> about:blank
 //   node tools/browser-smoke.mjs

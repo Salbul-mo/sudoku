@@ -30,7 +30,7 @@ test('Pages build output, routes, and Wrangler config are exact contracts', () =
   assert.deepEqual(
     JSON.parse(withoutComments),
     {
-      name: 'sudoku-django-pages',
+      name: 'sudoku-pages',
       pages_build_output_dir: './game/static',
       compatibility_date: '2026-08-02',
       limits: { cpu_ms: 10000 },

@@ -1,5 +1,5 @@
 // Board-level solving on top of the reusable exact-cover matrix. Ported
-// from game/sudoku/solver.py. Unlike the Python version, there is no
+// The solver shares the same DLX representation as the generator. There is no
 // per-thread matrix cache: a Cloudflare Worker/Pages Function isolate runs
 // single-threaded JS, so one lazily-built module-level matrix is safe to
 // reuse across every call in the isolate's lifetime (search() always
@@ -112,7 +112,7 @@ export function hasUniqueSolution(board, budget = DEFAULT_BUDGET) {
 // A budget overrun is folded into `true` ("an alternative might exist, not
 // proven safe to remove") so the digging loop in generator.js can treat the
 // return value as a plain "keep this clue?" boolean, matching
-// game/sudoku/generator.py::dig_holes's `rival is False` check.
+// generator's `rival === false` uniqueness check.
 export function alternativeExists(board, index, excludeDigit, budget = DEFAULT_BUDGET) {
     const matrix = matrixFor();
     const probe = board.slice();

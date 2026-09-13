@@ -1,4 +1,4 @@
-{% load static %}
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -8,38 +8,37 @@
     <!-- i18n:head:start -->
     <!-- Everything inside an i18n region is regenerated per language by
          tools/build_pages.mjs, this comment included.
-         The Korean below is not a placeholder: Django serves this template
-         as-is for local development, so it has to stand on its own. -->
-    <title>스도쿠 - 매번 새로 만드는 무료 온라인 퍼즐</title>
-    <meta name="description" content="힌트 갯수를 골라 새 퍼즐을 만드는 무료 온라인 스도쿠. 매번 새로 생성되며 정답이 하나뿐인 것이 보장됩니다. 설치 없이 브라우저에서 바로, 키보드와 터치 모두 지원합니다.">
+         The Korean below is the canonical source text for the default locale. -->
+    <title>?ㅻ룄荑?- 留ㅻ쾲 ?덈줈 留뚮뱶??臾대즺 ?⑤씪???쇱쫹</title>
+    <meta name="description" content="?뚰듃 媛?닔瑜?怨⑤씪 ???쇱쫹??留뚮뱶??臾대즺 ?⑤씪???ㅻ룄荑? 留ㅻ쾲 ?덈줈 ?앹꽦?섎ŉ ?뺣떟???섎굹肉먯씤 寃껋씠 蹂댁옣?⑸땲?? ?ㅼ튂 ?놁씠 釉뚮씪?곗??먯꽌 諛붾줈, ?ㅻ낫?쒖? ?곗튂 紐⑤몢 吏?먰빀?덈떎.">
     <link rel="canonical" href="https://sudoku-bw7.pages.dev/">
     <link rel="alternate" hreflang="ko" href="https://sudoku-bw7.pages.dev/">
     <link rel="alternate" hreflang="en" href="https://sudoku-bw7.pages.dev/en/">
     <link rel="alternate" hreflang="x-default" href="https://sudoku-bw7.pages.dev/">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sudoku-bw7.pages.dev/">
-    <meta property="og:title" content="스도쿠 - 매번 새로 만드는 무료 온라인 퍼즐">
-    <meta property="og:description" content="힌트 갯수를 골라 새 퍼즐을 만드는 무료 온라인 스도쿠. 정답이 하나뿐인 것이 보장됩니다.">
+    <meta property="og:title" content="?ㅻ룄荑?- 留ㅻ쾲 ?덈줈 留뚮뱶??臾대즺 ?⑤씪???쇱쫹">
+    <meta property="og:description" content="?뚰듃 媛?닔瑜?怨⑤씪 ???쇱쫹??留뚮뱶??臾대즺 ?⑤씪???ㅻ룄荑? ?뺣떟???섎굹肉먯씤 寃껋씠 蹂댁옣?⑸땲??">
     <meta property="og:locale" content="ko_KR">
     <meta property="og:image" content="https://sudoku-bw7.pages.dev/og-classic-ko.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="스도쿠">
+    <meta property="og:image:alt" content="?ㅻ룄荑?>
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://sudoku-bw7.pages.dev/og-classic-ko.png">
     <!-- i18n:head:end -->
 
-    <link rel="icon" href="{% static 'favicon.ico' %}" sizes="48x48">
-    <link rel="icon" href="{% static 'icon.svg' %}" type="image/svg+xml" sizes="any">
-    <link rel="apple-touch-icon" href="{% static 'apple-touch-icon.png' %}">
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <meta name="theme-color" content="#E8E7E3" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
 
-    <link rel="stylesheet" href="{% static 'game/css/tokens.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/layout.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/board.css' %}">
-    <link rel="stylesheet" href="{% static 'game/css/chrome.css' %}">
+    <link rel="stylesheet" href="/game/css/tokens.css">
+    <link rel="stylesheet" href="/game/css/layout.css">
+    <link rel="stylesheet" href="/game/css/board.css">
+    <link rel="stylesheet" href="/game/css/chrome.css">
 </head>
 <body>
     <!-- Outside #app on purpose: app.js empties that element on boot, so a
@@ -47,28 +46,27 @@
          the board is the page's visual title, but a document with no h1 at
          all is worse for both crawlers and screen readers. -->
     <!-- i18n:heading:start -->
-    <h1 class="visually-hidden">스도쿠</h1>
+    <h1 class="visually-hidden">?ㅻ룄荑?/h1>
     <!-- i18n:heading:end -->
 
     <main id="app"></main>
 
     <!-- i18n:noscript:start -->
     <noscript>
-        <p>이 스도쿠는 자바스크립트로 동작합니다. 브라우저에서 자바스크립트를
-        켜면 퍼즐이 나타납니다.</p>
+        <p>???ㅻ룄荑좊뒗 ?먮컮?ㅽ겕由쏀듃濡??숈옉?⑸땲?? 釉뚮씪?곗??먯꽌 ?먮컮?ㅽ겕由쏀듃瑜?        耳쒕㈃ ?쇱쫹???섑??⑸땲??</p>
     </noscript>
     <!-- i18n:noscript:end -->
 
     <!-- i18n:footer:start -->
     <footer class="site-footer">
-        <nav aria-label="다른 페이지">
-            <span aria-current="page">클래식</span>
-            <a href="/rush/">러시</a>
-            <a href="/learn/">풀이 연습</a>
+        <nav aria-label="?ㅻⅨ ?섏씠吏">
+            <span aria-current="page">?대옒??/span>
+            <a href="/rush/">?ъ떆</a>
+            <a href="/learn/">????곗뒿</a>
         </nav>
     </footer>
     <!-- i18n:footer:end -->
 
-    <script type="module" src="{% static 'game/js/main.js' %}"></script>
+    <script type="module" src="/game/js/main.js"></script>
 </body>
 </html>

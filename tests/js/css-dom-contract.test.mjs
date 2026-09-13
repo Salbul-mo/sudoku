@@ -68,7 +68,7 @@ test("the 48px control floor reaches the buttons the modules actually build", ()
 
 test("every stylesheet the template loads exists and is non-empty", async () => {
     const template = await readFile(
-        new URL("../../game/templates/game/index.html", import.meta.url), "utf8");
+        new URL("../../tools/templates/index.html", import.meta.url), "utf8");
     for (const name of CSS_FILES) {
         assert.ok(template.includes(`game/css/${name}`), `${name} is not linked from index.html`);
         const source = await readFile(
